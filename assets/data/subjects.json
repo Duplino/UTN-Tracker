@@ -1,0 +1,58 @@
+{
+  "groups": [
+    {
+      "id": "g1",
+      "name": "Primer Año - A",
+      "color": "#007bff",
+      "subjects": [
+        { "code": "MAT101", "name": "Álgebra I", "credits": 6, "grade": 7.5 },
+        { "code": "F1", "name": "Física I", "credits": 6, "grade": 6.0 },
+        { "code": "AM1", "name": "Análisis Matemático I", "credits": 6, "grade": 6.0 },
+        { "code": "AGA", "name": "Álgebra y Geometría Analítica", "credits": 6, "grade": 6.0 },
+        { "code": "AyED", "name": "Algoritmos y Estructura de Datos", "credits": 6, "grade": 6.0 },
+        { "code": "AdC", "name": "Arquitectura de Computadores", "credits": 6, "grade": 6.0 },
+        { "code": "InglesI", "name": "Inglés Técnico Nivel I", "credits": 6, "grade": 6.0 },
+        { "code": "LyED", "name": "Lógica y Estructuras Discretas", "credits": 6, "grade": 6.0 },
+        { "code": "SyPdN", "name": "Sistemas y Procesos de Negocio", "credits": 6, "grade": 6.0 }
+      ]
+    },
+    {
+      "id": "g2",
+      "name": "Primer Año - B",
+      "color": "#28a745",
+      "subjects": [
+        { "code": "AM2", "name": "Análisis Matemático II", "credits": 6, "grade": 6.0, "requires": ["AGA", "AM1"] },
+        { "code": "F2", "name": "Física II", "credits": 6, "grade": 6.0, "requires": ["F1", "AM1"] },
+        { "code": "IyS", "name": "Ingeniería y Sociedad", "credits": 6, "grade": 6.0},
+        { "code": "SSL", "name": "Sintaxis y Semántica de los Lenguajes", "credits": 6, "grade": 6.0, "requires": ["LyED", "AyED"] }
+      ]
+    },
+    {
+      "id": "g3",
+      "name": "Segundo Año - A",
+      "color": "#ffc107",
+      "subjects": [
+        { "code": "EDA201", "name": "Estructuras de Datos", "credits": 7, "grade": 5.5 },
+        { "code": "BD201", "name": "Bases de Datos", "credits": 6, "grade": 7.0 }
+      ]
+    },
+    {
+      "id": "g4",
+      "name": "Tercer Año - A",
+      "color": "#6f42c1",
+      "subjects": [
+        { "code": "SIS301", "name": "Sistemas Operativos", "credits": 7, "grade": null },
+        { "code": "RED301", "name": "Redes", "credits": 5, "grade": 6.8 }
+      ]
+    },
+    {
+      "id": "g5",
+      "name": "Cuarto Año - A",
+      "color": "#fd7e14",
+      "subjects": [
+        { "code": "ENG401", "name": "Inglés Técnico", "credits": 3, "grade": 9.0 , "requires": ["MAT101"]},
+        { "code": "ECO401", "name": "Economía", "credits": 4, "grade": 6.2 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+/* Custom styles for 5-column layout and cards */
+:root{
+  --gap: 1rem;
+}
+body{
+  padding:1.5rem;
+  background:#f8f9fa;
+}
+.toolbar{
+  display:flex;
+  gap:0.5rem;
+  margin-bottom:1rem;
+}
+.columns-grid{
+  display:grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--gap);
+  align-items:start;
+  margin-bottom:1.25rem;
+}
+
+/* Make container for overlay positioning */
+.columns-grid{
+  position: relative;
+}
+.card-subject{
+  margin-bottom:0.75rem;
+}
+.stats-row{
+  display:flex;
+  gap:1rem;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.stat-card{
+  flex:1 1 200px;
+}
+.progress-wrap{
+  margin-top:0.75rem;
+}
+/* Responsive: stack columns on small screens */
+@media (max-width: 992px){
+  .columns-grid{
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 600px){
+  .columns-grid{
+    grid-template-columns: repeat(1, 1fr);
+  }
+  .toolbar{flex-wrap:wrap}
+}
+
+/* Use full width for large screens */
+@media (min-width: 992px) {
+  .container-fluid {
+    max-width: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .columns-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* Progress bar styles moved from inline */
+.progress {
+  height: 18px;
+}
+#progress-bar {
+  width: 0%;
+}
+
+/* SVG overlay for arrows */
+.overlay-svg{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.arrow-line{
+  stroke: rgba(0,0,0,0.7);
+  stroke-width: 2;
+  fill: none;
+}
+
+.arrow-head{
+  fill: rgba(0,0,0,0.7);
+}
+
+/* Dim non-involved cards and highlight involved ones */
+.card-dim{
+  opacity: 0.25;
+  filter: grayscale(70%);
+  transition: opacity 180ms ease, filter 180ms ease, transform 180ms ease;
+}
+
+.card-highlight{
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  transform: translateY(-2px);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
