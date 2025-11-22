@@ -2,56 +2,74 @@
   "groups": [
     {
       "id": "g1",
-      "name": "Primer Año - A",
+      "name": "Primer Nivel",
       "color": "#007bff",
       "subjects": [
-        { "code": "MAT101", "name": "Álgebra I", "credits": 6, "grade": 7.5 },
-        { "code": "F1", "name": "Física I", "credits": 6, "grade": 6.0 },
-        { "code": "AM1", "name": "Análisis Matemático I", "credits": 6, "grade": 6.0 },
-        { "code": "AGA", "name": "Álgebra y Geometría Analítica", "credits": 6, "grade": 6.0 },
-        { "code": "AyED", "name": "Algoritmos y Estructura de Datos", "credits": 6, "grade": 6.0 },
-        { "code": "AdC", "name": "Arquitectura de Computadores", "credits": 6, "grade": 6.0 },
-        { "code": "InglesI", "name": "Inglés Técnico Nivel I", "credits": 6, "grade": 6.0 },
-        { "code": "LyED", "name": "Lógica y Estructuras Discretas", "credits": 6, "grade": 6.0 },
-        { "code": "SyPdN", "name": "Sistemas y Procesos de Negocio", "credits": 6, "grade": 6.0 }
+        { "code": "SyPdN", "name": "Sistemas y Procesos de Negocio"},
+        { "code": "F1", "name": "Física I"},
+        { "code": "AM1", "name": "Análisis Matemático I"},
+        { "code": "AGA", "name": "Álgebra y Geometría Analítica"},
+        { "code": "AyED", "name": "Algoritmos y Estructura de Datos"},
+        { "code": "AdC", "name": "Arquitectura de Computadores"},
+        { "code": "InglesI", "name": "Inglés Técnico Nivel I"},
+        { "code": "LyED", "name": "Lógica y Estructuras Discretas"}
+        
       ]
     },
     {
       "id": "g2",
-      "name": "Primer Año - B",
+      "name": "Segundo Nivel",
       "color": "#28a745",
       "subjects": [
-        { "code": "AM2", "name": "Análisis Matemático II", "credits": 6, "grade": 6.0, "requires": ["AGA", "AM1"] },
-        { "code": "F2", "name": "Física II", "credits": 6, "grade": 6.0, "requires": ["F1", "AM1"] },
-        { "code": "IyS", "name": "Ingeniería y Sociedad", "credits": 6, "grade": 6.0},
-        { "code": "SSL", "name": "Sintaxis y Semántica de los Lenguajes", "credits": 6, "grade": 6.0, "requires": ["LyED", "AyED"] }
+        { "code": "ASI", "name": "Análisis de Sistemas de Información", "requirements": { "cursar": [{ "id": "AyED", "type": "regularizada" }, { "id": "SyPdN", "type": "regularizada" }] } },
+        { "code": "AM2", "name": "Análisis Matemático II", "requirements": { "cursar": [{ "id": "AGA", "type": "regularizada" }, { "id": "AM1", "type": "regularizada" }]} },
+        { "code": "F2", "name": "Física II", "requirements": { "cursar": [ { "id": "F1", "type": "regularizada" }, { "id": "AM1", "type": "regularizada" } ] } },
+        { "code": "IyS", "name": "Ingeniería y Sociedad"},
+        { "code": "SySL", "name": "Sintaxis y Semántica de los Lenguajes", "requirements": { "cursar": [ { "id": "LyED", "type": "regularizada" }, { "id": "AyED", "type": "regularizada" } ] } },
+        { "code": "PdP", "name": "Paradigmas de Programación", "requirements": { "cursar": [ { "id": "LyED", "type": "regularizada" }, { "id": "AyED", "type": "regularizada" } ] } },
+        { "code": "SSOO", "name": "Sistemas Operativos", "requirements": { "cursar": [{ "id": "AdC", "type": "regularizada" }] } },
+        { "code": "InglesII", "name": "Inglés Técnico Nivel II", "requirements": { "cursar": [{ "id": "InglesI", "type": "regularizada" }]} }
       ]
     },
     {
       "id": "g3",
-      "name": "Segundo Año - A",
+      "name": "Tercer Nivel",
       "color": "#ffc107",
       "subjects": [
-        { "code": "EDA201", "name": "Estructuras de Datos", "credits": 7, "grade": 5.5 },
-        { "code": "BD201", "name": "Bases de Datos", "credits": 6, "grade": 7.0 }
+        { "code": "DSI", "name": "Diseño de Sistemas de Información", "requirements": { "cursar": [{ "id": "PdP", "type": "regularizada" }, { "id": "ASI", "type": "regularizada" }, { "id": "InglesI", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" }, { "id": "SyPdN", "type": "aprobada" }]} },
+        { "code": "PyE", "name": "Probabilidad y Estadística", "requirements": { "cursar": [{ "id": "AGA", "type": "regularizada" },{ "id": "AM1", "type": "regularizada" }] } },
+        { "code": "ECO", "name": "Economía", "requirements": { "cursar": [ { "id": "AGA", "type": "aprobada" }, { "id": "AM1", "type": "aprobada" } ] } },
+        { "code": "BD", "name": "Bases de Datos", "requirements": {"cursar": [ { "id": "SySL", "type": "regularizada" }, { "id": "ASI", "type": "regularizada" }, { "id": "LyED", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" } ] } },
+        { "code": "DdS", "name": "Desarrollo de Software", "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "LyED", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" }, { "id": "PdP", "type": "regularizada" } ] } },
+        { "code": "CD", "name": "Comunicación de Datos", "requirements": {"cursar": [ { "id": "F1", "type": "aprobada" }, { "id": "AdC", "type": "aprobada" } ] } },
+        { "code": "AN", "name": "Análisis Numérico", "requirements": {"cursar": [ { "id": "AM2", "type": "regularizada" }, { "id": "AM1", "type": "aprobada" }, { "id": "AGA", "type": "aprobada" } ] } }
       ]
     },
     {
       "id": "g4",
-      "name": "Tercer Año - A",
-      "color": "#6f42c1",
-      "subjects": [
-        { "code": "SIS301", "name": "Sistemas Operativos", "credits": 7, "grade": null },
-        { "code": "RED301", "name": "Redes", "credits": 5, "grade": 6.8 }
-      ]
-    },
-    {
-      "id": "g5",
-      "name": "Cuarto Año - A",
+      "name": "Cuarto Nivel",
       "color": "#fd7e14",
       "subjects": [
-        { "code": "ENG401", "name": "Inglés Técnico", "credits": 3, "grade": 9.0 , "requires": ["MAT101"]},
-        { "code": "ECO401", "name": "Economía", "credits": 4, "grade": 6.2 }
+        { "code": "AdmSI", "name": "Administración de Sistemas de Información", "requirements": { "cursar": [ { "id": "ECO", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "ASI", "type": "aprobada" } ], "aprobar": [] } },
+        { "code": "Leg", "name": "Legislación", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "IngSoc", "type": "aprobada" } ], "aprobar": [] } },
+        { "code": "IyCS", "name": "Ingeniería y Calidad de Software", "requirements": { "cursar": [ { "id": "BD", "type": "regularizada" }, { "id": "DdS", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "SySL", "type": "aprobada" }, { "id": "PdP", "type": "aprobada" } ], "aprobar": [] } },
+        { "code": "RD", "name": "Redes de Datos", "requirements": { "cursar": [ { "id": "SSOO", "type": "regularizada" }, { "id": "CD", "type": "regularizada" } ], "aprobar": [] } },
+        { "code": "IO", "name": "Investigación Operativa", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "AN", "type": "regularizada" } ], "aprobar": [] } },
+        { "code": "Sim", "name": "Simulación", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "AM2", "type": "aprobada" } ], "aprobar": [] } },
+        { "code": "TpA", "name": "Tecnologías para la Automatización", "requirements": { "cursar": [ { "id": "F2", "type": "regularizada" }, { "id": "AN", "type": "regularizada" }, { "id": "AM2", "type": "aprobada" } ], "aprobar": [] } }
+      ]
+    }
+    ,
+    {
+      "id": "g6",
+      "name": "Quinto Nivel",
+      "color": "#17a2b8",
+      "subjects": [
+        { "code": "IA", "name": "Inteligencia Artificial", "requirements": { "cursar": [ { "id": "Sim", "type": "regularizada" }, { "id": "PyE", "type": "aprobada" }, { "id": "AN", "type": "aprobada" } ], "aprobar": [] } },
+        { "code": "CdC", "name": "Ciencia de Datos", "requirements": { "cursar": [ { "id": "Sim", "type": "regularizada" }, { "id": "PyE", "type": "aprobada" }, { "id": "BD", "type": "aprobada" } ], "aprobar": [] } },
+        { "code": "SG", "name": "Sistemas de Gestión", "requirements": { "cursar": [ { "id": "ECO", "type": "regularizada" }, { "id": "IO", "type": "regularizada" }, { "id": "DSI", "type": "aprobada" } ], "aprobar": [] } },
+        { "code": "GC", "name": "Gestión Gerencial", "requirements": { "cursar": [ { "id": "Leg", "type": "regularizada" }, { "id": "AdmSI", "type": "regularizada" }, { "id": "ECO", "type": "aprobada" } ], "aprobar": [] } },
+        { "code": "SSI", "name": "Seguridad en los Sistemas de Información", "requirements": { "cursar": [ { "id": "RD", "type": "regularizada" }, { "id": "AdmSI", "type": "regularizada" }, { "id": "DdS", "type": "aprobada" }, { "id": "CD", "type": "aprobada" } ], "aprobar": [] } }
       ]
     }
   ]

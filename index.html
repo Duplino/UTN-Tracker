@@ -26,6 +26,12 @@
 					<input class="form-check-input" type="checkbox" id="toggle-correlativas" role="switch" aria-checked="true">
 					<label class="form-check-label" for="toggle-correlativas">Mostrar correlativas</label>
 				</div>
+				<!-- Help button to explain arrow legend -->
+				<div class="ms-2">
+					<button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#helpModal" id="btn-help">
+						Ayuda
+					</button>
+				</div>
 			</div>
 
 			<!-- Columns with subject cards -->
@@ -68,5 +74,102 @@
 
 		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 		<script src="assets/js/index.js"></script>
+
+		<!-- Help modal explaining correlativas legend -->
+		<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="helpModalLabel">Leyenda de correlativas</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <p>Las correlativas se muestran con flechas que indican dependencias entre materias:</p>
+		        <ul>
+		          <li><strong>Flechas negras</strong>: requisito <em>para cursar</em> (asistencia/inscripción).</li>
+		          <li><strong>Flechas verdes</strong>: requisito <em>para aprobar</em> (condición para la calificación final).</li>
+		        </ul>
+		        <p>Para los requisitos <em>para aprobar</em> hay dos estados:</p>
+		        <ul>
+		          <li>Linea continua: la materia debe estar <strong>aprobada</strong>.</li>
+		          <li>Linea punteada: la materia puede estar <strong>regularizada</strong> (no necesariamente aprobada).</li>
+		        </ul>
+		        <p>Ejemplo:</p>
+				<div class="d-flex gap-2 align-items-center">
+					<svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" marker-end="url(#help-arrow-black)"></path></svg>
+					<span>Requisito para cursar - aprobado (negro, continuo)</span>
+				</div>
+				<div class="d-flex gap-2 align-items-center">
+					<svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-black)"></path></svg>
+					<span>Requisito para cursar - regularizada (negro, punteado)</span>
+				</div>
+				<div class="d-flex gap-2 align-items-center mt-2">
+					<svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" marker-end="url(#help-arrow-green)"></path></svg>
+					<span>Requisito para aprobar - aprobado (verde, continuo)</span>
+				</div>
+				<div class="d-flex gap-2 align-items-center mt-2">
+					<svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-green)"></path></svg>
+					<span>Requisito para aprobar - regularizada (verde, punteado)</span>
+				</div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- Subject modal for entering parciales and finales -->
+		<div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="subjectModalLabel">Materia</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+				<form id="subject-form">
+					<!-- PRIMER PARCIAL: input-group with three inputs -->
+					<div class="mb-2">
+						<label class="form-label">PRIMER PARCIAL</label>
+						<div id="parcial1-group" class="input-group" role="group" aria-label="Primer parcial">
+							<input id="parcial1_1" data-attempt="1" type="number" min="0" max="10" step="0.1" class="form-control" placeholder="A" />
+							<input id="parcial1_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
+							<input id="parcial1_3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
+						</div>
+					</div>
+
+					<!-- SEGUNDO PARCIAL: input-group with three inputs -->
+					<div class="mb-3">
+						<label class="form-label">SEGUNDO PARCIAL</label>
+						<div id="parcial2-group" class="input-group" role="group" aria-label="Segundo parcial">
+							<input id="parcial2_1" data-attempt="1" type="number" min="0" max="10" step="0.1" class="form-control" placeholder="A" />
+							<input id="parcial2_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
+							<input id="parcial2_3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
+						</div>
+					</div>
+
+					<!-- Finales: four inputs on a single group row -->
+					<div class="mb-3">
+						<label class="form-label">Finales</label>
+						<div id="finals-container" class="input-group" role="group" aria-label="Notas de finales">
+							<input id="final1" data-attempt="1" type="number" min="0" max="10" step="0.1" class="form-control" placeholder="Final 1">
+							<input id="final2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Final 2">
+							<input id="final3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Final 3">
+							<input id="final4" data-attempt="4" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Final 4">
+						</div>
+					</div>
+				</form>
+
+				<!-- Dynamic status banner (updated live) -->
+				<div id="subject-status" class="mt-3" aria-live="polite" aria-atomic="true"></div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		        <button type="button" class="btn btn-primary" id="subject-save">Guardar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
 	</body>
 </html>

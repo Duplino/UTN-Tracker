@@ -1,6 +1,6 @@
 /* Custom styles for 5-column layout and cards */
 :root{
-  --gap: 1rem;
+  --gap: 0.5rem;
 }
 body{
   padding:1.5rem;
@@ -24,7 +24,15 @@ body{
   position: relative;
 }
 .card-subject{
-  margin-bottom:0.75rem;
+  margin-bottom:0.35rem;
+}
+/* Make card bodies more compact */
+.card-subject .card-body{
+  padding: 0.45rem !important;
+}
+.card-title{
+  font-size: 0.95rem;
+  line-height:1.05;
 }
 .stats-row{
   display:flex;
@@ -83,13 +91,26 @@ body{
 }
 
 .arrow-line{
-  stroke: rgba(0,0,0,0.7);
   stroke-width: 2;
   fill: none;
 }
 
 .arrow-head{
-  fill: rgba(0,0,0,0.7);
+  /* marker fills are set in the SVG defs so they match stroke color */
+  fill: currentColor;
+}
+
+/* dashed variant for regularizada requirements */
+.arrow-dashed{
+  stroke-dasharray: 6,4;
+}
+
+/* optional helper classes (JS sets stroke colors inline) */
+.arrow-aprobar{
+  stroke: #28a745;
+}
+.arrow-cursar{
+  stroke: #000;
 }
 
 /* Dim non-involved cards and highlight involved ones */
