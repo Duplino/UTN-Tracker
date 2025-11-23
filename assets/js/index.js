@@ -575,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // remove after animation
       setTimeout(() => {
         try{ target.classList.remove('req-highlight'); }catch(e){}
-      }, 900);
+      }, 800);
     });
   }
 
