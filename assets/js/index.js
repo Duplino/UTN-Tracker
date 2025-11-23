@@ -114,6 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.textContent = label;
     // handler: clear stored data for this subject and reset inputs
     btn.addEventListener('click', () => {
+      // animate unlocks: capture available-before, remove data, then capture after and animate
+      let prevAvailable = [];
+      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
       const key = getSubjectStorageKey(code);
       if (key) localStorage.removeItem(key);
       // clear inputs
@@ -138,9 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // clear status banner
       const statusContainer = document.getElementById('subject-status');
       if (statusContainer) statusContainer.innerHTML = '';
-      // remove card styling and re-evaluate cursar state
-      if (currentCard) applyCardStatusStyle(currentCard, null);
-      updateAllCardCursarState();
+  // remove card styling and re-evaluate cursar state
+  if (currentCard) applyCardStatusStyle(currentCard, null);
+  updateAllCardCursarState();
+  try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
       // remove the button itself
       btn.remove();
       // close modal after dar de baja
@@ -424,6 +428,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.textContent = 'Empezar';
 
         btn.addEventListener('click', () => {
+          // animate unlocks: capture available-before, save minimal stored object, then animate any newly unlocked
+          let prevAvailable = [];
+          try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
           // create minimal stored object
           const obj = { values: {}, status: 'Faltan examenes', savedAt: (new Date()).toISOString() };
           saveSubjectData(effectiveCode, obj);
@@ -470,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // update visuals
           applyCardStatusStyle(currentCard, null);
           updateAllCardCursarState();
+          try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
           try{ computeStats(displayedSubjects); }catch(e){}
           // remove the big start wrapper
           wrap.remove();
@@ -497,6 +505,9 @@ document.addEventListener('DOMContentLoaded', () => {
           const newSel = overrideSel.cloneNode(true);
           overrideSel.parentNode.replaceChild(newSel, overrideSel);
           newSel.addEventListener('change', () => {
+            // before changing override, capture available subjects
+            let prev = [];
+            try{ prev = getAvailableSubjectCodes(); }catch(e){}
             let s = loadSubjectData(effectiveCode || '') || {};
             const val = newSel.value;
             if (val === 'computed'){
@@ -510,6 +521,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setStatusBanner(applyStatus || '');
             applyCardStatusStyle(currentCard, (val === 'computed') ? (s && s.status ? s.status : null) : val);
             try{ computeStats(displayedSubjects); }catch(e){}
+            // re-evaluate cursar state and animate newly unlocked subjects
+            try{ updateAllCardCursarState(); const now = getAvailableSubjectCodes(); animateNewlyUnlocked(prev, now); }catch(e){}
             try{
               const modalEl = document.getElementById('subjectModal');
               if (modalEl){
@@ -529,6 +542,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const saveBtn = document.getElementById('subject-save');
       if (saveBtn){
         const handler = () => {
+          // capture available-before to animate newly unlocked after save
+          let prevAvailable = [];
+          try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
           const values = {};
           ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
             const i = document.getElementById(id);
@@ -557,6 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
           applyCardStatusStyle(currentCard, statusText);
           // after saving, re-evaluate cursar state for all cards (some may unlock)
           updateAllCardCursarState();
+          try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
           // recompute stats after saving
           try{ computeStats(displayedSubjects); }catch(e){/* ignore */}
           bsModal.hide();
@@ -839,6 +856,7 @@ document.addEventListener('DOMContentLoaded', () => {
       all.forEach(c => {
         try{
           const meets = cursarRequirementsMetForCard(c);
+          // disabled when requirements NOT met
           if (!meets){
             c.classList.add('card-disabled');
             c.setAttribute('aria-disabled','true');
@@ -846,9 +864,54 @@ document.addEventListener('DOMContentLoaded', () => {
             c.classList.remove('card-disabled');
             c.removeAttribute('aria-disabled');
           }
+          // available (dashed border) when requirements met but subject not started/saved
+          try{
+            const code = c.dataset && c.dataset.code ? c.dataset.code : null;
+            const stored = code ? loadSubjectData(code) : null;
+            if (meets && !stored){
+              c.classList.add('card-available');
+            } else {
+              c.classList.remove('card-available');
+            }
+          }catch(e){ /* ignore per-card */ }
         }catch(e){/* ignore per-card errors */}
       });
     }catch(e){ console.error('Error actualizando estado de cursar en cards', e); }
+  }
+
+  // Return array of subject codes that currently meet 'cursar' requirements and are not started (no stored data)
+  function getAvailableSubjectCodes(){
+    const codes = [];
+    try{
+      if (!columnsContainer) return codes;
+      const all = columnsContainer.querySelectorAll('.card-subject');
+      all.forEach(c => {
+        try{
+          const code = c.dataset && c.dataset.code ? c.dataset.code : null;
+          if (!code) return;
+          const meets = cursarRequirementsMetForCard(c);
+          const stored = loadSubjectData(code);
+          if (meets && !stored) codes.push(code);
+        }catch(e){/* ignore per-card */}
+      });
+    }catch(e){/* ignore */}
+    return codes;
+  }
+
+  // Animate newly unlocked subject cards (codes present in newCodes but not in prevCodes)
+  function animateNewlyUnlocked(prevCodes, newCodes){
+    try{
+      const prevSet = new Set(prevCodes || []);
+      (newCodes || []).forEach(code => {
+        if (!prevSet.has(code)){
+          const card = codeMap[code] || (columnsContainer ? columnsContainer.querySelector(`.card-subject[data-code="${code}"]`) : null);
+          if (card){
+            card.classList.add('card-unlocked');
+            setTimeout(()=>{ try{ card.classList.remove('card-unlocked'); }catch(e){} }, 1400);
+          }
+        }
+      });
+    }catch(e){/* ignore */}
   }
 
   function setupOverlayAndInteractions(){

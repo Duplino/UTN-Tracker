@@ -40,7 +40,7 @@
     {
       "id": "g3",
       "name": "Tercer Nivel",
-      "electivas": 0,
+      "electivas": 1,
       "subjects": [
         { "code": "DSI", "name": "Diseño de Sistemas de Información", "requirements": { "cursar": [{ "id": "PdP", "type": "regularizada" }, { "id": "ASI", "type": "regularizada" }, { "id": "InglesI", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" }, { "id": "SyPdN", "type": "aprobada" }] } },
         { "code": "PyE", "name": "Probabilidad y Estadística", "requirements": { "cursar": [{ "id": "AGA", "type": "regularizada" },{ "id": "AM1", "type": "regularizada" }] } },
@@ -54,7 +54,7 @@
     {
       "id": "g4",
       "name": "Cuarto Nivel",
-      "electivas": 1,
+      "electivas": 2,
       "subjects": [
         { "code": "AdmSI", "name": "Administración de Sistemas de Información", "requirements": { "cursar": [ { "id": "ECO", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "ASI", "type": "aprobada" } ], "aprobar": [] } },
         { "code": "Leg", "name": "Legislación", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "IngSoc", "type": "aprobada" } ], "aprobar": [] } },
@@ -68,7 +68,7 @@
     {
       "id": "g5",
       "name": "Quinto Nivel",
-      "electivas": 3,
+      "electivas": 4,
       "subjects": [
         { "code": "IA", "name": "Inteligencia Artificial", "requirements": { "cursar": [ { "id": "Sim", "type": "regularizada" }, { "id": "PyE", "type": "aprobada" }, { "id": "AN", "type": "aprobada" } ], "aprobar": [] } },
         { "code": "CdC", "name": "Ciencia de Datos", "requirements": { "cursar": [ { "id": "Sim", "type": "regularizada" }, { "id": "PyE", "type": "aprobada" }, { "id": "BD", "type": "aprobada" } ], "aprobar": [] } },
@@ -82,9 +82,81 @@
       "name": "Electivas",
       "render": false,
       "subjects": [
-        { "code": "EL101", "name": "Introducción a Electivas I", "requirements": { "cursar": [] } },
-        { "code": "EL102", "name": "Taller de Innovación", "requirements": { "cursar": [] } },
-        { "code": "EL201", "name": "Proyectos Interdisciplinarios", "requirements": { "cursar": [{ "id": "ASI", "type": "regularizada" }] } }
+        {
+          "code": "082122",
+          "name": "Administración Estratégica del Capital Humano",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232062",
+          "name": "Ciberseguridad",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232063",
+          "name": "Experiencia de Usuario y Accesibilidad",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232064",
+          "name": "Gestión del Talento Humano",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232065",
+          "name": "Ingeniería de Requisitos",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232066",
+          "name": "Metodología de la Conducción de Equipos de Trabajo",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232067",
+          "name": "Técnicas Avanzadas de Programación",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232068",
+          "name": "Técnicas de Gráficos por Computadora",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232069",
+          "name": "Tendencias y Escenarios Tecnológicos",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232070",
+          "name": "Transformación Digital",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "082071",
+          "name": "Criptografía",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "082073",
+          "name": "Tecnologías Avanzadas en la Construcción de Software",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232071",
+          "name": "Comunicación Gráfica y Visual",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232072",
+          "name": "Metodología de la Investigación Científico-Tecnológica",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        },
+        {
+          "code": "232061",
+          "name": "Química Ambiental",
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+        }
       ]
     }
   ]

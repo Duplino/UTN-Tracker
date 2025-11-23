@@ -1,7 +1,0 @@
-{
-  "electivas": [
-    { "code": "EL101", "name": "Introducción a Electivas I", "requirements": { "cursar": [] } },
-    { "code": "EL102", "name": "Taller de Innovación", "requirements": { "cursar": [] } },
-    { "code": "EL201", "name": "Proyectos Interdisciplinarios", "requirements": { "cursar": [{ "id": "ASI", "type": "regularizada" }] } }
-  ]
-}
