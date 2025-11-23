@@ -12,14 +12,14 @@
       "name": "Primer Nivel",
       "electivas": 0,
       "subjects": [
-        { "code": "SyPdN", "name": "Sistemas y Procesos de Negocio"},
-        { "code": "F1", "name": "Física I"},
-        { "code": "AM1", "name": "Análisis Matemático I"},
-        { "code": "AGA", "name": "Álgebra y Geometría Analítica"},
-        { "code": "AyED", "name": "Algoritmos y Estructura de Datos"},
-        { "code": "AdC", "name": "Arquitectura de Computadores"},
-        { "code": "InglesI", "name": "Inglés Técnico Nivel I"},
-        { "code": "LyED", "name": "Lógica y Estructuras Discretas"}
+  { "code": "SyPdN", "name": "Sistemas y Procesos de Negocio", "weekHours": 3 },
+  { "code": "F1", "name": "Física I", "weekHours": 5 },
+  { "code": "AM1", "name": "Análisis Matemático I", "weekHours": 5 },
+  { "code": "AGA", "name": "Álgebra y Geometría Analítica", "weekHours": 5 },
+  { "code": "AyED", "name": "Algoritmos y Estructura de Datos", "weekHours": 5 },
+  { "code": "AdC", "name": "Arquitectura de Computadores", "weekHours": 4 },
+  { "code": "InglesI", "name": "Inglés Técnico Nivel I", "weekHours": 2 },
+  { "code": "LyED", "name": "Lógica y Estructuras Discretas", "weekHours": 3 }
       ]
     },
     {
@@ -27,14 +27,14 @@
       "name": "Segundo Nivel",
       "electivas": 0,
       "subjects": [
-        { "code": "ASI", "name": "Análisis de Sistemas de Información", "requirements": { "cursar": [{ "id": "AyED", "type": "regularizada" }, { "id": "SyPdN", "type": "regularizada" }] } },
-        { "code": "AM2", "name": "Análisis Matemático II", "requirements": { "cursar": [{ "id": "AGA", "type": "regularizada" }, { "id": "AM1", "type": "regularizada" }]} },
-        { "code": "F2", "name": "Física II", "requirements": { "cursar": [ { "id": "F1", "type": "regularizada" }, { "id": "AM1", "type": "regularizada" } ] } },
-        { "code": "IyS", "name": "Ingeniería y Sociedad"},
-        { "code": "SySL", "name": "Sintaxis y Semántica de los Lenguajes", "requirements": { "cursar": [ { "id": "LyED", "type": "regularizada" }, { "id": "AyED", "type": "regularizada" } ] } },
-        { "code": "PdP", "name": "Paradigmas de Programación", "requirements": { "cursar": [ { "id": "LyED", "type": "regularizada" }, { "id": "AyED", "type": "regularizada" } ] } },
-        { "code": "SSOO", "name": "Sistemas Operativos", "requirements": { "cursar": [{ "id": "AdC", "type": "regularizada" }] } },
-        { "code": "InglesII", "name": "Inglés Técnico Nivel II", "requirements": { "cursar": [{ "id": "InglesI", "type": "regularizada" }]} }
+  { "code": "ASI", "name": "Análisis de Sistemas de Información", "requirements": { "cursar": [{ "id": "AyED", "type": "regularizada" }, { "id": "SyPdN", "type": "regularizada" }] }, "weekHours": 6 },
+  { "code": "AM2", "name": "Análisis Matemático II", "requirements": { "cursar": [{ "id": "AGA", "type": "regularizada" }, { "id": "AM1", "type": "regularizada" }] }, "weekHours": 5 },
+  { "code": "F2", "name": "Física II", "requirements": { "cursar": [ { "id": "F1", "type": "regularizada" }, { "id": "AM1", "type": "regularizada" } ] }, "weekHours": 5 },
+  { "code": "IyS", "name": "Ingeniería y Sociedad", "weekHours": 4 },
+  { "code": "SySL", "name": "Sintaxis y Semántica de los Lenguajes", "requirements": { "cursar": [ { "id": "LyED", "type": "regularizada" }, { "id": "AyED", "type": "regularizada" } ] }, "weekHours": 4 },
+  { "code": "PdP", "name": "Paradigmas de Programación", "requirements": { "cursar": [ { "id": "LyED", "type": "regularizada" }, { "id": "AyED", "type": "regularizada" } ] }, "weekHours": 4 },
+  { "code": "SSOO", "name": "Sistemas Operativos", "requirements": { "cursar": [{ "id": "AdC", "type": "regularizada" }] }, "weekHours": 8 },
+  { "code": "InglesII", "name": "Inglés Técnico Nivel II", "requirements": { "cursar": [{ "id": "InglesI", "type": "regularizada" }] }, "weekHours": 2 }
       ]
     },
     {
@@ -42,13 +42,13 @@
       "name": "Tercer Nivel",
       "electivas": 1,
       "subjects": [
-        { "code": "DSI", "name": "Diseño de Sistemas de Información", "requirements": { "cursar": [{ "id": "PdP", "type": "regularizada" }, { "id": "ASI", "type": "regularizada" }, { "id": "InglesI", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" }, { "id": "SyPdN", "type": "aprobada" }] } },
-        { "code": "PyE", "name": "Probabilidad y Estadística", "requirements": { "cursar": [{ "id": "AGA", "type": "regularizada" },{ "id": "AM1", "type": "regularizada" }] } },
-        { "code": "ECO", "name": "Economía", "requirements": { "cursar": [ { "id": "AGA", "type": "aprobada" }, { "id": "AM1", "type": "aprobada" } ] } },
-        { "code": "BD", "name": "Bases de Datos", "requirements": {"cursar": [ { "id": "SySL", "type": "regularizada" }, { "id": "ASI", "type": "regularizada" }, { "id": "LyED", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" } ] } },
-        { "code": "DdS", "name": "Desarrollo de Software", "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "LyED", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" }, { "id": "PdP", "type": "regularizada" } ] } },
-        { "code": "CD", "name": "Comunicación de Datos", "requirements": { "cursar": [ { "id": "F1", "type": "aprobada" }, { "id": "AdC", "type": "aprobada" } ] } },
-        { "code": "AN", "name": "Análisis Numérico", "requirements": { "cursar": [ { "id": "AM2", "type": "regularizada" }, { "id": "AM1", "type": "aprobada" }, { "id": "AGA", "type": "aprobada" } ] } }
+  { "code": "DSI", "name": "Diseño de Sistemas de Información", "requirements": { "cursar": [{ "id": "PdP", "type": "regularizada" }, { "id": "ASI", "type": "regularizada" }, { "id": "InglesI", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" }, { "id": "SyPdN", "type": "aprobada" }] }, "weekHours": 6 },
+  { "code": "PyE", "name": "Probabilidad y Estadística", "requirements": { "cursar": [{ "id": "AGA", "type": "regularizada" },{ "id": "AM1", "type": "regularizada" }] }, "weekHours": 6 },
+  { "code": "ECO", "name": "Economía", "requirements": { "cursar": [ { "id": "AGA", "type": "aprobada" }, { "id": "AM1", "type": "aprobada" } ] }, "weekHours": 6 },
+  { "code": "BD", "name": "Bases de Datos", "requirements": {"cursar": [ { "id": "SySL", "type": "regularizada" }, { "id": "ASI", "type": "regularizada" }, { "id": "LyED", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" } ] }, "weekHours": 6 },
+  { "code": "DdS", "name": "Desarrollo de Software", "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "LyED", "type": "aprobada" }, { "id": "AyED", "type": "aprobada" }, { "id": "PdP", "type": "regularizada" } ] }, "weekHours": 6 },
+  { "code": "CD", "name": "Comunicación de Datos", "requirements": { "cursar": [ { "id": "F1", "type": "aprobada" }, { "id": "AdC", "type": "aprobada" } ] }, "weekHours": 6 },
+  { "code": "AN", "name": "Análisis Numérico", "requirements": { "cursar": [ { "id": "AM2", "type": "regularizada" }, { "id": "AM1", "type": "aprobada" }, { "id": "AGA", "type": "aprobada" } ] }, "weekHours": 6 }
       ]
     },
     {
@@ -56,13 +56,13 @@
       "name": "Cuarto Nivel",
       "electivas": 2,
       "subjects": [
-        { "code": "AdmSI", "name": "Administración de Sistemas de Información", "requirements": { "cursar": [ { "id": "ECO", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "ASI", "type": "aprobada" } ], "aprobar": [] } },
-        { "code": "Leg", "name": "Legislación", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "IngSoc", "type": "aprobada" } ], "aprobar": [] } },
-        { "code": "IyCS", "name": "Ingeniería y Calidad de Software", "requirements": { "cursar": [ { "id": "BD", "type": "regularizada" }, { "id": "DdS", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "SySL", "type": "aprobada" }, { "id": "PdP", "type": "aprobada" } ], "aprobar": [] } },
-        { "code": "RD", "name": "Redes de Datos", "requirements": { "cursar": [ { "id": "SSOO", "type": "regularizada" }, { "id": "CD", "type": "regularizada" } ], "aprobar": [] } },
-        { "code": "IO", "name": "Investigación Operativa", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "AN", "type": "regularizada" } ], "aprobar": [] } },
-        { "code": "Sim", "name": "Simulación", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "AM2", "type": "aprobada" } ], "aprobar": [] } },
-        { "code": "TpA", "name": "Tecnologías para la Automatización", "requirements": { "cursar": [ { "id": "F2", "type": "regularizada" }, { "id": "AN", "type": "regularizada" }, { "id": "AM2", "type": "aprobada" } ], "aprobar": [] } }
+  { "code": "AdmSI", "name": "Administración de Sistemas de Información", "requirements": { "cursar": [ { "id": "ECO", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "ASI", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "Leg", "name": "Legislación", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "IngSoc", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "IyCS", "name": "Ingeniería y Calidad de Software", "requirements": { "cursar": [ { "id": "BD", "type": "regularizada" }, { "id": "DdS", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "SySL", "type": "aprobada" }, { "id": "PdP", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "RD", "name": "Redes de Datos", "requirements": { "cursar": [ { "id": "SSOO", "type": "regularizada" }, { "id": "CD", "type": "regularizada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "IO", "name": "Investigación Operativa", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "AN", "type": "regularizada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "Sim", "name": "Simulación", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "AM2", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "TpA", "name": "Tecnologías para la Automatización", "requirements": { "cursar": [ { "id": "F2", "type": "regularizada" }, { "id": "AN", "type": "regularizada" }, { "id": "AM2", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 }
       ]
     },
     {
@@ -70,11 +70,11 @@
       "name": "Quinto Nivel",
       "electivas": 4,
       "subjects": [
-        { "code": "IA", "name": "Inteligencia Artificial", "requirements": { "cursar": [ { "id": "Sim", "type": "regularizada" }, { "id": "PyE", "type": "aprobada" }, { "id": "AN", "type": "aprobada" } ], "aprobar": [] } },
-        { "code": "CdC", "name": "Ciencia de Datos", "requirements": { "cursar": [ { "id": "Sim", "type": "regularizada" }, { "id": "PyE", "type": "aprobada" }, { "id": "BD", "type": "aprobada" } ], "aprobar": [] } },
-        { "code": "SG", "name": "Sistemas de Gestión", "requirements": { "cursar": [ { "id": "ECO", "type": "regularizada" }, { "id": "IO", "type": "regularizada" }, { "id": "DSI", "type": "aprobada" } ], "aprobar": [] } },
-        { "code": "GC", "name": "Gestión Gerencial", "requirements": { "cursar": [ { "id": "Leg", "type": "regularizada" }, { "id": "AdmSI", "type": "regularizada" }, { "id": "ECO", "type": "aprobada" } ], "aprobar": [] } },
-        { "code": "SSI", "name": "Seguridad en los Sistemas de Información", "requirements": { "cursar": [ { "id": "RD", "type": "regularizada" }, { "id": "AdmSI", "type": "regularizada" }, { "id": "DdS", "type": "aprobada" }, { "id": "CD", "type": "aprobada" } ], "aprobar": [] } }
+  { "code": "IA", "name": "Inteligencia Artificial", "requirements": { "cursar": [ { "id": "Sim", "type": "regularizada" }, { "id": "PyE", "type": "aprobada" }, { "id": "AN", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "CdC", "name": "Ciencia de Datos", "requirements": { "cursar": [ { "id": "Sim", "type": "regularizada" }, { "id": "PyE", "type": "aprobada" }, { "id": "BD", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "SG", "name": "Sistemas de Gestión", "requirements": { "cursar": [ { "id": "ECO", "type": "regularizada" }, { "id": "IO", "type": "regularizada" }, { "id": "DSI", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "GC", "name": "Gestión Gerencial", "requirements": { "cursar": [ { "id": "Leg", "type": "regularizada" }, { "id": "AdmSI", "type": "regularizada" }, { "id": "ECO", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "SSI", "name": "Seguridad en los Sistemas de Información", "requirements": { "cursar": [ { "id": "RD", "type": "regularizada" }, { "id": "AdmSI", "type": "regularizada" }, { "id": "DdS", "type": "aprobada" }, { "id": "CD", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 }
       ]
     },
     {
@@ -85,12 +85,14 @@
         {
           "code": "082122",
           "name": "Administración Estratégica del Capital Humano",
-          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] },
+          "weekHours": 3
         },
         {
           "code": "232062",
           "name": "Ciberseguridad",
-          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] }
+          "requirements": { "cursar": [ { "id": "ASI", "type": "regularizada" }, { "id": "SySL", "type": "regularizada" }, { "id": "PdP", "type": "regularizada" } ] },
+          "weekHours": 3
         },
         {
           "code": "232063",

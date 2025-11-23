@@ -26,6 +26,33 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // Initialize state (will be set again after DOM rendered elements exist)
   correlativasEnabled = loadCorrelativasPref();
+  // reflect toggle UI and bind change handler so the switch actually toggles correlativas
+  try{
+    if (correlativasToggle){
+      correlativasToggle.checked = correlativasEnabled;
+      correlativasToggle.addEventListener('change', (ev) => {
+        correlativasEnabled = !!ev.target.checked;
+        saveCorrelativasPref(correlativasEnabled);
+        // when disabling, clear overlay and remove dim/highlight from all cards
+        try{
+          if (!correlativasEnabled){
+            clearOverlay();
+            if (columnsContainer){
+              const all = columnsContainer.querySelectorAll('.card-subject');
+              all.forEach(c => {
+                c.classList.remove('card-dim');
+                c.classList.remove('card-highlight');
+                c.classList.remove('card-electiva-hover');
+              });
+            }
+          } else {
+            // enable: rebuild overlay and reattach events
+            try{ setupOverlayAndInteractions(); }catch(e){}
+          }
+        }catch(e){}
+      });
+    }
+  }catch(e){/* ignore */}
 
   // Electivas button: open modal and load electivas from separate file
   const electivasBtn = document.getElementById('btn-electivas');
@@ -78,8 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!card) return;
     // remove previous status classes
     ['card-status-aprobada','card-status-desaprobada','card-status-promocionada','card-status-regularizada'].forEach(c => card.classList.remove(c));
-    if (!status) return;
-    if (status === 'Faltan notas') return; // don't style when missing notes
+  // allow badge rendering even when status is falsy; but skip applying styling class when status is 'Faltan notas'
+  if (status === 'Faltan notas') status = null; // treat as no final styling but still render badge
     const mapping = {
       'Aprobada': 'card-status-aprobada',
       'Desaprobada': 'card-status-desaprobada',
@@ -88,6 +115,87 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const cls = mapping[status];
     if (cls) card.classList.add(cls);
+    // --- badge rendering ---
+    try{
+      // badge container inside card (created in createCard)
+      let bc = card.querySelector('.card-badge-container');
+      if (!bc){
+        // create and append to top-right if missing
+        const right = card.querySelector('.text-end');
+        bc = document.createElement('div');
+        bc.className = 'card-badge-container';
+        if (right) right.appendChild(bc);
+        else {
+          const header = card.querySelector('.card-body');
+          if (header) header.appendChild(bc);
+        }
+      }
+      // determine weekHours (fallback 6)
+      const weekHours = Number.isFinite(Number(card.dataset.weekHours)) ? Number(card.dataset.weekHours) : 6;
+      // determine stored values to show final grade when approved
+      const code = card.dataset && card.dataset.code ? card.dataset.code : null;
+      const stored = code ? loadSubjectData(code) : null;
+      // clear
+      bc.innerHTML = '';
+      // Approved (Aprobada) => badge shows the final exam value where it was approved (first final >=6 in order)
+      if (status === 'Aprobada'){
+        let grade = null;
+        try{
+          if (stored && stored.values){
+            // search final1..final4 for the first numeric >= 6 (this is where the subject was approved)
+            for (let i = 1; i <= 4; i++){
+              const v = stored.values['final'+i];
+              const n = parseNum(v);
+              if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
+            }
+          }
+        }catch(e){/* ignore */}
+        if (grade !== null && !Number.isNaN(grade)){
+          const span = document.createElement('span');
+          span.className = 'badge bg-success';
+          span.style.fontSize = '0.8rem';
+          // show as integer when whole, otherwise keep decimal (user requested rounding only for promocionadas)
+          span.textContent = Number.isInteger(grade) ? String(grade) : String(grade);
+          bc.appendChild(span);
+        }
+      } else if (status === 'Promocionada'){
+        // Promocionada => average of both parciales (use the last attempt value for each parcial), rounded
+        let p1 = NaN, p2 = NaN;
+        try{
+          if (stored && stored.values){
+            // find last non-empty attempt for parcial1 (parcial1_3..parcial1_1)
+            for (let i = 3; i >= 1; i--){
+              const v = stored.values['parcial1_'+i];
+              const n = parseNum(v);
+              if (!Number.isNaN(n)){ p1 = n; break; }
+            }
+            for (let i = 3; i >= 1; i--){
+              const v = stored.values['parcial2_'+i];
+              const n = parseNum(v);
+              if (!Number.isNaN(n)){ p2 = n; break; }
+            }
+          }
+        }catch(e){/* ignore */}
+        if (!Number.isNaN(p1) && !Number.isNaN(p2)){
+          const avg = Math.round((p1 + p2) / 2);
+          const span = document.createElement('span');
+          span.className = 'badge bg-success';
+          span.style.fontSize = '0.8rem';
+          span.textContent = String(avg);
+          bc.appendChild(span);
+        }
+      } else if (status === 'Regularizada'){
+        // Do not show any badge for Regularizada subjects (user requested no badge)
+        // Intentionally left blank: no badge appended for this status.
+      } else {
+        // not approved -> show weekHours badge (blue)
+        const span = document.createElement('span');
+        span.className = 'badge bg-primary';
+        span.style.fontSize = '0.8rem';
+        span.textContent = `${weekHours} hs`;
+        bc.appendChild(span);
+      }
+    }catch(e){/* ignore badge errors */}
   }
 
   // Create or remove a "Recursar" button inside the modal footer depending on status.
@@ -268,6 +376,8 @@ document.addEventListener('DOMContentLoaded', () => {
     card.className = 'card card-subject';
     // attach metadata for interactions
     if (subject.code) card.dataset.code = subject.code;
+    // store weekHours for badge display (default to 6 when not provided)
+    card.dataset.weekHours = typeof subject.weekHours === 'number' ? String(subject.weekHours) : '6';
     // store requirements object (cursar/aprobar)
     const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
     card.dataset.requirements = JSON.stringify(reqsObj);
@@ -280,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <small class="text-muted d-block">${escapeHtml(subject.code)}</small>
           </div>
           <div class="text-end">
-            <small class="text-muted" aria-hidden="true"></small>
+            <div class="card-badge-container" aria-hidden="true"></div>
           </div>
         </div>
       </div>
@@ -966,14 +1076,12 @@ document.addEventListener('DOMContentLoaded', () => {
       card.addEventListener('mouseleave', onCardLeave);
     });
 
-    // Apply saved styles for each card based on persisted status
+    // Apply saved styles / badges for each card based on persisted status (or default badge)
     Object.keys(codeMap).forEach(code => {
       try{
         const stored = loadSubjectData(code);
-        if (stored){
-          const effectiveStatus = stored.overrideStatus ? stored.overrideStatus : (stored.status ? stored.status : null);
-          if (effectiveStatus) applyCardStatusStyle(codeMap[code], effectiveStatus);
-        }
+        const effectiveStatus = stored ? (stored.overrideStatus ? stored.overrideStatus : (stored.status ? stored.status : null)) : null;
+        applyCardStatusStyle(codeMap[code], effectiveStatus);
       }catch(e){/* ignore */}
     });
 
@@ -1213,9 +1321,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const total = baseTotal + electivasRequired;
 
+    // Sum weekly hours for subjects that are 'EN CURSO'
+    // Definition: a subject is considered 'en curso' when there is stored data for it
+    // and its status is NOT one of the terminal statuses (Aprobada, Promocionada, Regularizada, Desaprobada).
+    let inCourseHours = 0;
+    try{
+      for (const subj of (list || [])){
+        const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+        const stored = key ? loadSubjectData(key) : null;
+        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+        const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
+        if (stored && !terminal.includes(status)){
+          const wh = Number.isFinite(Number(subj.weekHours)) ? Number(subj.weekHours) : 6;
+          inCourseHours += wh;
+        }
+      }
+      // Also include electivas that are placed and have stored data and are in-course
+      const rawElect = localStorage.getItem('electives');
+      if (rawElect){
+        const emap = JSON.parse(rawElect) || {};
+        const electList = Array.isArray(electivasList) ? electivasList : [];
+        const byCode = {};
+        const byName = {};
+        electList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
+        Object.keys(emap).forEach(k => {
+          try{
+            const stored = loadSubjectData(k);
+            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+            const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
+            if (stored && !terminal.includes(status)){
+              // find metadata to get weekHours
+              const meta = byCode[k] || byName[k] || null;
+              const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : 6;
+              inCourseHours += wh;
+            }
+          }catch(e){/* ignore per-electiva */}
+        });
+      }
+    }catch(e){ inCourseHours = 0; }
+
     // Update stat cards
-    statsTotalPeso.textContent = '—';
-    statsAvg.textContent = '—';
+    statsTotalPeso.textContent = inCourseHours > 0 ? (String(inCourseHours) + ' hs') : '—';
+    // Compute average grade for approved subjects (Aprobada and Promocionada) when a numeric grade is available
+    let approvedGradeSum = 0;
+    let approvedGradeCount = 0;
+    try{
+      for (const subj of (list || [])){
+        const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+        const stored = key ? loadSubjectData(key) : null;
+        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+        if (status === 'Aprobada' || status === 'Promocionada'){
+          // determine grade according to rules: Aprobada -> first final >=6 (final1..4)
+          // Promocionada -> average of last parciales rounded
+          let grade = NaN;
+          try{
+            if (status === 'Aprobada' && stored && stored.values){
+              for (let i = 1; i <= 4; i++){
+                const v = stored.values['final'+i];
+                const n = parseNum(v);
+                if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
+              }
+            } else if (status === 'Promocionada' && stored && stored.values){
+              let p1 = NaN, p2 = NaN;
+              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial1_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p1 = n; break; } }
+              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial2_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p2 = n; break; } }
+              if (!Number.isNaN(p1) && !Number.isNaN(p2)) grade = Math.round((p1 + p2) / 2);
+            }
+          }catch(e){ /* ignore per-subject */ }
+          if (!Number.isNaN(grade)){
+            approvedGradeSum += Number(grade);
+            approvedGradeCount += 1;
+          }
+        }
+      }
+    }catch(e){ /* ignore */ }
+    if (approvedGradeCount > 0){
+  const avg = approvedGradeSum / approvedGradeCount;
+  // show with two decimals, use comma for decimal separator in locale ES
+  statsAvg.textContent = String(avg.toFixed(2)).replace('.', ',');
+    } else {
+      statsAvg.textContent = '—';
+    }
     statPlaceholder1.textContent = approved + ' / ' + total;
     statPlaceholder2.textContent = regularized;
 
