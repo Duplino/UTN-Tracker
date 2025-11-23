@@ -139,82 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
     modalFooter.insertBefore(btn, modalFooter.firstChild);
   }
 
-  // Override control: render a small select in the status area to let user override computed status
-  function renderOverrideControl(code){
-    const statusContainer = document.getElementById('subject-status');
-    if (!statusContainer) return;
-    // remove previous control
-    const prev = statusContainer.querySelector('#subject-override-wrap');
-    if (prev) prev.remove();
-    const wrap = document.createElement('div');
-    wrap.id = 'subject-override-wrap';
-    wrap.style.marginTop = '6px';
-    wrap.style.display = 'flex';
-    wrap.style.gap = '6px';
-
-    const label = document.createElement('label');
-    label.htmlFor = 'subject-override';
-    label.className = 'form-label small mb-0';
-    label.style.alignSelf = 'center';
-    label.textContent = 'Override:';
-
-    const select = document.createElement('select');
-    select.id = 'subject-override';
-    select.className = 'form-select form-select-sm';
-    select.style.width = 'auto';
-
-    const options = [
-      {v:'computed', t:'Usar calculado'},
-      {v:'Aprobada', t:'Aprobada'},
-      {v:'Promocionada', t:'Promocionada'},
-      {v:'Regularizada', t:'Regularizada'},
-      {v:'No regularizada', t:'No regularizada'},
-      {v:'Desaprobada', t:'Desaprobada'},
-      {v:'Faltan notas', t:'Faltan notas'}
-    ];
-    options.forEach(o => {
-      const opt = document.createElement('option'); opt.value = o.v; opt.textContent = o.t; select.appendChild(opt);
-    });
-
-    // determine subject code (prefer explicit arg, fall back to currentCard)
-    const effectiveCode = code || (currentCard && currentCard.dataset && currentCard.dataset.code) || '';
-    // load stored override
-    const key = getSubjectStorageKey(effectiveCode || '');
-    let stored = key ? loadSubjectData(effectiveCode || '') : null;
-    const override = stored && stored.overrideStatus ? stored.overrideStatus : 'computed';
-    select.value = override || 'computed';
-
-    select.addEventListener('change', () => {
-      let s = stored || {};
-      const val = select.value;
-      if (val === 'computed'){
-        if (s.overrideStatus) delete s.overrideStatus;
-      } else {
-        s.overrideStatus = val;
-      }
-      // ensure stored has values snapshot if not present (we don't overwrite existing values)
-      if (!s.values) s.values = (s.values || {});
-      saveSubjectData(effectiveCode || '', s);
-      // update banner and card style
-      const applyStatus = (val === 'computed') ? (document.getElementById('subject-status-text') ? document.getElementById('subject-status-text').textContent.trim() : '') : val;
-      setStatusBanner(applyStatus || '');
-      applyCardStatusStyle(currentCard, (val === 'computed') ? (stored && stored.status ? stored.status : null) : val);
-      // recompute stats reflecting override
-      try{ computeStats(displayedSubjects); }catch(e){}
-      // close modal after user selects an override
-      try{
-        const modalEl = document.getElementById('subjectModal');
-        if (modalEl){
-          const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-          inst.hide();
-        }
-      }catch(err){/* ignore */}
-    });
-
-    wrap.appendChild(label);
-    wrap.appendChild(select);
-    statusContainer.appendChild(wrap);
-  }
+  // The override control is now static in HTML (see index.html). Event binding and
+  // initialization happens when opening the modal (onCardClick) so we remove the
+  // dynamic renderer previously used.
 
   function clearOverrideFor(code){
     if (!code) return;
@@ -494,9 +421,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const formEl = document.getElementById('subject-form');
         const statusEl = document.getElementById('subject-status');
         const modalFooter = document.querySelector('#subjectModal .modal-footer');
+  const overrideWrap = document.getElementById('subject-override-wrap');
         if (formEl) formEl.classList.add('d-none');
         if (statusEl) statusEl.classList.add('d-none');
-        if (modalFooter) modalFooter.style.display = 'none';
+  if (modalFooter) modalFooter.style.display = 'none';
+  // hide the small override control while the big 'Empezar' button is shown
+  if (overrideWrap) overrideWrap.classList.add('d-none');
 
         const wrap = document.createElement('div');
         wrap.id = 'subject-start-wrap';
@@ -518,6 +448,8 @@ document.addEventListener('DOMContentLoaded', () => {
           // restore modal content
           if (formEl) formEl.classList.remove('d-none');
           if (statusEl) { statusEl.classList.remove('d-none'); setStatusBanner(obj.status); }
+          // restore override control visibility when returning from 'Empezar'
+          if (overrideWrap) overrideWrap.classList.remove('d-none');
           if (modalFooter) modalFooter.style.display = '';
           // update visuals
           applyCardStatusStyle(currentCard, null);
@@ -537,8 +469,44 @@ document.addEventListener('DOMContentLoaded', () => {
       updateSubjectStatus();
       // ensure recursar button reflects current status
       toggleRecursarButton(code);
-      // ensure override control is initialized (uses currentCard)
-      try{ renderOverrideControl(code); }catch(e){}
+      // initialize static override control (exists in HTML) and bind change handler
+      try{
+        const overrideSel = document.getElementById('subject-override');
+        const effectiveCode = code || (currentCard && currentCard.dataset && currentCard.dataset.code) || '';
+        if (overrideSel){
+          // set initial value from stored override
+          const storedOverride = loadSubjectData(effectiveCode || '') || {};
+          overrideSel.value = storedOverride && storedOverride.overrideStatus ? storedOverride.overrideStatus : 'computed';
+          // replace to remove previous handlers then attach
+          const newSel = overrideSel.cloneNode(true);
+          overrideSel.parentNode.replaceChild(newSel, overrideSel);
+          newSel.addEventListener('change', () => {
+            let s = loadSubjectData(effectiveCode || '') || {};
+            const val = newSel.value;
+            if (val === 'computed'){
+              if (s.overrideStatus) delete s.overrideStatus;
+            } else {
+              s.overrideStatus = val;
+            }
+            if (!s.values) s.values = (s.values || {});
+            saveSubjectData(effectiveCode || '', s);
+            const applyStatus = (val === 'computed') ? (document.getElementById('subject-status-text') ? document.getElementById('subject-status-text').textContent.trim() : '') : val;
+            setStatusBanner(applyStatus || '');
+            applyCardStatusStyle(currentCard, (val === 'computed') ? (s && s.status ? s.status : null) : val);
+            try{ computeStats(displayedSubjects); }catch(e){}
+            try{
+              const modalEl = document.getElementById('subjectModal');
+              if (modalEl){
+                const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                inst.hide();
+              }
+            }catch(err){/* ignore */}
+          });
+          // ensure override wrapper is visible by default when modal opens
+          const overrideWrap = document.getElementById('subject-override-wrap');
+          if (overrideWrap) overrideWrap.classList.remove('d-none');
+        }
+      }catch(e){}
       // render start button for current subject AFTER banner/override are rendered
       try{ renderStartButton(code); }catch(e){}
       // wire save to close the modal and log values (placeholder behavior)
@@ -556,10 +524,18 @@ document.addEventListener('DOMContentLoaded', () => {
           const statusText = statusEl ? statusEl.textContent.trim() : '';
           // persist to localStorage
           const storedObj = { values, status: statusText, savedAt: (new Date()).toISOString() };
-          // preserve existing override if present
-          const prevStored = loadSubjectData(code || name);
-          if (prevStored && prevStored.overrideStatus) storedObj.overrideStatus = prevStored.overrideStatus;
+          // Do NOT preserve existing override: saving the modal should clear any manual override
+          // so the computed status (from the entered notes) becomes the source of truth.
           saveSubjectData(code || name, storedObj);
+          // Ensure the static override control resets to 'computed' in the UI
+          try{
+            const ov = document.getElementById('subject-override');
+            if (ov){
+              const newOv = ov.cloneNode(true);
+              newOv.value = 'computed';
+              ov.parentNode.replaceChild(newOv, ov);
+            }
+          }catch(e){}
           console.log('Guardado subject:', code || name, { values, status: statusText });
           // update card style in dashboard
           applyCardStatusStyle(currentCard, statusText);
@@ -639,8 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
     left.textContent = status || '';
     alertDiv.appendChild(left);
     statusContainer.appendChild(alertDiv);
-    // render override control inside the alert (right side)
-    try{ renderOverrideControl(); }catch(e){/* ignore */}
+  // The override control is static in HTML; its value will be synced when modal opens.
   }
 
   function showFinalsUpTo(n){
@@ -650,7 +625,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const finalsContainer = document.getElementById('finals-container');
     if (finalsContainer){
-      if (n > 0) finalsContainer.classList.remove('d-none'); else finalsContainer.classList.add('d-none');
+      const finalsLabel = finalsContainer.previousElementSibling && finalsContainer.previousElementSibling.tagName === 'LABEL' ? finalsContainer.previousElementSibling : null;
+      if (n > 0){
+        finalsContainer.classList.remove('d-none');
+        if (finalsLabel) finalsLabel.classList.remove('d-none');
+      } else {
+        finalsContainer.classList.add('d-none');
+        if (finalsLabel) finalsLabel.classList.add('d-none');
+      }
     }
   }
 
@@ -705,14 +687,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Require at least one note in each parcial to show a result
+    // Detect presence of notas per parcial. If some notas are missing we still want to
+    // run the recovery / "Debe Recuperar" calculation for the parcial(s) that have values.
+    // We will mark a 'faltanNotas' flag and avoid early returning so the UI shows recuperatories
+    // while keeping finals hidden and the banner as 'Faltan notas' when appropriate.
     const p1_hasNote = p1_vals.map(v=>parseNum(v)).some(n=>!Number.isNaN(n));
     const p2_hasNote = p2_vals.map(v=>parseNum(v)).some(n=>!Number.isNaN(n));
-    if (!p1_hasNote || !p2_hasNote){
-      // If any parcial lacks notes, show 'Faltan notas' and don't proceed to evaluate promotion/regularizada/desaprobada
+    const faltanNotas = (!p1_hasNote || !p2_hasNote);
+    if (faltanNotas){
+      // keep finals hidden while notes are incomplete, but continue computing recuperatories
       showFinalsUpTo(0);
-      setStatusBanner('Faltan notas');
-      return;
+      // don't return here; continue to run recovery/placeholder logic below
     }
 
     // Case 2: one first >=8 and the other <8 -> allow ONE recuperatory on the lower one to try to reach >=8
@@ -791,7 +776,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if ((p1_last_info.index === 3 && !Number.isNaN(p1_last_info.value) && p1_last_info.value < 6) ||
         (p2_last_info.index === 3 && !Number.isNaN(p2_last_info.value) && p2_last_info.value < 6)){
       showFinalsUpTo(0);
-      setStatusBanner('Desaprobada');
+      // If notes are missing, prefer showing 'Faltan notas' instead of marking Desaprobada
+      if (faltanNotas){
+        setStatusBanner('Faltan notas');
+      } else {
+        setStatusBanner('Desaprobada');
+      }
       return;
     }
 
@@ -806,6 +796,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const v = el.value; return v === null || v === undefined || v === '';
     });
     showFinalsUpTo(0);
+    // If some notas are missing, show that message instead of inferring No regularizada / Desaprobada
+    if (faltanNotas){
+      setStatusBanner('Faltan notas');
+      return;
+    }
     if (partialRemaining || finalRemaining){
       setStatusBanner('No regularizada');
     } else {
@@ -860,8 +855,9 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.keys(codeMap).forEach(code => {
       try{
         const stored = loadSubjectData(code);
-        if (stored && stored.status){
-          applyCardStatusStyle(codeMap[code], stored.status);
+        if (stored){
+          const effectiveStatus = stored.overrideStatus ? stored.overrideStatus : (stored.status ? stored.status : null);
+          if (effectiveStatus) applyCardStatusStyle(codeMap[code], effectiveStatus);
         }
       }catch(e){/* ignore */}
     });
