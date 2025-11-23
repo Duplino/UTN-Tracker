@@ -371,15 +371,33 @@
 					const snap = await getDoc(ref);
 					if (!snap.exists()) return null;
 					const data = snap.data() || {};
-					// Merge subjectData
-					if (data.subjectData && typeof data.subjectData === 'object'){
-						Object.keys(data.subjectData).forEach(code => {
-							try{ localStorage.setItem('subjectData:' + code, JSON.stringify(data.subjectData[code])); }catch(e){}
+					// Apply subjectData: overwrite local keys with remote and remove local keys that no longer exist remotely
+					try{
+						window.__firestoreApplyingRemote = true;
+						const remote = data.subjectData && typeof data.subjectData === 'object' ? data.subjectData : {};
+						// set/overwrite remote entries
+						Object.keys(remote).forEach(code => {
+							try{ localStorage.setItem('subjectData:' + code, JSON.stringify(remote[code])); }catch(e){}
 						});
-					}
+						// remove any local subjectData keys not present in remote
+						for (let i = 0; i < localStorage.length; i++){
+							const k = localStorage.key(i);
+							if (!k) continue;
+							if (k.startsWith('subjectData:')){
+								const code = k.replace('subjectData:','');
+								if (!remote.hasOwnProperty(code)){
+									try{ localStorage.removeItem(k); }catch(e){}
+								}
+							}
+						}
+					}finally{ window.__firestoreApplyingRemote = false; }
 					// Merge electives and mostrarCorrelativas if present
-					if (data.electives) try{ localStorage.setItem('electives', JSON.stringify(data.electives)); }catch(e){}
-					if (typeof data.mostrarCorrelativas !== 'undefined') try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
+					if (typeof data.electives !== 'undefined'){
+						try{ localStorage.setItem('electives', JSON.stringify(data.electives)); }catch(e){}
+					}
+					if (typeof data.mostrarCorrelativas !== 'undefined'){
+						try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
+					}
 					// Note: do NOT dispatch an event here to avoid duplicate reloads; caller may reload or re-render as needed.
 					return data;
 				}catch(err){ console.error('firestoreDownloadAndApply error', err); return null; }
@@ -396,14 +414,27 @@
 						// ignore the initial snapshot delivered immediately after subscribing
 						if (first){ first = false; return; }
 						const data = snap.data() || {};
-						// apply remote changes to localStorage
-						if (data.subjectData){
-							Object.keys(data.subjectData).forEach(code => {
-								try{ localStorage.setItem('subjectData:' + code, JSON.stringify(data.subjectData[code])); }catch(e){}
+						// apply remote changes to localStorage (set remote keys and remove local keys that no longer exist)
+						try{
+							window.__firestoreApplyingRemote = true;
+							const remote = data.subjectData && typeof data.subjectData === 'object' ? data.subjectData : {};
+							Object.keys(remote).forEach(code => {
+								try{ localStorage.setItem('subjectData:' + code, JSON.stringify(remote[code])); }catch(e){}
 							});
-						}
-						if (data.electives) try{ localStorage.setItem('electives', JSON.stringify(data.electives)); }catch(e){}
-						if (typeof data.mostrarCorrelativas !== 'undefined') try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
+							// remove local keys not present in remote
+							for (let i = 0; i < localStorage.length; i++){
+								const k = localStorage.key(i);
+								if (!k) continue;
+								if (k.startsWith('subjectData:')){
+									const code = k.replace('subjectData:','');
+									if (!remote.hasOwnProperty(code)){
+										try{ localStorage.removeItem(k); }catch(e){}
+									}
+								}
+							}
+							if (typeof data.electives !== 'undefined') try{ localStorage.setItem('electives', JSON.stringify(data.electives)); }catch(e){}
+							if (typeof data.mostrarCorrelativas !== 'undefined') try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
+						}finally{ window.__firestoreApplyingRemote = false; }
 						// notify app to refresh UI (only for subsequent updates)
 						document.dispatchEvent(new CustomEvent('firestore:remote-update', { detail: { from: 'onSnapshot' } }));
 					});
