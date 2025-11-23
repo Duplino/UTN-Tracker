@@ -178,6 +178,14 @@ body{
   line-height: 1;
 }
 
+/* Hover style for electiva placeholder: subtle background highlight without dimming others */
+.card-electiva-hover{
+  background-color: rgba(0,0,0,0.03);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  transform: translateY(-2px);
+  transition: box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
+}
+
 /* Highlight animation for missing requirements: jump + red flash */
 @keyframes reqFlash {
   0% { transform: translateY(0); box-shadow: none; }

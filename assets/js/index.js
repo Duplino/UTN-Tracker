@@ -593,22 +593,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const reqObj = card.dataset.requirements ? JSON.parse(card.dataset.requirements) : { cursar: [] };
     const cursar = reqObj.cursar || [];
     if (!cursar || cursar.length === 0) return;
-    // For each required id, find the card in codeMap and animate it
-    cursar.forEach((r, idx) => {
+    // For each requirement, check if it's already met; only animate the missing ones
+    let firstMissingScrolled = false;
+    cursar.forEach((r) => {
       const id = (typeof r === 'string') ? r : (r.id || r.code);
       if (!id) return;
       const target = codeMap[id];
       if (!target) return;
-      // add highlight class
-      target.classList.add('req-highlight');
-      // optionally scroll the first missing into view
-      if (idx === 0){
-        try{ target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }catch(e){}
+      // determine if this single requirement is met according to its type
+      const stored = loadSubjectData(id);
+      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const type = (typeof r === 'object' && r.type) ? r.type : 'aprobada';
+      let met = false;
+      if (type === 'regularizada'){
+        met = ['Regularizada','Aprobada','Promocionada'].includes(status);
+      } else {
+        met = ['Aprobada','Promocionada'].includes(status);
       }
-      // remove after animation
-      setTimeout(() => {
-        try{ target.classList.remove('req-highlight'); }catch(e){}
-      }, 800);
+      // only animate and mark the requirement if it is NOT met
+      if (!met){
+        target.classList.add('req-highlight');
+        // scroll the first missing into view
+        if (!firstMissingScrolled){
+          try{ target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }catch(e){}
+          firstMissingScrolled = true;
+        }
+        // remove after animation
+        setTimeout(() => {
+          try{ target.classList.remove('req-highlight'); }catch(e){}
+        }, 800);
+      }
     });
   }
 
@@ -986,9 +1000,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function onCardHover(e){
-    // Respect the user's toggle preference
-    if (!correlativasEnabled) return;
     const card = e.currentTarget;
+    // If hovering a placeholder for adding electivas, just highlight that placeholder
+    // and do NOT dim the rest of the board. Placeholders have class 'card-electiva-add'.
+    try{
+      if (card && card.classList && card.classList.contains('card-electiva-add')){
+        clearOverlay();
+        // add a lightweight hover class to the placeholder and return early
+        card.classList.add('card-electiva-hover');
+        return;
+      }
+    }catch(err){/* ignore */}
+    // Respect the user's toggle preference for correlativas for normal cards
+    if (!correlativasEnabled) return;
     // clear previous drawings
     clearOverlay();
     const reqObj = card.dataset.requirements ? JSON.parse(card.dataset.requirements) : { cursar: [], aprobar: [] };
@@ -1039,6 +1063,8 @@ document.addEventListener('DOMContentLoaded', () => {
     allCards.forEach(c => {
       c.classList.remove('card-dim');
       c.classList.remove('card-highlight');
+      // remove electiva placeholder hover class if present
+      c.classList.remove('card-electiva-hover');
     });
   }
 
@@ -1146,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function computeStats(list){
     // Compute approved and regularized counts based on saved statuses in localStorage
-    const total = Array.isArray(list) ? list.length : 0;
+    const baseTotal = Array.isArray(list) ? list.length : 0;
     let approved = 0;
     let regularized = 0;
     for (const subj of (list || [])){
@@ -1156,6 +1182,36 @@ document.addEventListener('DOMContentLoaded', () => {
       if (status === 'Aprobada' || status === 'Promocionada') approved++;
       else if (status === 'Regularizada') regularized++;
     }
+
+    // Add required electivas per visible module to the total (even if not yet added to tablero)
+    let electivasRequired = 0;
+    try{
+      if (planData && Array.isArray(planData.modules)){
+        const visibleModules = planData.modules.filter(m => m && m.render !== false);
+        visibleModules.forEach(m => {
+          const n = Number.isFinite(Number(m.electivas)) ? Number(m.electivas) : 0;
+          electivasRequired += n;
+        });
+      }
+    }catch(e){ electivasRequired = 0; }
+
+    // Count electivas that are present in localStorage (placed) and have saved statuses
+    try{
+      const raw = localStorage.getItem('electives');
+      if (raw){
+        const obj = JSON.parse(raw);
+        Object.keys(obj || {}).forEach(k => {
+          try{
+            const stored = loadSubjectData(k);
+            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+            if (status === 'Aprobada' || status === 'Promocionada') approved++;
+            else if (status === 'Regularizada') regularized++;
+          }catch(e){}
+        });
+      }
+    }catch(e){}
+
+    const total = baseTotal + electivasRequired;
 
     // Update stat cards
     statsTotalPeso.textContent = '—';
