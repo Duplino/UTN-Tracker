@@ -11,11 +11,11 @@
 		<div class="container-fluid">
 			<!-- Top toolbar (not a navbar) -->
 			<div class="toolbar d-flex justify-content-between align-items-center">
-				<div class="btn-group" role="group" aria-label="Herramientas">
-					<button class="btn btn-primary">Agregar</button>
-					<button class="btn btn-outline-secondary">Importar</button>
-					<button class="btn btn-outline-secondary">Exportar</button>
-					<button class="btn btn-outline-secondary">Filtrar</button>
+				<div class="d-flex align-items-center" role="group" aria-label="Herramientas">
+					<select id="programSelect" class="form-select me-2" aria-label="Programas">
+						<option value="isi-k23">Ingeniería en Sistemas de Información - K23</option>
+					</select>
+					<button class="btn btn-outline-secondary" id="btn-electivas">electivas</button>
 				</div>
 				<div class="btn-group">
 					<button class="btn btn-light">Vista</button>
@@ -119,6 +119,26 @@
 		  </div>
 		</div>
 
+			<!-- Electivas modal -->
+			<div class="modal fade" id="electivasModal" tabindex="-1" aria-labelledby="electivasModalLabel" aria-hidden="true">
+			  <div class="modal-dialog modal-lg modal-dialog-centered">
+			    <div class="modal-content">
+			      <div class="modal-header">
+			        <h5 class="modal-title" id="electivasModalLabel">Materias Electivas</h5>
+			        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			      </div>
+			      <div class="modal-body">
+			        <div id="electivas-container" class="row g-2">
+			          <!-- Electivas cards injected here -->
+			        </div>
+			      </div>
+			      <div class="modal-footer">
+			        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			      </div>
+			    </div>
+			  </div>
+			</div>
+
 		<!-- Subject modal for entering parciales and finales -->
 		<div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
 		  <div class="modal-dialog modal-dialog-centered">
@@ -131,7 +151,7 @@
 				<form id="subject-form">
 					<!-- PRIMER PARCIAL: input-group with three inputs -->
 					<div class="mb-2">
-						<label class="form-label">PRIMER PARCIAL</label>
+						<label class="form-label">Primer Parcial</label>
 						<div id="parcial1-group" class="input-group" role="group" aria-label="Primer parcial">
 							<input id="parcial1_1" data-attempt="1" type="number" min="0" max="10" step="0.1" class="form-control" placeholder="Ingrese nota" />
 							<input id="parcial1_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
@@ -141,7 +161,7 @@
 
 					<!-- SEGUNDO PARCIAL: input-group with three inputs -->
 					<div class="mb-3">
-						<label class="form-label">SEGUNDO PARCIAL</label>
+						<label class="form-label">Segundo Parcial</label>
 						<div id="parcial2-group" class="input-group" role="group" aria-label="Segundo parcial">
 							<input id="parcial2_1" data-attempt="1" type="number" min="0" max="10" step="0.1" class="form-control" placeholder="Ingrese nota" />
 							<input id="parcial2_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />

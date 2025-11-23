@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const DATA_URL = 'assets/data/subjects.json';
+  const DATA_URL = 'assets/data/k23.json';
+  // Electivas will be read from the main DATA_URL (k23.json) under the module with id 'electives'
+  let planData = null;
+  let electivasList = [];
   let columns = 5;
 
   const columnsContainer = document.querySelector('.columns-grid');
@@ -23,6 +26,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // Initialize state (will be set again after DOM rendered elements exist)
   correlativasEnabled = loadCorrelativasPref();
+
+  // Electivas button: open modal and load electivas from separate file
+  const electivasBtn = document.getElementById('btn-electivas');
+  function openElectivasModal(){
+    // Use electivasList populated when the main DATA_URL was loaded
+    const list = Array.isArray(electivasList) ? electivasList : [];
+    if (!list || list.length === 0){
+      console.warn('No hay electivas cargadas en el plan');
+      const container = document.getElementById('electivas-container');
+      if (container) container.innerHTML = '<div class="alert alert-warning">No hay electivas disponibles en el plan.</div>';
+      const modalEl = document.getElementById('electivasModal');
+      if (modalEl){ const inst = new bootstrap.Modal(modalEl); inst.show(); }
+      return;
+    }
+    renderElectivasModal(list);
+  }
+  if (electivasBtn) electivasBtn.addEventListener('click', openElectivasModal);
 
   // --- LocalStorage helpers for subject data ---
   function getSubjectStorageKey(code){
@@ -188,111 +208,55 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Update all cards to mark as disabled if they don't meet cursar requirements
-  function updateAllCardCursarState(){
-    if (!codeMap) return;
-    Object.keys(codeMap).forEach(code => {
-      try{
-        const card = codeMap[code];
-        if (!card) return;
-        const ok = cursarRequirementsMetForCard(card);
-        if (!ok) card.classList.add('card-disabled'); else card.classList.remove('card-disabled');
-      }catch(e){/* ignore */}
-    });
-    // After updating disabled state, also update availability visuals
-    updateAllCardAvailability();
-  }
-
-  // Determine availability (meets cursar requirements but not in progress) and mark card with dashed border
-  function updateAllCardAvailability(){
-    if (!codeMap) return;
-    Object.keys(codeMap).forEach(code => {
-      try{
-        const card = codeMap[code];
-        if (!card) return;
-        updateAvailabilityForCard(card);
-      }catch(e){/* ignore */}
-    });
-  }
-
-  function updateAvailabilityForCard(card){
-    if (!card) return;
-    const code = card.dataset.code || '';
-    const stored = code ? loadSubjectData(code) : null;
-    // consider 'in course' when there's any stored data for the subject
-    const inCourse = !!stored;
-    const canCursar = cursarRequirementsMetForCard(card);
-    if (canCursar && !inCourse){
-      card.classList.add('card-available');
-    } else {
-      card.classList.remove('card-available');
-    }
-  }
-
-  fetch(DATA_URL)
-    .then(r => r.json())
-    .then(data => renderGroups(data))
-    .catch(err => {
-      console.error('Error loading groups', err);
-      columnsContainer.innerHTML = '<div class="alert alert-warning">No se pudieron cargar las materias.</div>';
-    });
-
   function renderGroups(data){
-    const groups = Array.isArray(data.groups) ? data.groups : [];
-    if (groups.length === 0) {
-      columnsContainer.innerHTML = '<div class="alert alert-info">No hay grupos disponibles.</div>';
+    const modules = Array.isArray(data.modules) ? data.modules : [];
+    // filter out modules that should not be rendered as columns
+    const visibleModules = modules.filter(m => m && m.render !== false);
+    if (visibleModules.length === 0) {
+      columnsContainer.innerHTML = '<div class="alert alert-info">No hay módulos disponibles.</div>';
       return;
     }
 
-    // Use number of groups as columns (limit to max 8 for layout sanity)
-    columns = Math.min(Math.max(groups.length, 1), 8);
+    // Use number of visible modules as columns (limit to max 8 for layout sanity)
+    columns = Math.min(Math.max(visibleModules.length, 1), 8);
     columnsContainer.innerHTML = '';
 
-    groups.forEach((group, idx) => {
+    // assign consecutive data-index values for visible columns
+    visibleModules.forEach((module, visIdx) => {
       const col = document.createElement('div');
       col.className = 'column-col';
-      col.dataset.index = idx;
+      col.dataset.index = visIdx;
 
-        // Column header with group name and color indicator
-        const header = document.createElement('div');
-        header.className = 'mb-2';
-        header.innerHTML = `<strong>${escapeHtml(group.name)}</strong> <span style="display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:6px;background:${escapeHtml(group.color || '#6c757d')};"></span>`;
+      // Column header with module name (no color in new format)
+      const header = document.createElement('div');
+      header.className = 'mb-2';
+      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong>`;
       col.appendChild(header);
 
-      // Render all subjects per group
-      const subjects = Array.isArray(group.subjects) ? group.subjects : [];
-      subjects.forEach(subj => col.appendChild(createCard(subj, group)));
+      // Render all subjects per module
+      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
+      subjects.forEach(subj => col.appendChild(createCard(subj, module)));
+
+      // Insert electiva placeholders according to module.electivas (if present)
+      const electivasCount = Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0;
+      for (let i = 0; i < electivasCount; i++){
+        col.appendChild(createAddElectivaPlaceholder(visIdx));
+      }
 
       columnsContainer.appendChild(col);
     });
 
-    // Compute stats from all displayed subjects
+    // Compute stats from all displayed subjects (use visible modules)
     displayedSubjects = [];
-    groups.forEach(g => {
-      if (Array.isArray(g.subjects)) {
-        displayedSubjects.push(...g.subjects);
-      }
+    visibleModules.forEach(m => {
+      if (Array.isArray(m.subjects)) displayedSubjects.push(...m.subjects);
     });
     computeStats(displayedSubjects);
 
     // Setup overlay SVG and interactivity for correlativas
     setupOverlayAndInteractions();
-
-    // Ensure the toggle reflects persisted preference and reacts to changes
-    if (correlativasToggle){
-      correlativasToggle.checked = correlativasEnabled;
-      correlativasToggle.setAttribute('aria-checked', correlativasEnabled);
-      correlativasToggle.addEventListener('change', (ev) => {
-        correlativasEnabled = correlativasToggle.checked;
-        correlativasToggle.setAttribute('aria-checked', correlativasEnabled);
-        saveCorrelativasPref(correlativasEnabled);
-        if (!correlativasEnabled){
-          // clear overlay and remove any dim/highlight state
-          clearOverlay();
-          const allCards = columnsContainer.querySelectorAll('.card-subject');
-          allCards.forEach(c => { c.classList.remove('card-dim'); c.classList.remove('card-highlight'); });
-        }
-      });
-    }
+    // restore any previously added electivas from localStorage (will replace placeholders)
+    try{ restoreElectivesFromStorage(); }catch(e){/* ignore */}
   }
 
   function createCard(subject, group = null){
@@ -323,6 +287,24 @@ document.addEventListener('DOMContentLoaded', () => {
       try{ computeStats(displayedSubjects); }catch(e){/* ignore */}
     // open subject modal on click
     card.addEventListener('click', onCardClick);
+    return card;
+  }
+
+  // Create a placeholder 'add electiva' card: dotted gray border, transparent background, centered +
+  // Accepts column index where it was placed so we can later insert the electiva in that column
+  function createAddElectivaPlaceholder(colIndex){
+    const card = document.createElement('div');
+    card.className = 'card card-subject card-electiva-add';
+    card.setAttribute('role','button');
+    card.setAttribute('aria-label','Agregar electiva');
+    card.style.cursor = 'pointer';
+    card.dataset.targetColumn = String(typeof colIndex === 'number' ? colIndex : '');
+    card.innerHTML = `<div>+</div>`;
+    // Open electivas modal when clicked and remember insertion target
+    card.addEventListener('click', (ev) => {
+      electivaInsertTarget = { colIndex: typeof colIndex === 'number' ? colIndex : null, placeholderEl: card };
+      try{ openElectivasModal(); }catch(e){ console.error('Error opening electivas modal', e); }
+    });
     return card;
   }
 
@@ -445,6 +427,40 @@ document.addEventListener('DOMContentLoaded', () => {
           // create minimal stored object
           const obj = { values: {}, status: 'Faltan examenes', savedAt: (new Date()).toISOString() };
           saveSubjectData(effectiveCode, obj);
+
+          // If this modal was opened for an electiva selection and we have a pending insert target,
+          // create a real dashboard card in that column and remove the placeholder.
+          try{
+            if (currentCard && currentCard._electivaMeta && currentCard._insertTarget){
+              const meta = currentCard._electivaMeta;
+              const target = currentCard._insertTarget;
+              // avoid duplicates: if code already present, just remove placeholder
+              if (!meta.code || !codeMap[meta.code]){
+                const newCard = createCard(meta);
+                const colEl = columnsContainer.querySelector(`.column-col[data-index="${target.colIndex}"]`);
+                if (colEl){
+                  if (target.placeholderEl && target.placeholderEl.parentNode === colEl){
+                    colEl.insertBefore(newCard, target.placeholderEl);
+                    target.placeholderEl.remove();
+                  } else {
+                    colEl.appendChild(newCard);
+                  }
+                  // Rebuild overlay/maps so the new card is included
+                  setupOverlayAndInteractions();
+                  try{ computeStats(displayedSubjects); }catch(e){}
+                  // set currentCard to the newly created real card so subsequent UI updates apply to it
+                  currentCard = codeMap[meta.code] || newCard;
+                }
+              } else {
+                // already exists: remove placeholder if present
+                try{ if (target && target.placeholderEl && target.placeholderEl.parentNode) target.placeholderEl.remove(); }catch(e){}
+              }
+              // clear pending insert
+              electivaInsertTarget = null;
+              if (currentCard && currentCard._insertTarget) delete currentCard._insertTarget;
+            }
+          }catch(e){ console.error('Error inserting electiva into column', e); }
+
           // restore modal content
           if (formEl) formEl.classList.remove('d-none');
           if (statusEl) { statusEl.classList.remove('d-none'); setStatusBanner(obj.status); }
@@ -812,6 +828,28 @@ document.addEventListener('DOMContentLoaded', () => {
   let overlaySvg = null;
   let codeMap = {};
   let dependentsMap = {};
+  // When clicking a placeholder + to add an electiva, we store the target column and placeholder element here
+  let electivaInsertTarget = null;
+
+  // Update all cards' disabled/enabled state according to cursar requirements
+  function updateAllCardCursarState(){
+    try{
+      if (!columnsContainer) return;
+      const all = columnsContainer.querySelectorAll('.card-subject');
+      all.forEach(c => {
+        try{
+          const meets = cursarRequirementsMetForCard(c);
+          if (!meets){
+            c.classList.add('card-disabled');
+            c.setAttribute('aria-disabled','true');
+          } else {
+            c.classList.remove('card-disabled');
+            c.removeAttribute('aria-disabled');
+          }
+        }catch(e){/* ignore per-card errors */}
+      });
+    }catch(e){ console.error('Error actualizando estado de cursar en cards', e); }
+  }
 
   function setupOverlayAndInteractions(){
     // create overlay SVG inside columnsContainer
@@ -1081,4 +1119,300 @@ document.addEventListener('DOMContentLoaded', () => {
       return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
     });
   }
+
+  // Render electivas list into the electivas modal container and show modal
+  function renderElectivasModal(list){
+    const container = document.getElementById('electivas-container');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!Array.isArray(list) || list.length === 0){
+      container.innerHTML = '<div class="col-12"><div class="alert alert-info">No hay electivas disponibles.</div></div>';
+    } else {
+      list.forEach(subj => {
+        const col = document.createElement('div');
+        col.className = 'col-12 col-md-6 col-lg-4 mb-3';
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="card-body p-2">
+            <h6 class="mb-1">${escapeHtml(subj.name || subj.code)}</h6>
+            <small class="text-muted">${escapeHtml(subj.code || '')}</small>
+            <div class="mt-2"><small class="text-muted">${escapeHtml((subj.requirements && subj.requirements.cursar && subj.requirements.cursar.length) ? ('Requiere: ' + subj.requirements.cursar.map(r => (typeof r === 'string' ? r : (r.id||r.code))).join(', ')) : '')}</small></div>
+            <div class="mt-2 d-flex gap-2">
+              <button class="btn btn-sm btn-primary btn-add-elective">Agregar al tablero</button>
+              <button class="btn btn-sm btn-outline-secondary btn-view-elective">Ver</button>
+            </div>
+          </div>
+        `;
+        // Clicking an electiva opens the subject modal prepopulated for that elective
+        card.style.cursor = 'pointer';
+        // Determine if this electiva is already on the tablero (by code)
+        const alreadyOnBoard = subj && subj.code && codeMap && codeMap[subj.code];
+
+        // 'Ver' button: show only when electiva is on the board; it should open the real card modal
+        const viewBtn = card.querySelector('.btn-view-elective');
+        if (viewBtn){
+          if (alreadyOnBoard){
+            // Open the actual card on the board
+            viewBtn.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              try{
+                const real = codeMap[subj.code];
+                if (real) onCardClick({ currentTarget: real });
+              }catch(e){ console.error('Error abriendo electiva real', e); }
+              try{ const m = document.getElementById('electivasModal'); if (m){ const inst = bootstrap.Modal.getInstance(m) || new bootstrap.Modal(m); inst.hide(); } }catch(e){}
+            });
+          } else {
+            // hide the view button when electiva not on board
+            viewBtn.style.display = 'none';
+          }
+        }
+
+        // 'Agregar al tablero' button: show only when electiva is NOT on the board
+        const addBtn = card.querySelector('.btn-add-elective');
+        if (addBtn){
+          if (alreadyOnBoard){
+            addBtn.style.display = 'none';
+          } else {
+            addBtn.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              // If there's a pending insert target (user clicked a + placeholder), insert directly
+              // into that column and replace the placeholder element.
+              if (electivaInsertTarget && typeof electivaInsertTarget.colIndex === 'number'){
+                // close electivas modal first
+                try{ const m = document.getElementById('electivasModal'); if (m){ const inst = bootstrap.Modal.getInstance(m) || new bootstrap.Modal(m); inst.hide(); } }catch(e){}
+                performAddElectiveToColumn(subj, electivaInsertTarget.colIndex, electivaInsertTarget.placeholderEl);
+                // clear pending insert target
+                electivaInsertTarget = null;
+                return;
+              }
+              // fallback: ask user which column to add to
+              showPickColumnModal(subj);
+            });
+          }
+        }
+        col.appendChild(card);
+        container.appendChild(col);
+      });
+    }
+    const modalEl = document.getElementById('electivasModal');
+    if (modalEl){ const inst = new bootstrap.Modal(modalEl); inst.show(); }
+  }
+
+  // Show a small modal to pick a column where to insert the electiva
+  function showPickColumnModal(subj){
+    // build modal if not present
+    let pick = document.getElementById('pickColumnModal');
+    if (!pick){
+      pick = document.createElement('div');
+      pick.id = 'pickColumnModal';
+      pick.className = 'modal fade';
+      pick.tabIndex = -1;
+      pick.innerHTML = `
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Agregar al tablero</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+            <div class="modal-body">
+              <div class="mb-2"><label class="form-label">Elegí columna</label><select id="pickColumnSelect" class="form-select"></select></div>
+              <div id="pickColumnAlert"></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary" id="pickColumnConfirm">Agregar</button></div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(pick);
+    }
+    // populate select with current columns
+    const select = pick.querySelector('#pickColumnSelect');
+    select.innerHTML = '';
+    const cols = Array.from(document.querySelectorAll('.column-col'));
+    if (cols.length === 0){
+      const alert = pick.querySelector('#pickColumnAlert');
+      if (alert) alert.innerHTML = '<div class="alert alert-warning">No hay columnas disponibles para insertar.</div>';
+      const modal = new bootstrap.Modal(pick); modal.show();
+      return;
+    }
+    cols.forEach(c => {
+      const idx = c.dataset.index;
+      const nameEl = c.querySelector('strong');
+      const name = nameEl ? nameEl.textContent.trim() : (`Col ${idx}`);
+      const opt = document.createElement('option'); opt.value = idx; opt.textContent = `${idx} — ${name}`;
+      select.appendChild(opt);
+    });
+    // show modal
+    const modal = new bootstrap.Modal(pick);
+    modal.show();
+    // confirm handler
+    const confirmBtn = pick.querySelector('#pickColumnConfirm');
+    const handler = () => {
+      const chosen = parseInt(select.value, 10);
+      // if there's a placeholder in the chosen column, prefer replacing it
+      const colEl = columnsContainer.querySelector(`.column-col[data-index="${chosen}"]`);
+      let placeholderEl = null;
+      if (colEl){
+        placeholderEl = colEl.querySelector('.card-electiva-add');
+      }
+      performAddElectiveToColumn(subj, chosen, placeholderEl);
+      confirmBtn.removeEventListener('click', handler);
+      modal.hide();
+    };
+    confirmBtn.addEventListener('click', handler);
+  }
+
+  // Insert electiva into a given column index and persist in localStorage under key 'electives'
+  function performAddElectiveToColumn(subj, colIndex, placeholderEl, skipConfirm){
+    try{
+      // avoid duplicates
+      if (subj.code && codeMap[subj.code]){
+        showElectivasAlert('warning', 'La electiva ya está presente en el tablero.');
+        return;
+      }
+      // check cursar requirements for this electiva using existing stored data
+      const tmp = document.createElement('div');
+      tmp.dataset.requirements = JSON.stringify(subj.requirements || { cursar: [], aprobar: [] });
+      const meets = cursarRequirementsMetForCard(tmp);
+      if (!meets && !skipConfirm){
+        const proceed = window.confirm('La electiva no cumple las correlativas para cursar. ¿Deseás agregarla de todos modos?');
+        if (!proceed) return;
+      }
+      const newCard = createCard(subj);
+      // mark as electiva and add a delete (trash) button on the top-right corner
+      try{
+        newCard.classList.add('card-electiva');
+        newCard.dataset.electiva = '1';
+        // ensure relative positioning so the trash button can be absolute
+        const prevPos = newCard.style.position;
+        if (!prevPos) newCard.style.position = 'relative';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-sm btn-outline-danger btn-electiva-remove';
+        removeBtn.setAttribute('aria-label','Eliminar electiva');
+        removeBtn.style.position = 'absolute';
+        removeBtn.style.top = '6px';
+        removeBtn.style.right = '6px';
+        removeBtn.style.zIndex = '10';
+        removeBtn.style.padding = '0.15rem 0.4rem';
+        removeBtn.innerHTML = '🗑';
+        // deletion handler: stop propagation (don't open modal), remove from board and storage
+        removeBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          try{
+            const key = subj.code || subj.name;
+            // if subject in course, remove its stored data (dar de baja)
+            try{ const sk = getSubjectStorageKey(key); if (sk) localStorage.removeItem(sk); }catch(e){}
+            // remove from electives map
+            try{
+              const raw = localStorage.getItem('electives');
+              if (raw){ const obj = JSON.parse(raw); if (obj && obj[key]){ delete obj[key]; localStorage.setItem('electives', JSON.stringify(obj)); } }
+            }catch(e){ console.error('Error actualizando electives al eliminar', e); }
+            // Remove the card from DOM and replace with a placeholder in the same column and position
+            const parent = newCard.parentNode;
+            const next = newCard.nextSibling;
+            newCard.remove();
+            try{
+              const colIdx = typeof colIndex === 'number' ? colIndex : (parent && parent.dataset ? parseInt(parent.dataset.index,10) : NaN);
+              if (!Number.isNaN(colIdx) && parent){
+                const ph = createAddElectivaPlaceholder(colIdx);
+                if (next) parent.insertBefore(ph, next); else parent.appendChild(ph);
+              }
+            }catch(e){/* ignore */}
+            // refresh overlay and stats
+            try{ setupOverlayAndInteractions(); }catch(e){}
+            try{ computeStats(displayedSubjects); }catch(e){}
+          }catch(err){ console.error('Error eliminando electiva', err); }
+        });
+        // prepend remove button into the card body
+        const body = newCard.querySelector('.card-body') || newCard;
+        body.appendChild(removeBtn);
+      }catch(e){ console.error('Error agregando boton eliminar a la card', e); }
+      const colEl = columnsContainer.querySelector(`.column-col[data-index="${colIndex}"]`);
+      if (colEl){
+        // If a placeholder element was provided and it lives in the target column,
+        // replace it with the new card. Otherwise append at the end of the column.
+        if (placeholderEl && placeholderEl.parentNode === colEl){
+          colEl.insertBefore(newCard, placeholderEl);
+          try{ placeholderEl.remove(); }catch(e){}
+        } else {
+          colEl.appendChild(newCard);
+        }
+      } else {
+        // no column found: append directly to container
+        columnsContainer.appendChild(newCard);
+      }
+      // persist placement
+      try{
+        const raw = localStorage.getItem('electives');
+        const obj = raw ? JSON.parse(raw) : {};
+        obj[subj.code || subj.name] = { colIndex };
+        localStorage.setItem('electives', JSON.stringify(obj));
+      }catch(e){ console.error('Error guardando electives', e); }
+      // refresh overlays and stats
+      setupOverlayAndInteractions();
+      try{ computeStats(displayedSubjects); }catch(e){}
+      showElectivasAlert('success', 'Electiva agregada al tablero.');
+    }catch(e){ console.error('Error agregando electiva', e); showElectivasAlert('danger','Error al agregar electiva.'); }
+  }
+
+  // Restore electivas previously saved in localStorage into the dashboard.
+  // Behavior: read `localStorage.electives` and use electivasList (loaded from DATA_URL)
+  // to get the real metadata (so cards show the electiva name instead of just the code),
+  // then insert each electiva into its saved column, replacing placeholders when possible.
+  function restoreElectivesFromStorage(){
+    try{
+      const raw = localStorage.getItem('electives');
+      if (!raw) return;
+      const stored = JSON.parse(raw);
+      if (!stored || Object.keys(stored).length === 0) return;
+      // Build lookup from electivasList (loaded from DATA_URL)
+      const list = Array.isArray(electivasList) ? electivasList : [];
+      const byCode = {};
+      const byName = {};
+      list.forEach(s => { if (s.code) byCode[s.code] = s; if (s.name) byName[s.name] = s; });
+      Object.keys(stored).forEach(key => {
+        try{
+          const entry = stored[key];
+          const colIndex = typeof entry.colIndex === 'number' ? entry.colIndex : parseInt(entry.colIndex,10);
+          // prefer matching by code first, then by name
+          let subjMeta = null;
+          if (byCode[key]) subjMeta = byCode[key];
+          else if (byName[key]) subjMeta = byName[key];
+          else {
+            // fallback minimal object (use key as name so UI isn't just the code)
+            subjMeta = { code: key, name: key, requirements: { cursar: [], aprobar: [] } };
+          }
+          const colEl = columnsContainer.querySelector(`.column-col[data-index="${colIndex}"]`);
+          let placeholderEl = null;
+          if (colEl) placeholderEl = colEl.querySelector('.card-electiva-add');
+          // insert without prompting
+          performAddElectiveToColumn(subjMeta, colIndex, placeholderEl, true);
+        }catch(e){ console.error('Error restaurando electiva', key, e); }
+      });
+    }catch(e){ console.error('Error leyendo electives from storage', e); }
+  }
+
+  function showElectivasAlert(level, msg){
+    const container = document.getElementById('electivas-container');
+    if (!container) return;
+    const a = document.createElement('div');
+    a.className = `col-12`;
+    a.innerHTML = `<div class="alert alert-${level} py-1">${escapeHtml(msg)}</div>`;
+    container.insertBefore(a, container.firstChild);
+    setTimeout(()=>{ try{ a.remove(); }catch(e){} }, 2500);
+  }
+
+  // Load the main plan (subjects + modules + electivas) from DATA_URL and render
+  fetch(DATA_URL)
+    .then(r => r.json())
+    .then(d => {
+      planData = d;
+      const modules = Array.isArray(d.modules) ? d.modules : [];
+      // electivas module typically has id 'electives' and render: false
+      const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
+      electivasList = electModule && Array.isArray(electModule.subjects) ? electModule.subjects : [];
+      try{ renderGroups(d); }catch(e){ console.error('Error renderizando grupos', e); }
+    })
+    .catch(err => {
+      console.error('Error cargando plan desde DATA_URL', err);
+      if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-danger">No se pudo cargar el plan de materias.</div>';
+    });
 });

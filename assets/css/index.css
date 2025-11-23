@@ -160,6 +160,24 @@ body{
   border: 2px dashed rgba(0,0,0,0.08);
 }
 
+/* Placeholder card for adding electivas: match light dashed border and sizing of other cards */
+.card-electiva-add{
+  border: 2px dashed rgba(0,0,0,0.08);
+  background: transparent;
+  min-height: 56px; /* similar visual height to compact subject cards */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem; /* same inner padding as .card-subject .card-body */
+  margin-bottom: 0.35rem;
+}
+
+.card-electiva-add > div{ /* the + symbol */
+  font-size: 28px;
+  color: rgba(0,0,0,0.45);
+  line-height: 1;
+}
+
 /* Highlight animation for missing requirements: jump + red flash */
 @keyframes reqFlash {
   0% { transform: translateY(0); box-shadow: none; }
