@@ -32,6 +32,12 @@
 						Ayuda
 					</button>
 				</div>
+				<!-- Profile / Login button (opens profile modal) -->
+				<div class="ms-2">
+					<button type="button" class="btn btn-outline-secondary" id="btn-profile" data-bs-toggle="modal" data-bs-target="#profileModal" aria-label="Perfil">
+						Perfil
+					</button>
+				</div>
 			</div>
 
 			<!-- Columns with subject cards -->
@@ -116,6 +122,83 @@
 		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
 		      </div>
 		    </div>
+		  </div>
+		</div>
+
+		<!-- Profile / Auth modal (HTML only - JS to be implemented later) -->
+		<div class="modal fade" id="profileModal" tabindex="-1" aria-labelledby="profileModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+			  <div class="modal-header">
+				<h5 class="modal-title" id="profileModalLabel">Cuenta / Perfil</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			  </div>
+			  <div class="modal-body">
+				<!-- Note: JS will show/hide sections depending on auth state -->
+				<!-- Sign-in section -->
+				<div id="profile-signin" class="auth-section">
+				  <h6>Iniciar sesión</h6>
+				  <div class="mb-2">
+					<!-- Google Sign-In button -->
+					<button id="profile-google-btn" class="btn btn-outline-danger w-100 mb-2" type="button" aria-label="Iniciar sesión con Google">
+					  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48" style="vertical-align:middle;margin-right:8px;">
+						<path fill="#EA4335" d="M24 9.5c3.9 0 7.1 1.4 9.4 3.2l6.9-6.9C35.6 2.9 30.1 0 24 0 14.7 0 6.9 5 2.9 12.3l7.9 6.1C12.9 14 18 9.5 24 9.5z"/>
+						<path fill="#34A853" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.6H24v9h12.7c-.6 3-2.3 5.2-4.9 6.9l7.5 5.8C44.7 37.2 46.5 31.2 46.5 24.5z"/>
+						<path fill="#4A90E2" d="M10.8 28.4A14.8 14.8 0 0110 24c0-1.6.3-3.1.8-4.5L2.9 13.4A24 24 0 000 24c0 3.8.9 7.4 2.6 10.6l8.2-6.2z"/>
+						<path fill="#FBBC05" d="M24 48c6 0 11.1-2 15-5.5l-7.5-5.8c-2 1.4-4.6 2.3-7.5 2.3-6 0-11.1-3.9-13-9.2l-8.2 6.2C6.9 43 14.7 48 24 48z"/>
+					  </svg>
+					  Continuar con Google
+					</button>
+				  </div>
+				  <div class="mb-2">
+					<label class="form-label small">Email</label>
+					<input id="profile-email-signin" type="email" class="form-control" placeholder="tu@ejemplo.com" />
+				  </div>
+				  <div class="mb-2">
+					<label class="form-label small">Contraseña</label>
+					<input id="profile-password-signin" type="password" class="form-control" placeholder="Contraseña" />
+				  </div>
+				  <div class="d-flex gap-2">
+					<button id="profile-signin-btn" class="btn btn-primary">Iniciar sesión</button>
+					<button id="profile-show-register" class="btn btn-link">Registrarse</button>
+				  </div>
+				</div>
+				<!-- Register section -->
+				<div id="profile-register" class="auth-section d-none">
+				  <h6>Crear cuenta</h6>
+				  <div class="mb-2">
+					<label class="form-label small">Nombre para mostrar</label>
+					<input id="profile-name-register" type="text" class="form-control" placeholder="Tu nombre" />
+				  </div>
+				  <div class="mb-2">
+					<label class="form-label small">Email</label>
+					<input id="profile-email-register" type="email" class="form-control" placeholder="tu@ejemplo.com" />
+				  </div>
+				  <div class="mb-2">
+					<label class="form-label small">Contraseña</label>
+					<input id="profile-password-register" type="password" class="form-control" placeholder="Contraseña" />
+				  </div>
+				  <div class="d-flex gap-2">
+					<button id="profile-register-btn" class="btn btn-primary">Crear cuenta</button>
+					<button id="profile-show-signin" class="btn btn-link">Volver a iniciar sesión</button>
+				  </div>
+				</div>
+				<!-- User info section (visible when logged in) -->
+				<div id="profile-user" class="auth-section d-none">
+				  <h6>Sesión iniciada</h6>
+				  <div class="mb-2"><strong id="profile-user-name">Nombre</strong></div>
+				  <div class="mb-2 text-muted" id="profile-user-email">email@ejemplo.com</div>
+				  <div class="d-flex gap-2">
+					<button id="profile-signout-btn" class="btn btn-outline-danger">Cerrar sesión</button>
+					<button id="profile-sync-btn" class="btn btn-outline-secondary">Sincronizar ahora</button>
+				  </div>
+				  <div class="mt-3"><small class="text-muted">Cuando inicies sesión, podrás sincronizar tu tablero entre dispositivos.</small></div>
+				</div>
+			  </div>
+			  <div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			  </div>
+			</div>
 		  </div>
 		</div>
 
@@ -218,5 +301,177 @@
 		    </div>
 		  </div>
 		</div>
+
+		<script type="module">
+			// Import the functions you need from the SDKs you need
+			import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+			import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
+			import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+			import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+			// TODO: Add SDKs for Firebase products that you want to use
+			// https://firebase.google.com/docs/web/setup#available-libraries
+
+			// Your web app's Firebase configuration
+			// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+			const firebaseConfig = {
+				apiKey: "AIzaSyB4n2_ZY0tBjwMzoQqvjjUHlqD0Yu6Dr0A",
+				authDomain: "utntracker.firebaseapp.com",
+				projectId: "utntracker",
+				storageBucket: "utntracker.firebasestorage.app",
+				messagingSenderId: "791264678302",
+				appId: "1:791264678302:web:e637c2e3b499614683868f",
+				measurementId: "G-T4WYQC67SW"
+			};
+
+			// Initialize Firebase
+			const app = initializeApp(firebaseConfig);
+			const analytics = getAnalytics(app);
+
+			// Auth: Google sign-in and simple UI wiring for the profile modal
+			const auth = getAuth(app);
+			const provider = new GoogleAuthProvider();
+
+			// Firestore initialization
+			const db = getFirestore(app);
+			let userDocUnsubscribe = null;
+
+			// Helper: upload a single subject to the user's Firestore doc under `subjectData.{code}`
+			window.firestoreUploadSubject = async function(code, payload){
+				try{
+					if (!auth || !auth.currentUser) return;
+					const ref = doc(db, 'users', auth.currentUser.uid);
+					// set the nested field subjectData.code to payload (merge)
+					await setDoc(ref, { subjectData: { [code]: payload }, updatedAt: serverTimestamp() }, { merge: true });
+				}catch(err){ console.error('firestoreUploadSubject error', err); }
+			};
+
+			// Helper: delete a subject field from subjectData
+			window.firestoreDeleteSubject = async function(code){
+				try{
+					if (!auth || !auth.currentUser) return;
+					const ref = doc(db, 'users', auth.currentUser.uid);
+					await updateDoc(ref, { [`subjectData.${code}`]: deleteField(), updatedAt: serverTimestamp() });
+				}catch(err){ console.error('firestoreDeleteSubject error', err); }
+			};
+
+			// Helper: upload electives map wholesale
+			window.firestoreUploadElectives = async function(mapObj){
+				try{
+					if (!auth || !auth.currentUser) return;
+					const ref = doc(db, 'users', auth.currentUser.uid);
+					await setDoc(ref, { electives: mapObj, updatedAt: serverTimestamp() }, { merge: true });
+				}catch(err){ console.error('firestoreUploadElectives error', err); }
+			};
+
+			// Helper: download user doc and merge into localStorage (overwrite local keys)
+			window.firestoreDownloadAndApply = async function(){
+				try{
+					if (!auth || !auth.currentUser) return null;
+					const ref = doc(db, 'users', auth.currentUser.uid);
+					const snap = await getDoc(ref);
+					if (!snap.exists()) return null;
+					const data = snap.data() || {};
+					// Merge subjectData
+					if (data.subjectData && typeof data.subjectData === 'object'){
+						Object.keys(data.subjectData).forEach(code => {
+							try{ localStorage.setItem('subjectData:' + code, JSON.stringify(data.subjectData[code])); }catch(e){}
+						});
+					}
+					// Merge electives and mostrarCorrelativas if present
+					if (data.electives) try{ localStorage.setItem('electives', JSON.stringify(data.electives)); }catch(e){}
+					if (typeof data.mostrarCorrelativas !== 'undefined') try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
+					// Note: do NOT dispatch an event here to avoid duplicate reloads; caller may reload or re-render as needed.
+					return data;
+				}catch(err){ console.error('firestoreDownloadAndApply error', err); return null; }
+			};
+
+			// Setup real-time listener on user's doc to apply remote changes automatically
+			async function startUserDocListener(uid){
+				try{
+					const ref = doc(db, 'users', uid);
+					if (userDocUnsubscribe) userDocUnsubscribe();
+					let first = true;
+					userDocUnsubscribe = onSnapshot(ref, (snap) => {
+						if (!snap.exists()) return;
+						// ignore the initial snapshot delivered immediately after subscribing
+						if (first){ first = false; return; }
+						const data = snap.data() || {};
+						// apply remote changes to localStorage
+						if (data.subjectData){
+							Object.keys(data.subjectData).forEach(code => {
+								try{ localStorage.setItem('subjectData:' + code, JSON.stringify(data.subjectData[code])); }catch(e){}
+							});
+						}
+						if (data.electives) try{ localStorage.setItem('electives', JSON.stringify(data.electives)); }catch(e){}
+						if (typeof data.mostrarCorrelativas !== 'undefined') try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
+						// notify app to refresh UI (only for subsequent updates)
+						document.dispatchEvent(new CustomEvent('firestore:remote-update', { detail: { from: 'onSnapshot' } }));
+					});
+				}catch(err){ console.error('startUserDocListener error', err); }
+			}
+
+			function showSigninSection() {
+	 			document.getElementById('profile-signin').classList.remove('d-none');
+	 			document.getElementById('profile-register').classList.add('d-none');
+	 			document.getElementById('profile-user').classList.add('d-none');
+	 		}
+
+			// Ensure modal starts on sign-in section by default
+			showSigninSection();
+
+	 		document.getElementById('profile-show-register').addEventListener('click', (e) => {
+	 			e.preventDefault();
+	 			document.getElementById('profile-signin').classList.add('d-none');
+	 			document.getElementById('profile-register').classList.remove('d-none');
+	 		});
+
+	 		document.getElementById('profile-show-signin').addEventListener('click', (e) => {
+	 			e.preventDefault();
+	 			showSigninSection();
+	 		});
+
+	 		// Google sign-in button
+	 		document.getElementById('profile-google-btn').addEventListener('click', async () => {
+	 			try {
+	 				await signInWithPopup(auth, provider);
+	 				// onAuthStateChanged will update UI
+	 			} catch (err) {
+	 				console.error('Google sign-in error', err);
+	 				alert('Error al iniciar con Google: ' + (err.message || err));
+	 			}
+	 		});
+
+	 		// Sign out button
+	 		document.getElementById('profile-signout-btn').addEventListener('click', async () => {
+	 			try {
+	 				await signOut(auth);
+	 				showSigninSection();
+	 			} catch (err) {
+	 				console.error('Sign-out error', err);
+	 				alert('Error al cerrar sesión: ' + (err.message || err));
+	 			}
+	 		});
+
+			onAuthStateChanged(auth, async (user) => {
+				if (user) {
+					// Show user info
+					document.getElementById('profile-user-name').textContent = user.displayName || 'Usuario';
+					document.getElementById('profile-user-email').textContent = user.email || '';
+					document.getElementById('profile-user').classList.remove('d-none');
+					document.getElementById('profile-signin').classList.add('d-none');
+					document.getElementById('profile-register').classList.add('d-none');
+					// Download remote state and trigger a single in-place refresh (avoid reload loop)
+					try{ await (window.firestoreDownloadAndApply ? window.firestoreDownloadAndApply() : Promise.resolve()); }catch(e){ console.error(e); }
+					// Dispatch a single remote-update event so the app re-renders from the freshly-downloaded localStorage
+					try{ document.dispatchEvent(new CustomEvent('firestore:remote-update', { detail: { from: 'initialDownload' } })); }catch(e){ console.error(e); }
+					// Start realtime listener after initial download (listener will ignore its initial snapshot)
+					try{ startUserDocListener(user.uid); }catch(e){ console.error(e); }
+				} else {
+					// stop listener when signed out
+					try{ if (userDocUnsubscribe) userDocUnsubscribe(); }catch(e){}
+					showSigninSection();
+				}
+			});
+		</script>
 	</body>
 </html>

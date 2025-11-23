@@ -14,6 +14,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressLabel = document.getElementById('progress-label');
   let displayedSubjects = [];
 
+  // When Firestore listener notifies of remote changes, refresh the app state
+  document.addEventListener('firestore:remote-update', (ev) => {
+    try{
+      console.log('Firestore remote update received', ev && ev.detail);
+      // Prefer in-place re-render from planData when available to avoid a full reload loop.
+      if (typeof renderGroups === 'function' && typeof planData !== 'undefined' && planData){
+        try{
+          window.__firestoreApplyingRemote = true;
+          renderGroups(planData);
+        }catch(e){ console.error('Error re-rendering after remote update', e); }
+        finally{ window.__firestoreApplyingRemote = false; }
+      } else {
+        // fallback: reload once
+        try{ location.reload(); }catch(e){}
+      }
+    }catch(e){ console.error(e); }
+  });
+
   // Correlativas toggle: read persisted preference and bind toggle UI
   const correlativasToggle = document.getElementById('toggle-correlativas');
   let correlativasEnabled = true;
@@ -95,6 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!key) return;
     try{
       localStorage.setItem(key, JSON.stringify(payload));
+      // upload to Firestore if available (skip when applying remote changes)
+      try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadSubject) window.firestoreUploadSubject(code, payload); }catch(e){ console.error('uploadSubject hook error', e); }
     }catch(e){
       console.error('Error guardando subject data', e);
     }
@@ -225,8 +245,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // animate unlocks: capture available-before, remove data, then capture after and animate
       let prevAvailable = [];
       try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
-      const key = getSubjectStorageKey(code);
-      if (key) localStorage.removeItem(key);
+  const key = getSubjectStorageKey(code);
+  if (key) localStorage.removeItem(key);
+  // notify Firestore to delete this subject if enabled
+  try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(code); }catch(e){ console.error('firestoreDeleteSubject hook error', e); }
       // clear inputs
       ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
         const el = document.getElementById(id);
@@ -1610,6 +1632,10 @@ document.addEventListener('DOMContentLoaded', () => {
               const raw = localStorage.getItem('electives');
               if (raw){ const obj = JSON.parse(raw); if (obj && obj[key]){ delete obj[key]; localStorage.setItem('electives', JSON.stringify(obj)); } }
             }catch(e){ console.error('Error actualizando electives al eliminar', e); }
+            // upload updated electives map (skip if applying remote changes)
+            try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadElectives) window.firestoreUploadElectives(JSON.parse(localStorage.getItem('electives') || '{}')); }catch(err){ console.error('firestoreUploadElectives hook error', err); }
+            // notify backend to delete subject data as well
+            try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(key); }catch(err){ console.error('firestoreDeleteSubject hook error', err); }
             // Remove the card from DOM and replace with a placeholder in the same column and position
             const parent = newCard.parentNode;
             const next = newCard.nextSibling;
@@ -1649,7 +1675,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const raw = localStorage.getItem('electives');
         const obj = raw ? JSON.parse(raw) : {};
         obj[subj.code || subj.name] = { colIndex };
-        localStorage.setItem('electives', JSON.stringify(obj));
+  localStorage.setItem('electives', JSON.stringify(obj));
+  // upload electives map to Firestore when available (skip during remote application)
+  try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadElectives) window.firestoreUploadElectives(obj); }catch(err){ console.error('firestoreUploadElectives hook error', err); }
       }catch(e){ console.error('Error guardando electives', e); }
       // refresh overlays and stats
       setupOverlayAndInteractions();
