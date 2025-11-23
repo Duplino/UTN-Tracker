@@ -125,3 +125,48 @@ body{
   transform: translateY(-2px);
   transition: box-shadow 180ms ease, transform 180ms ease;
 }
+
+/* Very light status backgrounds for subject cards */
+.card-status-aprobada{
+  background-color: rgba(40,167,69,0.06); /* very light green */
+}
+.card-status-desaprobada{
+  background-color: rgba(220,53,69,0.05); /* very light red */
+}
+.card-status-promocionada{
+  background-color: rgba(13,110,253,0.04); /* very light blue */
+}
+.card-status-regularizada{
+  background-color: rgba(255,193,7,0.04); /* very light yellow */
+}
+
+/* Disabled look when a subject doesn't meet 'cursar' requirements */
+.card-disabled{
+  opacity: 0.45;
+  filter: grayscale(90%);
+  /* keep pointer events so hover/tooltip/interactions still work; click is disabled in JS */
+}
+
+/* When hovering a disabled card, show it as normal (white, no grayscale) so correlatives are visible */
+.card-disabled:hover{
+  opacity: 1;
+  filter: none;
+  background-color: #ffffff;
+}
+
+/* Available to start (meets cursar requirements but not in course) */
+.card-available{
+  border: 2px dashed rgba(0,0,0,0.08);
+}
+
+/* Highlight animation for missing requirements: jump + red flash */
+@keyframes reqFlash {
+  0% { transform: translateY(0); box-shadow: none; }
+  25% { transform: translateY(-8px); box-shadow: 0 8px 20px rgba(220,53,69,0.18); }
+  60% { transform: translateY(0); box-shadow: 0 6px 14px rgba(220,53,69,0.12); }
+  100% { transform: translateY(0); box-shadow: none; }
+}
+.req-highlight{
+  animation: reqFlash 800ms ease;
+  border-color: rgba(220,53,69,0.85) !important;
+}

@@ -1,0 +1,1 @@
+Faltra discriminar materias del titulo intermedio, chequear las electivas, como manejar eso, PPS, Proyecto final, chequear que estén todas y en orden
