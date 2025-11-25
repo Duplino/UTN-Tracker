@@ -57,7 +57,7 @@
       "electivas": 2,
       "subjects": [
   { "code": "AdmSI", "name": "Administración de Sistemas de Información", "requirements": { "cursar": [ { "id": "ECO", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "ASI", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
-  { "code": "Leg", "name": "Legislación", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "IngSoc", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
+  { "code": "Leg", "name": "Legislación", "requirements": { "cursar": [ { "id": "IyS", "type": "regularizada" } ], "aprobar": [] }, "weekHours": 6 },
   { "code": "IyCS", "name": "Ingeniería y Calidad de Software", "requirements": { "cursar": [ { "id": "BD", "type": "regularizada" }, { "id": "DdS", "type": "regularizada" }, { "id": "DSI", "type": "regularizada" }, { "id": "SySL", "type": "aprobada" }, { "id": "PdP", "type": "aprobada" } ], "aprobar": [] }, "weekHours": 6 },
   { "code": "RD", "name": "Redes de Datos", "requirements": { "cursar": [ { "id": "SSOO", "type": "regularizada" }, { "id": "CD", "type": "regularizada" } ], "aprobar": [] }, "weekHours": 6 },
   { "code": "IO", "name": "Investigación Operativa", "requirements": { "cursar": [ { "id": "PyE", "type": "regularizada" }, { "id": "AN", "type": "regularizada" } ], "aprobar": [] }, "weekHours": 6 },
