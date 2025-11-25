@@ -1636,6 +1636,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadElectives) window.firestoreUploadElectives(JSON.parse(localStorage.getItem('electives') || '{}')); }catch(err){ console.error('firestoreUploadElectives hook error', err); }
             // notify backend to delete subject data as well
             try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(key); }catch(err){ console.error('firestoreDeleteSubject hook error', err); }
+            // also request deletion of the elective entry under `electives.<code>` in Firestore
+            try{ if (!window.__firestoreApplyingRemote && window.firestoreDeleteElective) window.firestoreDeleteElective(key); }catch(err){ console.error('firestoreDeleteElective hook error', err); }
             // Remove the card from DOM and replace with a placeholder in the same column and position
             const parent = newCard.parentNode;
             const next = newCard.nextSibling;

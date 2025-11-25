@@ -363,6 +363,15 @@
 				}catch(err){ console.error('firestoreUploadElectives error', err); }
 			};
 
+			// Helper: delete a single elective entry from the user's electives map
+			window.firestoreDeleteElective = async function(code){
+				try{
+					if (!auth || !auth.currentUser) return;
+					const ref = doc(db, 'users', auth.currentUser.uid);
+					await updateDoc(ref, { [`electives.${code}`]: deleteField(), updatedAt: serverTimestamp() });
+				}catch(err){ console.error('firestoreDeleteElective error', err); }
+			};
+
 			// Helper: download user doc and merge into localStorage (overwrite local keys)
 			window.firestoreDownloadAndApply = async function(){
 				try{
