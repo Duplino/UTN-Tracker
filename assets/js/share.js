@@ -195,6 +195,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const all = columnsContainer.querySelectorAll('.card-subject');
       all.forEach(c => {
         try {
+          // Skip electiva placeholder cards (they have no subject code and shouldn't be counted)
+          if (c.classList.contains('card-electiva-placeholder')) return;
+          
           const meets = cursarRequirementsMetForCard(c);
           if (!meets) {
             c.classList.add('card-disabled');
@@ -699,10 +702,11 @@ document.addEventListener('DOMContentLoaded', () => {
     statPlaceholder2.textContent = regularized;
 
     // Count available subjects (cards with .card-available class = meet cursar requirements and not started)
+    // Exclude electiva placeholders from the count
     let disponibles = 0;
     try {
       if (columnsContainer) {
-        const availableCards = columnsContainer.querySelectorAll('.card-subject.card-available');
+        const availableCards = columnsContainer.querySelectorAll('.card-subject.card-available:not(.card-electiva-placeholder)');
         disponibles = availableCards.length;
       }
     } catch (e) { disponibles = 0; }
