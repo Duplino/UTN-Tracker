@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>UTN Tracker - Perfil Público</title>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+		<link href="assets/css/index.css" rel="stylesheet">
+		<link href="assets/css/share.css" rel="stylesheet">
+	</head>
+	<body>
+		<div class="container-fluid">
+			<!-- Top toolbar (simplified for public view) -->
+			<div class="toolbar d-flex justify-content-between align-items-center">
+				<div class="d-flex align-items-center" role="group" aria-label="Información">
+					<h5 class="mb-0 me-3" id="share-title">Perfil Público</h5>
+					<span class="badge bg-secondary" id="share-program">Ingeniería en Sistemas de Información - K23</span>
+				</div>
+				<!-- Toggle to enable/disable correlativas hover visualization -->
+				<div class="form-check form-switch ms-3" aria-label="Mostrar correlativas">
+					<input class="form-check-input" type="checkbox" id="toggle-correlativas" role="switch" aria-checked="true" checked>
+					<label class="form-check-label" for="toggle-correlativas">Mostrar correlativas</label>
+				</div>
+				<!-- Help button to explain arrow legend -->
+				<div class="ms-2">
+					<button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#helpModal" id="btn-help">
+						Ayuda
+					</button>
+				</div>
+				<!-- Link to main app -->
+				<div class="ms-2">
+					<a href="index.html" class="btn btn-outline-primary">Crear mi tablero</a>
+				</div>
+			</div>
+
+			<!-- Alert for missing or private profile -->
+			<div id="share-alert" class="alert alert-warning d-none" role="alert">
+				Este perfil no existe o no es público.
+			</div>
+
+			<!-- Columns with subject cards -->
+			<section class="columns-grid" aria-label="Materias">
+				<!-- Columns produced dynamically by JS -->
+			</section>
+
+			<!-- Bottom statistics and progress -->
+			<section class="mt-3">
+				<div class="stats-row">
+					<div class="card stat-card p-2">
+						<div class="small text-muted">Horas semanales</div>
+							<div id="stat-peso" class="h5">—</div>
+					</div>
+					<div class="card stat-card p-2">
+						<div class="small text-muted">Promedio</div>
+						<div id="stat-promedio" class="h5">—</div>
+					</div>
+					<div class="card stat-card p-2">
+						<div class="small text-muted">Materias aprobadas</div>
+						<div id="stat-placeholder-1" class="h6">—</div>
+					</div>
+					<div class="card stat-card p-2">
+						<div class="small text-muted">Finales pendientes</div>
+						<div id="stat-placeholder-2" class="h6">—</div>
+					</div>
+				</div>
+
+				<div class="progress-wrap">
+					<div class="d-flex justify-content-between">
+						<small class="text-muted">Progreso de aprobadas</small>
+						<small id="progress-label" class="text-muted">0%</small>
+					</div>
+					<div class="progress" aria-hidden="false">
+						<div id="progress-bar" class="progress-bar bg-success" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100"></div>
+					</div>
+				</div>
+			</section>
+		</div>
+
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+		<!-- Help modal explaining correlativas legend -->
+		<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="helpModalLabel">Leyenda de correlativas</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <p>Las correlativas se muestran con flechas que indican dependencias entre materias:</p>
+		        <ul>
+		          <li><strong>Flechas negras</strong>: requisito <em>para cursar</em> (asistencia/inscripción).</li>
+		          <li><strong>Flechas verdes</strong>: requisito <em>para aprobar</em> (condición para la calificación final).</li>
+		        </ul>
+		        <p>Para los requisitos <em>para aprobar</em> hay dos estados:</p>
+		        <ul>
+		          <li>Linea continua: la materia debe estar <strong>aprobada</strong>.</li>
+		          <li>Linea punteada: la materia puede estar <strong>regularizada</strong> (no necesariamente aprobada).</li>
+		        </ul>
+		        <p>Ejemplo:</p>
+				<div class="d-flex gap-2 align-items-center">
+					<svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" marker-end="url(#help-arrow-black)"></path></svg>
+					<span>Requisito para cursar - aprobado (negro, continuo)</span>
+				</div>
+				<div class="d-flex gap-2 align-items-center">
+					<svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-black)"></path></svg>
+					<span>Requisito para cursar - regularizada (negro, punteado)</span>
+				</div>
+				<div class="d-flex gap-2 align-items-center mt-2">
+					<svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" marker-end="url(#help-arrow-green)"></path></svg>
+					<span>Requisito para aprobar - aprobado (verde, continuo)</span>
+				</div>
+				<div class="d-flex gap-2 align-items-center mt-2">
+					<svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-green)"></path></svg>
+					<span>Requisito para aprobar - regularizada (verde, punteado)</span>
+				</div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- Small footer -->
+		<footer class="app-footer mt-3">
+			<div class="container-fluid d-flex justify-content-between align-items-center">
+				<div class="small text-muted">Hecho con amor por <a href="https://scalise.ar" target="_blank" rel="noopener">Federico Scalise Giussani</a></div>
+				<div>
+					<a class="btn btn-sm btn-outline-secondary github-btn" href="https://github.com/Duplino/UTN-Tracker" target="_blank" rel="noopener" aria-label="Ver repositorio en GitHub">
+						<!-- GitHub mark (small) -->
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2 .37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 012 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+						<span class="visually-hidden">GitHub</span>
+					</a>
+				</div>
+			</div>
+		</footer>
+
+		<script type="module">
+			// Import the functions you need from the SDKs you need
+			import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+			import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+			// Your web app's Firebase configuration
+			const firebaseConfig = {
+				apiKey: "AIzaSyB4n2_ZY0tBjwMzoQqvjjUHlqD0Yu6Dr0A",
+				authDomain: "utntracker.firebaseapp.com",
+				projectId: "utntracker",
+				storageBucket: "utntracker.firebasestorage.app",
+				messagingSenderId: "791264678302",
+				appId: "1:791264678302:web:e637c2e3b499614683868f",
+				measurementId: "G-T4WYQC67SW"
+			};
+
+			// Initialize Firebase
+			const app = initializeApp(firebaseConfig);
+			const db = getFirestore(app);
+
+			// Get uid from URL
+			const urlParams = new URLSearchParams(window.location.search);
+			const uid = urlParams.get('uid');
+
+			// Export fetched data for the share.js script
+			window.shareUserData = null;
+			window.shareElectives = null;
+
+			if (uid) {
+				try {
+					const userRef = doc(db, 'users', uid);
+					const snap = await getDoc(userRef);
+					if (snap.exists()) {
+						const data = snap.data();
+						// Check if profile is public
+						if (data.public === true) {
+							window.shareUserData = data.subjectData || {};
+							window.shareElectives = data.electives || {};
+							// Dispatch event to notify share.js that data is ready
+							document.dispatchEvent(new CustomEvent('share:data-ready', { detail: data }));
+						} else {
+							// Profile is not public
+							document.getElementById('share-alert').classList.remove('d-none');
+							document.getElementById('share-alert').textContent = 'Este perfil no es público.';
+						}
+					} else {
+						// User not found
+						document.getElementById('share-alert').classList.remove('d-none');
+						document.getElementById('share-alert').textContent = 'Este perfil no existe.';
+					}
+				} catch (err) {
+					console.error('Error fetching user data:', err);
+					document.getElementById('share-alert').classList.remove('d-none');
+					document.getElementById('share-alert').textContent = 'Error al cargar el perfil.';
+				}
+			} else {
+				// No uid provided
+				document.getElementById('share-alert').classList.remove('d-none');
+				document.getElementById('share-alert').textContent = 'No se especificó un perfil para mostrar.';
+			}
+		</script>
+		<script src="assets/js/share.js"></script>
+	</body>
+</html>
