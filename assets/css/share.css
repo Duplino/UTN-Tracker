@@ -1,0 +1,46 @@
+/* Styles specific to the public share page */
+
+/* Read-only cards: subtle visual indicator and no pointer cursor */
+.card-readonly {
+  cursor: default !important;
+}
+
+.card-readonly:hover {
+  /* Remove any hover effects that might suggest interactivity */
+  transform: none;
+}
+
+/* Status label styling */
+.status-label {
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+/* Empty electiva placeholder */
+.card-electiva-placeholder {
+  border: 2px dashed rgba(0, 0, 0, 0.08);
+  background: transparent;
+  min-height: 56px;
+  margin-bottom: 0.35rem;
+}
+
+/* Share page title styling */
+#share-title {
+  color: #495057;
+}
+
+#share-program {
+  font-size: 0.85rem;
+}
+
+/* Alert styling for error/warning messages */
+#share-alert {
+  margin-bottom: 1rem;
+}
+
+/* Electiva cards in public view */
+.card-electiva {
+  border-left: 3px solid #6c757d;
+}
