@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const span = document.createElement('span');
           span.className = 'badge bg-success';
           span.style.fontSize = '0.8rem';
-          span.textContent = Number.isInteger(grade) ? String(grade) : String(grade);
+          span.textContent = String(grade);
           bc.appendChild(span);
         }
       } else if (status === 'Promocionada') {
