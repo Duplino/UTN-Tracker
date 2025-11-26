@@ -192,6 +192,18 @@
 					<button id="profile-signout-btn" class="btn btn-outline-danger">Cerrar sesión</button>
 					<button id="profile-sync-btn" class="btn btn-outline-secondary">Sincronizar ahora</button>
 				  </div>
+				  <div class="mt-3">
+					<div class="form-check form-switch">
+					  <input class="form-check-input" type="checkbox" id="profile-share-toggle">
+					  <label class="form-check-label small" for="profile-share-toggle">Compartir públicamente</label>
+					</div>
+					<div class="mt-2 small">
+					  <span id="profile-share-link-wrap" style="display:none;">
+						Enlace público: <a href="#" id="profile-share-link" target="_blank" rel="noopener"></a>
+					  </span>
+					  <span id="profile-share-note" class="text-muted">Activa el interruptor para hacer público tu tablero.</span>
+					</div>
+				  </div>
 				  <div class="mt-3"><small class="text-muted">Cuando inicies sesión, podrás sincronizar tu tablero entre dispositivos.</small></div>
 				</div>
 			  </div>
@@ -363,6 +375,16 @@
 				}catch(err){ console.error('firestoreUploadElectives error', err); }
 			};
 
+			// Helper: set public flag on user doc
+			window.firestoreSetPublic = async function(flag){
+				try{
+					if (!auth || !auth.currentUser) return;
+					const ref = doc(db, 'users', auth.currentUser.uid);
+					await updateDoc(ref, { public: !!flag, updatedAt: serverTimestamp() });
+					return true;
+				}catch(err){ console.error('firestoreSetPublic error', err); return false; }
+			};
+
 			// Helper: delete a single elective entry from the user's electives map
 			window.firestoreDeleteElective = async function(code){
 				try{
@@ -506,6 +528,40 @@
 					try{ document.dispatchEvent(new CustomEvent('firestore:remote-update', { detail: { from: 'initialDownload' } })); }catch(e){ console.error(e); }
 					// Start realtime listener after initial download (listener will ignore its initial snapshot)
 					try{ startUserDocListener(user.uid); }catch(e){ console.error(e); }
+					// set share toggle UI from remote doc (if available)
+					try{
+						const ref = doc(db, 'users', user.uid);
+						const snap = await getDoc(ref);
+						if (snap && snap.exists()){
+							const d = snap.data() || {};
+							const isPublic = !!d.public;
+							const toggle = document.getElementById('profile-share-toggle');
+							if (toggle) toggle.checked = isPublic;
+							const wrap = document.getElementById('profile-share-link-wrap');
+							const link = document.getElementById('profile-share-link');
+							if (wrap && link){
+								if (isPublic){ wrap.style.display = ''; link.href = `share.html?uid=${user.uid}`; link.textContent = location.origin + '/share.html?uid=' + user.uid; }
+								else { wrap.style.display = 'none'; link.href = '#'; link.textContent = ''; }
+							}
+						}
+					}catch(err){ console.error('Error inicializando estado de compartido', err); }
+
+					// bind toggle handler (set public flag in remote doc)
+					try{
+						const toggle = document.getElementById('profile-share-toggle');
+						if (toggle){
+							toggle.addEventListener('change', async (ev) => {
+								const val = !!toggle.checked;
+								// optimistically update UI
+								const wrap = document.getElementById('profile-share-link-wrap');
+								const link = document.getElementById('profile-share-link');
+								if (val){ wrap.style.display = ''; link.href = `share.html?uid=${user.uid}`; link.textContent = location.origin + '/share.html?uid=' + user.uid; }
+								else { wrap.style.display = 'none'; link.href = '#'; link.textContent = ''; }
+								// persist remote flag
+								try{ if (window.firestoreSetPublic) await window.firestoreSetPublic(val); }catch(e){ console.error('Error seteando public', e); }
+							});
+						}
+					}catch(err){ console.error('Error binding share toggle', err); }
 				} else {
 					// stop listener when signed out
 					try{ if (userDocUnsubscribe) userDocUnsubscribe(); }catch(e){}

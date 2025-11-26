@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users documents: allow read if the user document has `public == true`,
+    // otherwise only the authenticated owner (uid == userId) can read/write.
+    match /users/{userId} {
+      // Allow reads when the document is explicitly public, or when the
+      // requester is the owner.
+      allow read: if (resource.data.public == true) || (request.auth != null && request.auth.uid == userId);
+
+      // Writes (create/update/delete) are only allowed to the owner.
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Default: deny access to other collections unless explicitly allowed below.
+  }
+}
