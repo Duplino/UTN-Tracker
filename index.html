@@ -19,7 +19,7 @@
 				</div>
 				<div class="btn-group">
 					<button class="btn btn-light">Vista</button>
-					<button class="btn btn-light">Orden</button>
+					<button class="btn btn-light">Orden 2</button>
 				</div>
 				<!-- Toggle to enable/disable correlativas hover visualization -->
 				<div class="form-check form-switch ms-3" aria-label="Mostrar correlativas">
@@ -528,40 +528,6 @@
 					try{ document.dispatchEvent(new CustomEvent('firestore:remote-update', { detail: { from: 'initialDownload' } })); }catch(e){ console.error(e); }
 					// Start realtime listener after initial download (listener will ignore its initial snapshot)
 					try{ startUserDocListener(user.uid); }catch(e){ console.error(e); }
-					// set share toggle UI from remote doc (if available)
-					try{
-						const ref = doc(db, 'users', user.uid);
-						const snap = await getDoc(ref);
-						if (snap && snap.exists()){
-							const d = snap.data() || {};
-							const isPublic = !!d.public;
-							const toggle = document.getElementById('profile-share-toggle');
-							if (toggle) toggle.checked = isPublic;
-							const wrap = document.getElementById('profile-share-link-wrap');
-							const link = document.getElementById('profile-share-link');
-							if (wrap && link){
-								if (isPublic){ wrap.style.display = ''; link.href = `share.html?uid=${user.uid}`; link.textContent = location.origin + '/share.html?uid=' + user.uid; }
-								else { wrap.style.display = 'none'; link.href = '#'; link.textContent = ''; }
-							}
-						}
-					}catch(err){ console.error('Error inicializando estado de compartido', err); }
-
-					// bind toggle handler (set public flag in remote doc)
-					try{
-						const toggle = document.getElementById('profile-share-toggle');
-						if (toggle){
-							toggle.addEventListener('change', async (ev) => {
-								const val = !!toggle.checked;
-								// optimistically update UI
-								const wrap = document.getElementById('profile-share-link-wrap');
-								const link = document.getElementById('profile-share-link');
-								if (val){ wrap.style.display = ''; link.href = `share.html?uid=${user.uid}`; link.textContent = location.origin + '/share.html?uid=' + user.uid; }
-								else { wrap.style.display = 'none'; link.href = '#'; link.textContent = ''; }
-								// persist remote flag
-								try{ if (window.firestoreSetPublic) await window.firestoreSetPublic(val); }catch(e){ console.error('Error seteando public', e); }
-							});
-						}
-					}catch(err){ console.error('Error binding share toggle', err); }
 				} else {
 					// stop listener when signed out
 					try{ if (userDocUnsubscribe) userDocUnsubscribe(); }catch(e){}
