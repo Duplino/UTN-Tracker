@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statsAvg = document.getElementById('stat-promedio');
   const statPlaceholder1 = document.getElementById('stat-placeholder-1');
   const statPlaceholder2 = document.getElementById('stat-placeholder-2');
+  const statDisponibles = document.getElementById('stat-disponibles');
   const progressBar = document.getElementById('progress-bar');
   const progressLabel = document.getElementById('progress-label');
   let displayedSubjects = [];
@@ -261,8 +262,9 @@ document.addEventListener('DOMContentLoaded', () => {
     visibleModules.forEach(m => {
       if (Array.isArray(m.subjects)) displayedSubjects.push(...m.subjects);
     });
-    computeStats(displayedSubjects);
     setupOverlayAndInteractions();
+    // Compute stats after cursar state is updated (so .card-available classes are present)
+    computeStats(displayedSubjects);
   }
 
   // Get placed elective for a specific slot
@@ -695,6 +697,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     statPlaceholder1.textContent = approved + ' / ' + total;
     statPlaceholder2.textContent = regularized;
+
+    // Count available subjects (cards with .card-available class = meet cursar requirements and not started)
+    let disponibles = 0;
+    try {
+      if (columnsContainer) {
+        const availableCards = columnsContainer.querySelectorAll('.card-subject.card-available');
+        disponibles = availableCards.length;
+      }
+    } catch (e) { disponibles = 0; }
+    if (statDisponibles) statDisponibles.textContent = disponibles;
 
     // Progress formula: (approved + regularized/2) / total
     let progress = 0;
