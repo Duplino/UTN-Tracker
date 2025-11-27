@@ -356,8 +356,14 @@
 				try{
 					if (!auth || !auth.currentUser) return;
 					const ref = doc(db, 'users', auth.currentUser.uid);
+					// If overrideStatus is not present in payload, explicitly delete it from Firebase
+					// (merge:true won't delete missing fields, so we must use deleteField())
+					const payloadToUpload = { ...payload };
+					if (!('overrideStatus' in payloadToUpload)) {
+						payloadToUpload.overrideStatus = deleteField();
+					}
 					// set the nested field subjectData.code to payload (merge)
-					await setDoc(ref, { subjectData: { [code]: payload }, updatedAt: serverTimestamp() }, { merge: true });
+					await setDoc(ref, { subjectData: { [code]: payloadToUpload }, updatedAt: serverTimestamp() }, { merge: true });
 				}catch(err){ console.error('firestoreUploadSubject error', err); }
 			};
 
