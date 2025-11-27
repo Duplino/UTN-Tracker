@@ -201,6 +201,13 @@ body{
   filter: grayscale(0%);
 }
 
+/* Status label styling */
+.status-label{
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 0.1rem;
+}
+
 /* Footer styles */
 .app-footer{
   font-size: 0.75rem;
