@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Correlativas toggle: read persisted preference and bind toggle UI
-  const correlativasToggle = document.getElementById('toggle-correlativas');
+  const correlativasToggle = document.getElementById('settings-correlativas');
   let correlativasEnabled = true;
   function loadCorrelativasPref(){
     const v = localStorage.getItem('mostrarCorrelativas');
@@ -72,6 +72,30 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   }catch(e){/* ignore */}
+
+  // Show status toggle: read persisted preference and bind toggle UI
+  const showStatusToggle = document.getElementById('settings-show-status');
+  let showStatusEnabled = false;
+  function loadShowStatusPref(){
+    const v = localStorage.getItem('mostrarEstado');
+    return v === '1';
+  }
+  function saveShowStatusPref(val){
+    localStorage.setItem('mostrarEstado', val ? '1' : '0');
+  }
+  showStatusEnabled = loadShowStatusPref();
+  try{
+    if (showStatusToggle){
+      showStatusToggle.checked = showStatusEnabled;
+      showStatusToggle.addEventListener('change', (ev) => {
+        showStatusEnabled = !!ev.target.checked;
+        saveShowStatusPref(showStatusEnabled);
+        // re-render groups to show/hide status labels
+        try{ if (planData) renderGroups(planData); }catch(e){}
+      });
+    }
+  }catch(e){/* ignore */}
+
 
   // Electivas button: open modal and load electivas from separate file
   const electivasBtn = document.getElementById('btn-electivas');
@@ -119,6 +143,63 @@ document.addEventListener('DOMContentLoaded', () => {
     }catch(e){
       console.error('Error guardando subject data', e);
     }
+  }
+
+  // Get a user-friendly description for the status (for displaying below subject cards)
+  function getStatusDescription(status) {
+    switch (status) {
+      case 'Aprobada': return 'Aprobada';
+      case 'Promocionada': return 'Promocionada';
+      case 'Regularizada': return 'Regularizada';
+      case 'Desaprobada': return 'Desaprobada';
+      case 'No regularizada': return 'Debe recuperar';
+      case 'Faltan notas': return 'En curso';
+      case 'Faltan examenes': return 'En curso';
+      default: return status || null;
+    }
+  }
+
+  // Check if a subject can be promoted (both parciales >=6 but at least one <8)
+  function canPromote(stored) {
+    if (!stored || !stored.values) return false;
+    // Get best parcial values
+    let p1 = NaN, p2 = NaN;
+    for (let i = 3; i >= 1; i--) {
+      const v = stored.values['parcial1_' + i];
+      const n = parseNum(v);
+      if (!Number.isNaN(n)) { p1 = n; break; }
+    }
+    for (let i = 3; i >= 1; i--) {
+      const v = stored.values['parcial2_' + i];
+      const n = parseNum(v);
+      if (!Number.isNaN(n)) { p2 = n; break; }
+    }
+    // Can promote if: both >=6, AND at least one >= 8 already OR exactly one <8 with recuperatory chance
+    // Simplified: if regularizada (both >=6) and both >= 8 already -> would be promocionada, not this case
+    // If regularizada and at least one >=8 and other <8 -> can try to recover to >=8
+    if (Number.isNaN(p1) || Number.isNaN(p2)) return false;
+    if (p1 < 6 || p2 < 6) return false; // not regularizada
+    // If both >=8, it's already promocionada
+    if (p1 >= 8 && p2 >= 8) return false;
+    // If exactly one >=8 and the other >=6 but <8, they could still promote with a recuperatory
+    // Check if there's still a recuperatory attempt available
+    // According to promotion logic: only ONE recuperatory is allowed across both parcials to try to reach >=8
+    // So if one is <8 and hasn't used its recuperatory for promotion yet, can promote
+    if (p1 >= 8 && p2 < 8) {
+      // Check if p2 attempt 2 has been used
+      const p2_2 = stored.values['parcial2_2'];
+      const n2_2 = parseNum(p2_2);
+      // If attempt 2 not used yet, can still try to promote
+      if (Number.isNaN(n2_2)) return true;
+      return false;
+    }
+    if (p2 >= 8 && p1 < 8) {
+      const p1_2 = stored.values['parcial1_2'];
+      const n1_2 = parseNum(p1_2);
+      if (Number.isNaN(n1_2)) return true;
+      return false;
+    }
+    return false;
   }
 
   // Apply a very light status background class to a card (except 'Faltan notas')
@@ -406,12 +487,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
     card.dataset.requirements = JSON.stringify(reqsObj);
     if (group && group.color) card.dataset.groupColor = group.color;
+    
+    // Get status for this subject if showStatusEnabled
+    const stored = loadSubjectData(subject.code);
+    const status = stored ? (stored.overrideStatus || stored.status || null) : null;
+    const statusDesc = getStatusDescription(status);
+    const promotable = status === 'Regularizada' && canPromote(stored);
+    let statusLabel = '';
+    if (showStatusEnabled && statusDesc) {
+      statusLabel = promotable ? `<small class="text-muted status-label">${escapeHtml(statusDesc)} • Puede promocionar</small>` : `<small class="text-muted status-label">${escapeHtml(statusDesc)}</small>`;
+    }
+
     card.innerHTML = `
       <div class="card-body p-1">
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <h6 class="card-title mb-0">${escapeHtml(subject.name)}</h6>
             <small class="text-muted d-block">${escapeHtml(subject.code)}</small>
+            ${statusLabel}
           </div>
           <div class="text-end">
             <div class="card-badge-container" aria-hidden="true"></div>

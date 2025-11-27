@@ -73,6 +73,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Check if a subject can be promoted (both parciales >=6 but at least one <8)
+  function canPromote(stored) {
+    if (!stored || !stored.values) return false;
+    // Get best parcial values
+    let p1 = NaN, p2 = NaN;
+    for (let i = 3; i >= 1; i--) {
+      const v = stored.values['parcial1_' + i];
+      const n = parseNum(v);
+      if (!Number.isNaN(n)) { p1 = n; break; }
+    }
+    for (let i = 3; i >= 1; i--) {
+      const v = stored.values['parcial2_' + i];
+      const n = parseNum(v);
+      if (!Number.isNaN(n)) { p2 = n; break; }
+    }
+    if (Number.isNaN(p1) || Number.isNaN(p2)) return false;
+    if (p1 < 6 || p2 < 6) return false; // not regularizada
+    // If both >=8, it's already promocionada
+    if (p1 >= 8 && p2 >= 8) return false;
+    // If exactly one >=8 and the other >=6 but <8, they could still promote with a recuperatory
+    if (p1 >= 8 && p2 < 8) {
+      const p2_2 = stored.values['parcial2_2'];
+      const n2_2 = parseNum(p2_2);
+      if (Number.isNaN(n2_2)) return true;
+      return false;
+    }
+    if (p2 >= 8 && p1 < 8) {
+      const p1_2 = stored.values['parcial1_2'];
+      const n1_2 = parseNum(p1_2);
+      if (Number.isNaN(n1_2)) return true;
+      return false;
+    }
+    return false;
+  }
+
   // Apply card status style (visual appearance based on status)
   function applyCardStatusStyle(card, status) {
     if (!card) return;
@@ -305,6 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const stored = loadSubjectData(subject.code);
     const status = getStatusText(stored);
     const statusDesc = getStatusDescription(status);
+    const promotable = status === 'Regularizada' && canPromote(stored);
+    const statusLabel = statusDesc ? (promotable ? `${escapeHtml(statusDesc)} • Puede promocionar` : escapeHtml(statusDesc)) : '';
 
     card.innerHTML = `
       <div class="card-body p-1">
@@ -312,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div>
             <h6 class="card-title mb-0">${escapeHtml(subject.name)}</h6>
             <small class="text-muted d-block">${escapeHtml(subject.code)}</small>
-            ${statusDesc ? `<small class="text-muted status-label">${escapeHtml(statusDesc)}</small>` : ''}
+            ${statusLabel ? `<small class="text-muted status-label">${statusLabel}</small>` : ''}
           </div>
           <div class="text-end">
             <div class="card-badge-container" aria-hidden="true"></div>
@@ -342,6 +379,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const stored = loadSubjectData(subj.code);
     const status = getStatusText(stored);
     const statusDesc = getStatusDescription(status);
+    const promotable = status === 'Regularizada' && canPromote(stored);
+    const statusLabel = statusDesc ? (promotable ? `${escapeHtml(statusDesc)} • Puede promocionar` : escapeHtml(statusDesc)) : '';
 
     card.innerHTML = `
       <div class="card-body p-1">
@@ -349,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div>
             <h6 class="card-title mb-0">${escapeHtml(subj.name)}</h6>
             <small class="text-muted d-block">${escapeHtml(subj.code)}</small>
-            ${statusDesc ? `<small class="text-muted status-label">${escapeHtml(statusDesc)}</small>` : ''}
+            ${statusLabel ? `<small class="text-muted status-label">${statusLabel}</small>` : ''}
           </div>
           <div class="text-end">
             <div class="card-badge-container" aria-hidden="true"></div>
