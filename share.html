@@ -168,6 +168,7 @@
 			// Export fetched data for the share.js script
 			window.shareUserData = null;
 			window.shareElectives = null;
+			window.sharePlan = null;
 
 			if (uid) {
 				try {
@@ -179,6 +180,18 @@
 						if (data.public === true) {
 							window.shareUserData = data.subjectData || {};
 							window.shareElectives = data.electives || {};
+							window.sharePlan = data.plan || null;
+							// Update the program badge with the plan name if available
+							if (data.plan) {
+								const planNames = {
+									'k23': 'Ingeniería en Sistemas de Información - K23',
+									'k23medio': 'Analista en Sistemas de Información - K23'
+								};
+								const programBadge = document.getElementById('share-program');
+								if (programBadge && planNames[data.plan]) {
+									programBadge.textContent = planNames[data.plan];
+								}
+							}
 							// Dispatch event to notify share.js that data is ready
 							document.dispatchEvent(new CustomEvent('share:data-ready', { detail: data }));
 						} else {
