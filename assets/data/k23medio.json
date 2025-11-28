@@ -19,7 +19,8 @@
   { "code": "AyED", "name": "Algoritmos y Estructura de Datos", "weekHours": 5 },
   { "code": "AdC", "name": "Arquitectura de Computadores", "weekHours": 4 },
   { "code": "InglesI", "name": "Inglés Técnico Nivel I", "weekHours": 2 },
-  { "code": "LyED", "name": "Lógica y Estructuras Discretas", "weekHours": 3 }
+  { "code": "LyED", "name": "Lógica y Estructuras Discretas", "weekHours": 3 },
+  { "code": "AAA", "name": "TEST", "weekHours": 3 }
       ]
     },
     {
