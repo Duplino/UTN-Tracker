@@ -218,12 +218,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const key = getSubjectStorageKey(code);
     if (!key) return;
     try{
+      // Preserve recursedCount if it exists in current storage and not in payload
+      const existingData = loadSubjectData(code);
+      if (existingData && typeof existingData.recursedCount === 'number' && !('recursedCount' in payload)) {
+        payload.recursedCount = existingData.recursedCount;
+      }
       localStorage.setItem(key, JSON.stringify(payload));
       // upload to Firestore if available (skip when applying remote changes)
       try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadSubject) window.firestoreUploadSubject(code, payload); }catch(e){ console.error('uploadSubject hook error', e); }
     }catch(e){
       console.error('Error guardando subject data', e);
     }
+  }
+
+  // Convert a number to Roman numeral (for recursed count display)
+  function toRomanNumeral(num) {
+    if (num <= 0 || num > 20) return String(num); // fallback for edge cases
+    const romanNumerals = [
+      { value: 10, numeral: 'X' },
+      { value: 9, numeral: 'IX' },
+      { value: 5, numeral: 'V' },
+      { value: 4, numeral: 'IV' },
+      { value: 1, numeral: 'I' }
+    ];
+    let result = '';
+    let remaining = num;
+    for (const { value, numeral } of romanNumerals) {
+      while (remaining >= value) {
+        result += numeral;
+        remaining -= value;
+      }
+    }
+    return result;
   }
 
   // Get a user-friendly description for the status (for displaying below subject cards)
@@ -405,13 +431,31 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.textContent = label;
     // handler: clear stored data for this subject and reset inputs
     btn.addEventListener('click', () => {
-      // animate unlocks: capture available-before, remove data, then capture after and animate
+      // Determine if this is a recurse (failed subject) or just dropping
+      const isRecursing = (bannerStatus === 'Desaprobada' || storedStatus === 'Desaprobada');
+      const prevRecursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
+      const newRecursedCount = isRecursing ? (prevRecursedCount + 1) : prevRecursedCount;
+      const key = getSubjectStorageKey(code);
+      
+      // Animate unlocks: capture available-before, remove data, then capture after and animate
       let prevAvailable = [];
       try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
-  const key = getSubjectStorageKey(code);
-  if (key) localStorage.removeItem(key);
-  // notify Firestore to delete this subject if enabled
-  try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(code); }catch(e){ console.error('firestoreDeleteSubject hook error', e); }
+      
+      // Clear subject data but preserve recursedCount if > 0
+      if (key) {
+        if (newRecursedCount > 0) {
+          // Save just the recursedCount, clearing all other data
+          const minimalData = { recursedCount: newRecursedCount };
+          localStorage.setItem(key, JSON.stringify(minimalData));
+          // Upload to Firestore if available
+          try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadSubject) window.firestoreUploadSubject(code, minimalData); }catch(e){ console.error('firestoreUploadSubject hook error', e); }
+        } else {
+          localStorage.removeItem(key);
+          // notify Firestore to delete this subject if enabled
+          try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(code); }catch(e){ console.error('firestoreDeleteSubject hook error', e); }
+        }
+      }
+      
       // clear inputs
       ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
         const el = document.getElementById(id);
@@ -438,6 +482,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (currentCard) applyCardStatusStyle(currentCard, null);
   updateAllCardCursarState();
   try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
+  // Re-render card to show updated recursed numeral
+  try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-rendering after recursar', e); }
       // remove the button itself
       btn.remove();
       // close modal after dar de baja
@@ -579,12 +625,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (showStatusEnabled && statusDesc) {
       statusLabel = promotable ? `<small class="text-muted status-label">${escapeHtml(statusDesc)} • Puede promocionar</small>` : `<small class="text-muted status-label">${escapeHtml(statusDesc)}</small>`;
     }
+    
+    // Get recursed count for Roman numeral display
+    const recursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
+    let romanNumeralHtml = '';
+    if (recursedCount > 0) {
+      const cursadaNumeral = toRomanNumeral(recursedCount + 1);
+      romanNumeralHtml = `<span class="recursed-numeral" title="Cursada ${cursadaNumeral}">${cursadaNumeral}</span>`;
+    }
 
     card.innerHTML = `
       <div class="card-body p-1">
         <div class="d-flex justify-content-between align-items-start">
           <div>
-            <h6 class="card-title mb-0">${escapeHtml(subject.name)}</h6>
+            <h6 class="card-title mb-0">${escapeHtml(subject.name)}${romanNumeralHtml}</h6>
             <small class="text-muted d-block">${escapeHtml(subject.code)}</small>
             ${statusLabel}
           </div>
@@ -633,8 +687,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const code = currentCard.dataset.code || '';
     const titleEl = document.getElementById('subjectModalLabel');
-    const name = currentCard.querySelector('.card-title') ? currentCard.querySelector('.card-title').textContent : code;
+    // Get the subject name from the card title, excluding any Roman numeral span
+    const cardTitleEl = currentCard.querySelector('.card-title');
+    let name = code;
+    if (cardTitleEl) {
+      // Clone the element and remove the recursed-numeral span to get clean text
+      const clone = cardTitleEl.cloneNode(true);
+      const numeralSpan = clone.querySelector('.recursed-numeral');
+      if (numeralSpan) numeralSpan.remove();
+      name = clone.textContent.trim() || code;
+    }
     titleEl.textContent = `${name} ${code ? '(' + code + ')' : ''}`;
+    
+    // Display recursedCount badge in modal header if > 0
+    const existingRecursedBadge = document.getElementById('subject-recursed-badge');
+    if (existingRecursedBadge) existingRecursedBadge.remove();
+    const storedForBadge = loadSubjectData(code);
+    if (storedForBadge && typeof storedForBadge.recursedCount === 'number' && storedForBadge.recursedCount > 0) {
+      const badge = document.createElement('span');
+      badge.id = 'subject-recursed-badge';
+      badge.className = 'badge bg-secondary ms-2';
+      badge.style.fontSize = '0.75rem';
+      badge.style.fontWeight = 'normal';
+      badge.style.verticalAlign = 'middle';
+      const cursadaNumeral = toRomanNumeral(storedForBadge.recursedCount + 1);
+      badge.textContent = `Cursada ${cursadaNumeral}`;
+      badge.title = `Has recursado esta materia ${storedForBadge.recursedCount} vez${storedForBadge.recursedCount !== 1 ? 'es' : ''}`;
+      titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
+    }
 
     // clear inputs for now (new layout: parciales with 3 fields each)
     ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
