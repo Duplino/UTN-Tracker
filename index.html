@@ -132,38 +132,6 @@
 					  Continuar con Google
 					</button>
 				  </div>
-				  <div class="mb-2">
-					<label class="form-label small">Email</label>
-					<input id="profile-email-signin" type="email" class="form-control" placeholder="tu@ejemplo.com" />
-				  </div>
-				  <div class="mb-2">
-					<label class="form-label small">Contraseña</label>
-					<input id="profile-password-signin" type="password" class="form-control" placeholder="Contraseña" />
-				  </div>
-				  <div class="d-flex gap-2">
-					<button id="profile-signin-btn" class="btn btn-primary">Iniciar sesión</button>
-					<button id="profile-show-register" class="btn btn-link">Registrarse</button>
-				  </div>
-				</div>
-				<!-- Register section -->
-				<div id="profile-register" class="auth-section d-none">
-				  <h6>Crear cuenta</h6>
-				  <div class="mb-2">
-					<label class="form-label small">Nombre para mostrar</label>
-					<input id="profile-name-register" type="text" class="form-control" placeholder="Tu nombre" />
-				  </div>
-				  <div class="mb-2">
-					<label class="form-label small">Email</label>
-					<input id="profile-email-register" type="email" class="form-control" placeholder="tu@ejemplo.com" />
-				  </div>
-				  <div class="mb-2">
-					<label class="form-label small">Contraseña</label>
-					<input id="profile-password-register" type="password" class="form-control" placeholder="Contraseña" />
-				  </div>
-				  <div class="d-flex gap-2">
-					<button id="profile-register-btn" class="btn btn-primary">Crear cuenta</button>
-					<button id="profile-show-signin" class="btn btn-link">Volver a iniciar sesión</button>
-				  </div>
 				</div>
 				<!-- User info section (visible when logged in) -->
 				<div id="profile-user" class="auth-section d-none">
@@ -436,6 +404,15 @@
 				}catch(err){ console.error('firestoreUploadSelectedStats error', err); }
 			};
 
+			// Helper: upload year started (año de antigüedad) to user doc
+			window.firestoreUploadYearStarted = async function(year){
+				try{
+					if (!auth || !auth.currentUser) return;
+					const ref = doc(db, 'users', auth.currentUser.uid);
+					await setDoc(ref, { yearStarted: year, updatedAt: serverTimestamp() }, { merge: true });
+				}catch(err){ console.error('firestoreUploadYearStarted error', err); }
+			};
+
 			// Helper: set public flag on user doc
 			window.firestoreSetPublic = async function(flag){
 				try{
@@ -498,6 +475,10 @@
 					if (typeof data.selectedStats !== 'undefined' && Array.isArray(data.selectedStats)){
 						try{ localStorage.setItem('selectedStats', JSON.stringify(data.selectedStats)); }catch(e){}
 					}
+					// Merge yearStarted (año de antigüedad) if present
+					if (typeof data.yearStarted !== 'undefined' && data.yearStarted){
+						try{ localStorage.setItem('yearStarted', String(data.yearStarted)); }catch(e){}
+					}
 					// Note: do NOT dispatch an event here to avoid duplicate reloads; caller may reload or re-render as needed.
 					return data;
 				}catch(err){ console.error('firestoreDownloadAndApply error', err); return null; }
@@ -536,6 +517,7 @@
 							if (typeof data.mostrarCorrelativas !== 'undefined') try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
 							if (typeof data.plan !== 'undefined' && data.plan) try{ localStorage.setItem('plan', data.plan); }catch(e){}
 							if (typeof data.selectedStats !== 'undefined' && Array.isArray(data.selectedStats)) try{ localStorage.setItem('selectedStats', JSON.stringify(data.selectedStats)); }catch(e){}
+							if (typeof data.yearStarted !== 'undefined' && data.yearStarted) try{ localStorage.setItem('yearStarted', String(data.yearStarted)); }catch(e){}
 						}finally{ window.__firestoreApplyingRemote = false; }
 						// notify app to refresh UI (only for subsequent updates)
 						document.dispatchEvent(new CustomEvent('firestore:remote-update', { detail: { from: 'onSnapshot' } }));
@@ -545,23 +527,11 @@
 
 			function showSigninSection() {
 	 			document.getElementById('profile-signin').classList.remove('d-none');
-	 			document.getElementById('profile-register').classList.add('d-none');
 	 			document.getElementById('profile-user').classList.add('d-none');
 	 		}
 
 			// Ensure modal starts on sign-in section by default
 			showSigninSection();
-
-	 		document.getElementById('profile-show-register').addEventListener('click', (e) => {
-	 			e.preventDefault();
-	 			document.getElementById('profile-signin').classList.add('d-none');
-	 			document.getElementById('profile-register').classList.remove('d-none');
-	 		});
-
-	 		document.getElementById('profile-show-signin').addEventListener('click', (e) => {
-	 			e.preventDefault();
-	 			showSigninSection();
-	 		});
 
 	 		// Google sign-in button
 	 		document.getElementById('profile-google-btn').addEventListener('click', async () => {
@@ -592,7 +562,6 @@
 					document.getElementById('profile-user-email').textContent = user.email || '';
 					document.getElementById('profile-user').classList.remove('d-none');
 					document.getElementById('profile-signin').classList.add('d-none');
-					document.getElementById('profile-register').classList.add('d-none');
 					// Enable settings share toggle now that user is logged in
 					const settingsShareToggle = document.getElementById('settings-share-toggle');
 					if (settingsShareToggle) {

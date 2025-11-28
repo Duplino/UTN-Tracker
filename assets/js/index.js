@@ -2044,6 +2044,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   function saveYearStarted(year){
     try{ localStorage.setItem('yearStarted', String(year)); }catch(e){}
+    // Upload to Firestore if available (skip when applying remote changes)
+    try{ 
+      if (!window.__firestoreApplyingRemote && window.firestoreUploadYearStarted) {
+        window.firestoreUploadYearStarted(year); 
+      }
+    } catch(e) { console.error('firestoreUploadYearStarted hook error', e); }
   }
   
   // Initialize year started input in profile modal
