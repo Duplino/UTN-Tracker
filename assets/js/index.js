@@ -214,16 +214,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Check if subject has actual progress (grades or status), not just recursedCount
+  function hasSubjectProgress(code){
+    const stored = loadSubjectData(code);
+    if (!stored) return false;
+    // Check if there's a status or any values (grades)
+    if (stored.status || stored.overrideStatus) return true;
+    if (stored.values && Object.keys(stored.values).some(k => stored.values[k] !== null && stored.values[k] !== undefined && stored.values[k] !== '')) return true;
+    return false;
+  }
+
   function saveSubjectData(code, payload){
     const key = getSubjectStorageKey(code);
     if (!key) return;
     try{
+      // Preserve recursedCount if it exists in current storage and not in payload
+      const existingData = loadSubjectData(code);
+      if (existingData && typeof existingData.recursedCount === 'number' && !('recursedCount' in payload)) {
+        payload.recursedCount = existingData.recursedCount;
+      }
       localStorage.setItem(key, JSON.stringify(payload));
       // upload to Firestore if available (skip when applying remote changes)
       try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadSubject) window.firestoreUploadSubject(code, payload); }catch(e){ console.error('uploadSubject hook error', e); }
     }catch(e){
       console.error('Error guardando subject data', e);
     }
+  }
+
+  // Convert a number to Roman numeral (for recursed count display)
+  function toRomanNumeral(num) {
+    if (num <= 0 || num > 20) return String(num); // fallback for edge cases
+    const romanNumerals = [
+      { value: 10, numeral: 'X' },
+      { value: 9, numeral: 'IX' },
+      { value: 5, numeral: 'V' },
+      { value: 4, numeral: 'IV' },
+      { value: 1, numeral: 'I' }
+    ];
+    let result = '';
+    let remaining = num;
+    for (const { value, numeral } of romanNumerals) {
+      while (remaining >= value) {
+        result += numeral;
+        remaining -= value;
+      }
+    }
+    return result;
   }
 
   // Get a user-friendly description for the status (for displaying below subject cards)
@@ -405,13 +441,36 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.textContent = label;
     // handler: clear stored data for this subject and reset inputs
     btn.addEventListener('click', () => {
-      // animate unlocks: capture available-before, remove data, then capture after and animate
+      // Determine if this is a recurse (failed subject) or just dropping
+      const isRecursing = (bannerStatus === 'Desaprobada' || storedStatus === 'Desaprobada');
+      const prevRecursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
+      const newRecursedCount = isRecursing ? (prevRecursedCount + 1) : prevRecursedCount;
+      const key = getSubjectStorageKey(code);
+      
+      // Animate unlocks: capture available-before, remove data, then capture after and animate
       let prevAvailable = [];
       try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
-  const key = getSubjectStorageKey(code);
-  if (key) localStorage.removeItem(key);
-  // notify Firestore to delete this subject if enabled
-  try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(code); }catch(e){ console.error('firestoreDeleteSubject hook error', e); }
+      
+      // Clear subject data - always delete from Firebase first to clear all grades/status
+      // Then re-upload just the recursedCount if needed
+      if (key) {
+        // First, delete from Firebase to clear all existing data (grades, status, etc.)
+        try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(code); }catch(e){ console.error('firestoreDeleteSubject hook error', e); }
+        
+        if (newRecursedCount > 0) {
+          // Save just the recursedCount locally and upload to Firebase
+          const minimalData = { recursedCount: newRecursedCount };
+          localStorage.setItem(key, JSON.stringify(minimalData));
+          // Upload to Firestore after a short delay to ensure delete completes first
+          setTimeout(() => {
+            try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadSubject) window.firestoreUploadSubject(code, minimalData); }catch(e){ console.error('firestoreUploadSubject hook error', e); }
+          }, 100);
+        } else {
+          localStorage.removeItem(key);
+          // Already deleted from Firestore above
+        }
+      }
+      
       // clear inputs
       ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
         const el = document.getElementById(id);
@@ -438,6 +497,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (currentCard) applyCardStatusStyle(currentCard, null);
   updateAllCardCursarState();
   try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
+  // Re-render card to show updated recursed numeral
+  try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-rendering after recursar', e); }
       // remove the button itself
       btn.remove();
       // close modal after dar de baja
@@ -579,12 +640,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (showStatusEnabled && statusDesc) {
       statusLabel = promotable ? `<small class="text-muted status-label">${escapeHtml(statusDesc)} • Puede promocionar</small>` : `<small class="text-muted status-label">${escapeHtml(statusDesc)}</small>`;
     }
+    
+    // Get recursed count for Roman numeral display - only show on cards when recursedCount > 0 (II, III, etc.)
+    const recursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
+    let romanNumeralHtml = '';
+    if (recursedCount > 0) {
+      const cursadaNumber = recursedCount + 1; // 1 recurse = Cursada II, 2 recurses = Cursada III, etc.
+      const cursadaNumeral = toRomanNumeral(cursadaNumber);
+      romanNumeralHtml = `<span class="recursed-numeral" title="Cursada ${cursadaNumeral}">${cursadaNumeral}</span>`;
+    }
 
     card.innerHTML = `
       <div class="card-body p-1">
         <div class="d-flex justify-content-between align-items-start">
           <div>
-            <h6 class="card-title mb-0">${escapeHtml(subject.name)}</h6>
+            <h6 class="card-title mb-0">${escapeHtml(subject.name)}${romanNumeralHtml}</h6>
             <small class="text-muted d-block">${escapeHtml(subject.code)}</small>
             ${statusLabel}
           </div>
@@ -600,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try{ computeStats(displayedSubjects); }catch(e){/* ignore */}
     // open subject modal on click
     card.addEventListener('click', onCardClick);
+    
     return card;
   }
 
@@ -633,8 +704,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const code = currentCard.dataset.code || '';
     const titleEl = document.getElementById('subjectModalLabel');
-    const name = currentCard.querySelector('.card-title') ? currentCard.querySelector('.card-title').textContent : code;
+    // Get the subject name from the card title, excluding any Roman numeral span
+    const cardTitleEl = currentCard.querySelector('.card-title');
+    let name = code;
+    if (cardTitleEl) {
+      // Clone the element and remove the recursed-numeral span to get clean text
+      const clone = cardTitleEl.cloneNode(true);
+      const numeralSpan = clone.querySelector('.recursed-numeral');
+      if (numeralSpan) numeralSpan.remove();
+      name = clone.textContent.trim() || code;
+    }
     titleEl.textContent = `${name} ${code ? '(' + code + ')' : ''}`;
+    
+    // Always display recursedCount badge in modal header (starting from "Cursada I"), make it clickable to edit
+    const existingRecursedBadge = document.getElementById('subject-recursed-badge');
+    if (existingRecursedBadge) existingRecursedBadge.remove();
+    const storedForBadge = loadSubjectData(code);
+    const currentRecursedCount = (storedForBadge && typeof storedForBadge.recursedCount === 'number') ? storedForBadge.recursedCount : 0;
+    const cursadaNumber = currentRecursedCount + 1;
+    const cursadaNumeral = toRomanNumeral(cursadaNumber);
+    
+    const badge = document.createElement('span');
+    badge.id = 'subject-recursed-badge';
+    badge.className = 'badge bg-secondary ms-2';
+    badge.style.fontSize = '0.75rem';
+    badge.style.fontWeight = 'normal';
+    badge.style.verticalAlign = 'middle';
+    badge.style.cursor = 'pointer';
+    badge.textContent = `Cursada ${cursadaNumeral}`;
+    badge.title = currentRecursedCount > 0 
+      ? `Has recursado esta materia ${currentRecursedCount} vez${currentRecursedCount !== 1 ? 'es' : ''} - Click para editar`
+      : 'Click para editar el número de cursada';
+    
+    // Add click handler to edit cursada number
+    badge.addEventListener('click', () => {
+      const currentStored = loadSubjectData(code) || {};
+      const currentCount = (typeof currentStored.recursedCount === 'number') ? currentStored.recursedCount : 0;
+      const currentCursada = currentCount + 1;
+      const newCursadaStr = prompt(`Ingresá el número de cursada (actualmente: ${currentCursada}):`, String(currentCursada));
+      if (newCursadaStr === null) return; // User cancelled
+      const newCursada = parseInt(newCursadaStr, 10);
+      if (Number.isNaN(newCursada) || newCursada < 1) {
+        alert('Por favor ingresá un número válido mayor o igual a 1.');
+        return;
+      }
+      const newRecursedCount = newCursada - 1; // Convert cursada number to recursedCount
+      // Update the stored data
+      currentStored.recursedCount = newRecursedCount;
+      saveSubjectData(code, currentStored);
+      // Update the badge text
+      badge.textContent = `Cursada ${toRomanNumeral(newCursada)}`;
+      badge.title = newRecursedCount > 0 
+        ? `Has recursado esta materia ${newRecursedCount} vez${newRecursedCount !== 1 ? 'es' : ''} - Click para editar`
+        : 'Click para editar el número de cursada';
+      // Re-render the board to reflect the change
+      try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-rendering after cursada edit', e); }
+    });
+    
+    titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
 
     // clear inputs for now (new layout: parciales with 3 fields each)
     ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
@@ -707,9 +834,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (prev) prev.remove();
         const effectiveCode = code || (currentCard && currentCard.dataset && currentCard.dataset.code) || '';
         if (!effectiveCode) return;
-        const stored = loadSubjectData(effectiveCode);
-        // only show when NOT stored and when subject can be cursar
-        if (stored) return;
+        // only show when subject has no progress (not started) and when subject can be cursar
+        if (hasSubjectProgress(effectiveCode)) return;
         if (!cursarRequirementsMetForCard(currentCard)) return;
 
         // Hide main form and status area so the big button occupies the modal
@@ -1212,11 +1338,10 @@ document.addEventListener('DOMContentLoaded', () => {
             c.classList.remove('card-disabled');
             c.removeAttribute('aria-disabled');
           }
-          // available (dashed border) when requirements met but subject not started/saved
+          // available (dashed border) when requirements met but subject not started (no actual progress)
           try{
             const code = c.dataset && c.dataset.code ? c.dataset.code : null;
-            const stored = code ? loadSubjectData(code) : null;
-            if (meets && !stored){
+            if (meets && !hasSubjectProgress(code)){
               c.classList.add('card-available');
             } else {
               c.classList.remove('card-available');
@@ -1238,8 +1363,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const code = c.dataset && c.dataset.code ? c.dataset.code : null;
           if (!code) return;
           const meets = cursarRequirementsMetForCard(c);
-          const stored = loadSubjectData(code);
-          if (meets && !stored) codes.push(code);
+          if (meets && !hasSubjectProgress(code)) codes.push(code);
         }catch(e){/* ignore per-card */}
       });
     }catch(e){/* ignore */}

@@ -208,6 +208,16 @@ body{
   margin-top: 0.1rem;
 }
 
+/* Recursed numeral styling - small Roman numeral next to subject name */
+.recursed-numeral{
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #6c757d;
+  margin-left: 0.35rem;
+  vertical-align: super;
+  opacity: 0.85;
+}
+
 /* Footer styles */
 .app-footer{
   font-size: 0.75rem;
