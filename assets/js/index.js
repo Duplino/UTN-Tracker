@@ -214,6 +214,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Check if subject has actual progress (grades or status), not just recursedCount
+  function hasSubjectProgress(code){
+    const stored = loadSubjectData(code);
+    if (!stored) return false;
+    // Check if there's a status or any values (grades)
+    if (stored.status || stored.overrideStatus) return true;
+    if (stored.values && Object.keys(stored.values).some(k => stored.values[k] !== null && stored.values[k] !== undefined && stored.values[k] !== '')) return true;
+    return false;
+  }
+
   function saveSubjectData(code, payload){
     const key = getSubjectStorageKey(code);
     if (!key) return;
@@ -626,13 +636,11 @@ document.addEventListener('DOMContentLoaded', () => {
       statusLabel = promotable ? `<small class="text-muted status-label">${escapeHtml(statusDesc)} • Puede promocionar</small>` : `<small class="text-muted status-label">${escapeHtml(statusDesc)}</small>`;
     }
     
-    // Get recursed count for Roman numeral display
+    // Get recursed count for Roman numeral display - always show starting from I
     const recursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
-    let romanNumeralHtml = '';
-    if (recursedCount > 0) {
-      const cursadaNumeral = toRomanNumeral(recursedCount + 1);
-      romanNumeralHtml = `<span class="recursed-numeral" title="Cursada ${cursadaNumeral}">${cursadaNumeral}</span>`;
-    }
+    const cursadaNumber = recursedCount + 1; // 0 recurses = Cursada I, 1 recurse = Cursada II, etc.
+    const cursadaNumeral = toRomanNumeral(cursadaNumber);
+    const romanNumeralHtml = `<span class="recursed-numeral" data-code="${escapeHtml(subject.code)}" title="Cursada ${cursadaNumeral} - Click para editar">${cursadaNumeral}</span>`;
 
     card.innerHTML = `
       <div class="card-body p-1">
@@ -654,6 +662,34 @@ document.addEventListener('DOMContentLoaded', () => {
       try{ computeStats(displayedSubjects); }catch(e){/* ignore */}
     // open subject modal on click
     card.addEventListener('click', onCardClick);
+    
+    // Add click handler for the Roman numeral to edit cursada count
+    const numeralSpan = card.querySelector('.recursed-numeral');
+    if (numeralSpan) {
+      numeralSpan.style.cursor = 'pointer';
+      numeralSpan.addEventListener('click', (ev) => {
+        ev.stopPropagation(); // Prevent opening the subject modal
+        const code = numeralSpan.dataset.code;
+        if (!code) return;
+        const currentStored = loadSubjectData(code) || {};
+        const currentCount = (typeof currentStored.recursedCount === 'number') ? currentStored.recursedCount : 0;
+        const currentCursada = currentCount + 1;
+        const newCursadaStr = prompt(`Ingresá el número de cursada (actualmente: ${currentCursada}):`, String(currentCursada));
+        if (newCursadaStr === null) return; // User cancelled
+        const newCursada = parseInt(newCursadaStr, 10);
+        if (Number.isNaN(newCursada) || newCursada < 1) {
+          alert('Por favor ingresá un número válido mayor o igual a 1.');
+          return;
+        }
+        const newRecursedCount = newCursada - 1; // Convert cursada number to recursedCount
+        // Update the stored data
+        currentStored.recursedCount = newRecursedCount;
+        saveSubjectData(code, currentStored);
+        // Re-render the board to reflect the change
+        try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-rendering after cursada edit', e); }
+      });
+    }
+    
     return card;
   }
 
@@ -787,9 +823,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (prev) prev.remove();
         const effectiveCode = code || (currentCard && currentCard.dataset && currentCard.dataset.code) || '';
         if (!effectiveCode) return;
-        const stored = loadSubjectData(effectiveCode);
-        // only show when NOT stored and when subject can be cursar
-        if (stored) return;
+        // only show when subject has no progress (not started) and when subject can be cursar
+        if (hasSubjectProgress(effectiveCode)) return;
         if (!cursarRequirementsMetForCard(currentCard)) return;
 
         // Hide main form and status area so the big button occupies the modal
@@ -1292,11 +1327,10 @@ document.addEventListener('DOMContentLoaded', () => {
             c.classList.remove('card-disabled');
             c.removeAttribute('aria-disabled');
           }
-          // available (dashed border) when requirements met but subject not started/saved
+          // available (dashed border) when requirements met but subject not started (no actual progress)
           try{
             const code = c.dataset && c.dataset.code ? c.dataset.code : null;
-            const stored = code ? loadSubjectData(code) : null;
-            if (meets && !stored){
+            if (meets && !hasSubjectProgress(code)){
               c.classList.add('card-available');
             } else {
               c.classList.remove('card-available');
@@ -1318,8 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const code = c.dataset && c.dataset.code ? c.dataset.code : null;
           if (!code) return;
           const meets = cursarRequirementsMetForCard(c);
-          const stored = loadSubjectData(code);
-          if (meets && !stored) codes.push(code);
+          if (meets && !hasSubjectProgress(code)) codes.push(code);
         }catch(e){/* ignore per-card */}
       });
     }catch(e){/* ignore */}

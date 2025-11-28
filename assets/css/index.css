@@ -216,6 +216,15 @@ body{
   margin-left: 0.35rem;
   vertical-align: super;
   opacity: 0.85;
+  cursor: pointer;
+  padding: 0 0.15rem;
+  border-radius: 2px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.recursed-numeral:hover{
+  background-color: rgba(0,0,0,0.08);
+  color: #495057;
 }
 
 /* Footer styles */
