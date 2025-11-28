@@ -233,3 +233,55 @@ body{
 .app-footer a{
   color: inherit;
 }
+
+/* Stats modal styles */
+.stats-table{
+  margin-bottom: 0;
+}
+.stats-table th,
+.stats-table td{
+  vertical-align: middle;
+  padding: 0.5rem;
+}
+.stats-table .btn-add-stat,
+.stats-table .btn-remove-stat{
+  padding: 0.15rem 0.4rem;
+  font-size: 0.8rem;
+  min-width: 28px;
+}
+.stats-table .btn-add-stat{
+  border-color: #28a745;
+  color: #28a745;
+}
+.stats-table .btn-add-stat:hover{
+  background-color: #28a745;
+  color: #fff;
+}
+.stats-table .btn-remove-stat{
+  border-color: #dc3545;
+  color: #dc3545;
+}
+.stats-table .btn-remove-stat:hover{
+  background-color: #dc3545;
+  color: #fff;
+}
+.stats-table .btn:disabled{
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Dynamic stat cards in stats row */
+.stats-row .stat-card{
+  flex: 1 1 0;
+  min-width: 100px;
+  max-width: 280px;
+}
+.stats-row:empty::before{
+  content: "No hay estadísticas seleccionadas. Abrí el panel de estadísticas para agregar.";
+  color: #6c757d;
+  font-size: 0.85rem;
+  display: block;
+  text-align: center;
+  width: 100%;
+  padding: 1rem;
+}
