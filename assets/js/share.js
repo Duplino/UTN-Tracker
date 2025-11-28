@@ -276,6 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     columns = Math.min(Math.max(visibleModules.length, 1), 8);
     columnsContainer.innerHTML = '';
+    
+    // Dynamically adjust the grid columns based on the number of visible modules
+    columnsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
 
     visibleModules.forEach((module, visIdx) => {
       const col = document.createElement('div');
@@ -316,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Get placed elective for a specific slot
+  // NOTE: Only returns electives that exist in the current plan's electivasList
   function getPlacedElectiveForSlot(colIndex, slotIndex) {
     if (!remoteElectives || Object.keys(remoteElectives).length === 0) return null;
     const electList = Array.isArray(electivasList) ? electivasList : [];
@@ -327,9 +331,13 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const key of Object.keys(remoteElectives)) {
       const entry = remoteElectives[key];
       const entryColIndex = typeof entry.colIndex === 'number' ? entry.colIndex : parseInt(entry.colIndex, 10);
+      // Skip electives that don't exist in the current plan
+      const electiveMeta = byCode[key] || byName[key];
+      if (!electiveMeta) continue;
+      
       if (entryColIndex === colIndex) {
         if (slotCounter === slotIndex) {
-          return byCode[key] || byName[key] || { code: key, name: key };
+          return electiveMeta;
         }
         slotCounter++;
       }

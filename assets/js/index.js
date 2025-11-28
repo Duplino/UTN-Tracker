@@ -517,6 +517,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use number of visible modules as columns (limit to max 8 for layout sanity)
     columns = Math.min(Math.max(visibleModules.length, 1), 8);
     columnsContainer.innerHTML = '';
+    
+    // Dynamically adjust the grid columns based on the number of visible modules
+    columnsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
 
     // assign consecutive data-index values for visible columns
     visibleModules.forEach((module, visIdx) => {
@@ -1882,6 +1885,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Behavior: read `localStorage.electives` and use electivasList (loaded from DATA_URL)
   // to get the real metadata (so cards show the electiva name instead of just the code),
   // then insert each electiva into its saved column, replacing placeholders when possible.
+  // NOTE: If an elective doesn't exist in the current plan's electivasList, it is NOT displayed.
   function restoreElectivesFromStorage(){
     try{
       const raw = localStorage.getItem('electives');
@@ -1901,9 +1905,10 @@ document.addEventListener('DOMContentLoaded', () => {
           let subjMeta = null;
           if (byCode[key]) subjMeta = byCode[key];
           else if (byName[key]) subjMeta = byName[key];
-          else {
-            // fallback minimal object (use key as name so UI isn't just the code)
-            subjMeta = { code: key, name: key, requirements: { cursar: [], aprobar: [] } };
+          // If elective doesn't exist in the current plan, skip it (don't display)
+          if (!subjMeta) {
+            console.log('Elective not found in current plan, skipping:', key);
+            return; // skip this elective
           }
           const colEl = columnsContainer.querySelector(`.column-col[data-index="${colIndex}"]`);
           let placeholderEl = null;
