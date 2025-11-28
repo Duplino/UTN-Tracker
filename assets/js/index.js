@@ -1981,6 +1981,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // STATS MODULE: All available stats and dynamic infoboxes
   // =====================================================
   
+  // Configuration constants
+  const STATS_CONFIG = {
+    MAX_STATS: 5,                    // Maximum number of stat cards to display
+    DEFAULT_WEEK_HOURS: 6,           // Default weekly hours when not specified
+    MIN_YEAR_STARTED: 1990,          // Minimum year for "year started" input
+    MAX_YEAR_STARTED: 2099,          // Maximum year for "year started" input
+    // Academic weight formula coefficients (Peso = 11*Aprobadas - 5*Años - 3*Desaprobadas)
+    PESO_COEF_APROBADAS: 11,
+    PESO_COEF_ANTIGUEDAD: 5,
+    PESO_COEF_DESAPROBADAS: 3
+  };
+  
   // All available stats definitions
   const ALL_STATS = [
     { id: 'horasSemanales', name: 'Horas semanales', compute: computeHorasSemanales },
@@ -1997,7 +2009,6 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Default selected stats (keys)
   const DEFAULT_SELECTED_STATS = ['horasSemanales', 'promedio', 'materiasAprobadas', 'finalesPendientes', 'materiasCursables'];
-  const MAX_STATS = 5;
   
   // Load selected stats from localStorage or use defaults
   function getSelectedStats(){
@@ -2005,14 +2016,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const raw = localStorage.getItem('selectedStats');
       if (raw){
         const arr = JSON.parse(raw);
-        if (Array.isArray(arr) && arr.length > 0) return arr.slice(0, MAX_STATS);
+        if (Array.isArray(arr) && arr.length > 0) return arr.slice(0, STATS_CONFIG.MAX_STATS);
       }
     }catch(e){}
     return DEFAULT_SELECTED_STATS.slice();
   }
   
   function saveSelectedStats(arr){
-    try{ localStorage.setItem('selectedStats', JSON.stringify(arr.slice(0, MAX_STATS))); }catch(e){}
+    try{ localStorage.setItem('selectedStats', JSON.stringify(arr.slice(0, STATS_CONFIG.MAX_STATS))); }catch(e){}
   }
   
   // Load year started from localStorage
@@ -2058,7 +2069,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
         const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
         if (stored && !terminal.includes(status)){
-          const wh = Number.isFinite(Number(subj.weekHours)) ? Number(subj.weekHours) : 6;
+          const wh = Number.isFinite(Number(subj.weekHours)) ? Number(subj.weekHours) : STATS_CONFIG.DEFAULT_WEEK_HOURS;
           inCourseHours += wh;
         }
       }
@@ -2077,7 +2088,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
             if (stored && !terminal.includes(status)){
               const meta = byCode[k] || byName[k] || null;
-              const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : 6;
+              const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : STATS_CONFIG.DEFAULT_WEEK_HOURS;
               inCourseHours += wh;
             }
           }catch(e){}
@@ -2296,7 +2307,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   function computePesoAcademico(){
-    // Formula: 11*Aprobadas - 5*Años Antigüedad - 3*Desaprobadas
+    // Formula: COEF_APROBADAS*Aprobadas - COEF_ANTIGUEDAD*Años - COEF_DESAPROBADAS*Desaprobadas
     // Get approved count (number only)
     const aprobStr = computeMateriasAprobadas();
     const aprobMatch = aprobStr.match(/^(\d+)/);
@@ -2315,8 +2326,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const desaprobadasStr = computeDesaprobadas();
     const desaprobadas = parseInt(desaprobadasStr, 10) || 0;
     
-    // Calculate peso
-    const peso = 11 * aprobadas - 5 * aniosAntiguedad - 3 * desaprobadas;
+    // Calculate peso using configured coefficients
+    const peso = STATS_CONFIG.PESO_COEF_APROBADAS * aprobadas 
+               - STATS_CONFIG.PESO_COEF_ANTIGUEDAD * aniosAntiguedad 
+               - STATS_CONFIG.PESO_COEF_DESAPROBADAS * desaprobadas;
     return String(peso);
   }
   
@@ -2366,7 +2379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!tbody) return;
     tbody.innerHTML = '';
     const selected = getSelectedStats();
-    const atMax = selected.length >= MAX_STATS;
+    const atMax = selected.length >= STATS_CONFIG.MAX_STATS;
     
     ALL_STATS.forEach(statDef => {
       const isSelected = selected.includes(statDef.id);
