@@ -1,6 +1,31 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const DATA_URL = 'assets/data/k23.json';
-  // Electivas will be read from the main DATA_URL (k23.json) under the module with id 'electives'
+  // Plan management: determine which plan to load
+  const AVAILABLE_PLANS = {
+    'k23': 'assets/data/k23.json',
+    'k23medio': 'assets/data/k23medio.json'
+  };
+  const DEFAULT_PLAN = 'k23';
+  
+  // Load saved plan from localStorage or use default
+  function getSavedPlan() {
+    const saved = localStorage.getItem('plan');
+    return (saved && AVAILABLE_PLANS[saved]) ? saved : DEFAULT_PLAN;
+  }
+  
+  function savePlan(planKey) {
+    localStorage.setItem('plan', planKey);
+    // Upload plan to Firestore if available (skip when applying remote changes)
+    try { 
+      if (!window.__firestoreApplyingRemote && window.firestoreUploadPlan) {
+        window.firestoreUploadPlan(planKey); 
+      }
+    } catch(e) { console.error('firestoreUploadPlan hook error', e); }
+  }
+  
+  let currentPlan = getSavedPlan();
+  let DATA_URL = AVAILABLE_PLANS[currentPlan];
+  
+  // Electivas will be read from the main DATA_URL under the module with id 'electives'
   let planData = null;
   let electivasList = [];
   let columns = 5;
@@ -19,6 +44,23 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('firestore:remote-update', (ev) => {
     try{
       console.log('Firestore remote update received', ev && ev.detail);
+      
+      // Check if plan has changed in localStorage (set by Firestore sync) and reload if needed
+      // This only triggers a reload when the remote plan differs from the currently loaded plan
+      const savedPlan = getSavedPlan();
+      if (savedPlan !== currentPlan) {
+        currentPlan = savedPlan;
+        DATA_URL = AVAILABLE_PLANS[currentPlan];
+        // Update the dropdown to reflect the new plan
+        const programSelectEl = document.getElementById('programSelect');
+        if (programSelectEl) {
+          programSelectEl.value = currentPlan;
+        }
+        // Reload plan data
+        loadPlanData();
+        return;
+      }
+      
       // Prefer in-place re-render from planData when available to avoid a full reload loop.
       if (typeof renderGroups === 'function' && typeof planData !== 'undefined' && planData){
         try{
@@ -96,6 +138,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }catch(e){/* ignore */}
 
+
+  // Program selector: allow user to switch between plans
+  const programSelect = document.getElementById('programSelect');
+  function initProgramSelector() {
+    if (!programSelect) return;
+    // Set the dropdown to the current plan
+    programSelect.value = currentPlan;
+    // Handle plan change
+    programSelect.addEventListener('change', (ev) => {
+      const newPlan = ev.target.value;
+      if (!AVAILABLE_PLANS[newPlan]) return;
+      // Save the new plan preference (does NOT delete other data like subjectData, electives)
+      savePlan(newPlan);
+      currentPlan = newPlan;
+      DATA_URL = AVAILABLE_PLANS[currentPlan];
+      // Reload the plan data
+      loadPlanData();
+    });
+  }
+  
+  // Function to load plan data from the current DATA_URL
+  function loadPlanData() {
+    fetch(DATA_URL)
+      .then(r => r.json())
+      .then(d => {
+        planData = d;
+        const modules = Array.isArray(d.modules) ? d.modules : [];
+        // electivas module typically has id 'electives' and render: false
+        const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
+        electivasList = electModule && Array.isArray(electModule.subjects) ? electModule.subjects : [];
+        try{ renderGroups(d); }catch(e){ console.error('Error renderizando grupos', e); }
+      })
+      .catch(err => {
+        console.error('Error cargando plan desde DATA_URL', err);
+        if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-danger">No se pudo cargar el plan de materias.</div>';
+      });
+  }
+  
+  initProgramSelector();
 
   // Electivas button: open modal and load electivas from separate file
   const electivasBtn = document.getElementById('btn-electivas');
@@ -436,6 +517,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use number of visible modules as columns (limit to max 8 for layout sanity)
     columns = Math.min(Math.max(visibleModules.length, 1), 8);
     columnsContainer.innerHTML = '';
+    
+    // Dynamically adjust the grid columns based on the number of visible modules
+    columnsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
 
     // assign consecutive data-index values for visible columns
     visibleModules.forEach((module, visIdx) => {
@@ -1801,6 +1885,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Behavior: read `localStorage.electives` and use electivasList (loaded from DATA_URL)
   // to get the real metadata (so cards show the electiva name instead of just the code),
   // then insert each electiva into its saved column, replacing placeholders when possible.
+  // NOTE: If an elective doesn't exist in the current plan's electivasList, it is NOT displayed.
   function restoreElectivesFromStorage(){
     try{
       const raw = localStorage.getItem('electives');
@@ -1820,9 +1905,10 @@ document.addEventListener('DOMContentLoaded', () => {
           let subjMeta = null;
           if (byCode[key]) subjMeta = byCode[key];
           else if (byName[key]) subjMeta = byName[key];
-          else {
-            // fallback minimal object (use key as name so UI isn't just the code)
-            subjMeta = { code: key, name: key, requirements: { cursar: [], aprobar: [] } };
+          // If elective doesn't exist in the current plan, skip it (don't display)
+          if (!subjMeta) {
+            console.log('Elective not found in current plan, skipping:', key);
+            return; // skip this elective
           }
           const colEl = columnsContainer.querySelector(`.column-col[data-index="${colIndex}"]`);
           let placeholderEl = null;
@@ -1845,18 +1931,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Load the main plan (subjects + modules + electivas) from DATA_URL and render
-  fetch(DATA_URL)
-    .then(r => r.json())
-    .then(d => {
-      planData = d;
-      const modules = Array.isArray(d.modules) ? d.modules : [];
-      // electivas module typically has id 'electives' and render: false
-      const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
-      electivasList = electModule && Array.isArray(electModule.subjects) ? electModule.subjects : [];
-      try{ renderGroups(d); }catch(e){ console.error('Error renderizando grupos', e); }
-    })
-    .catch(err => {
-      console.error('Error cargando plan desde DATA_URL', err);
-      if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-danger">No se pudo cargar el plan de materias.</div>';
-    });
+  loadPlanData();
 });

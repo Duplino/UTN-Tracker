@@ -1,6 +1,16 @@
 // Share page JavaScript - Read-only public profile view
 document.addEventListener('DOMContentLoaded', () => {
-  const DATA_URL = 'assets/data/k23.json';
+  // Plan management: determine which plan to load
+  const AVAILABLE_PLANS = {
+    'k23': 'assets/data/k23.json',
+    'k23medio': 'assets/data/k23medio.json'
+  };
+  const DEFAULT_PLAN = 'k23';
+  
+  // Get initial plan from window.sharePlan (set by share.html module) or use default
+  let currentPlan = (window.sharePlan && AVAILABLE_PLANS[window.sharePlan]) ? window.sharePlan : DEFAULT_PLAN;
+  
+  let DATA_URL = AVAILABLE_PLANS[currentPlan];
   let planData = null;
   let electivasList = [];
   let columns = 5;
@@ -266,6 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     columns = Math.min(Math.max(visibleModules.length, 1), 8);
     columnsContainer.innerHTML = '';
+    
+    // Dynamically adjust the grid columns based on the number of visible modules
+    columnsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
 
     visibleModules.forEach((module, visIdx) => {
       const col = document.createElement('div');
@@ -306,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Get placed elective for a specific slot
+  // NOTE: Only returns electives that exist in the current plan's electivasList
   function getPlacedElectiveForSlot(colIndex, slotIndex) {
     if (!remoteElectives || Object.keys(remoteElectives).length === 0) return null;
     const electList = Array.isArray(electivasList) ? electivasList : [];
@@ -317,9 +331,13 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const key of Object.keys(remoteElectives)) {
       const entry = remoteElectives[key];
       const entryColIndex = typeof entry.colIndex === 'number' ? entry.colIndex : parseInt(entry.colIndex, 10);
+      // Skip electives that don't exist in the current plan
+      const electiveMeta = byCode[key] || byName[key];
+      if (!electiveMeta) continue;
+      
       if (entryColIndex === colIndex) {
         if (slotCounter === slotIndex) {
-          return byCode[key] || byName[key] || { code: key, name: key };
+          return electiveMeta;
         }
         slotCounter++;
       }
@@ -776,6 +794,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = ev.detail || {};
       remoteSubjectData = data.subjectData || {};
       remoteElectives = data.electives || {};
+      
+      // Check if the plan from Firestore is different from the current one
+      const remotePlan = data.plan || DEFAULT_PLAN;
+      if (AVAILABLE_PLANS[remotePlan] && remotePlan !== currentPlan) {
+        // Update the plan and reload the data
+        currentPlan = remotePlan;
+        DATA_URL = AVAILABLE_PLANS[currentPlan];
+        loadPlanData();
+        return;
+      }
+      
       // Re-render if planData is already loaded
       if (planData) {
         renderGroups(planData);
@@ -785,23 +814,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Function to load plan data from the current DATA_URL
+  function loadPlanData() {
+    fetch(DATA_URL)
+      .then(r => r.json())
+      .then(d => {
+        planData = d;
+        const modules = Array.isArray(d.modules) ? d.modules : [];
+        const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
+        electivasList = electModule && Array.isArray(electModule.subjects) ? electModule.subjects : [];
+        // If remote data is already available, render with it
+        if (window.shareUserData) {
+          remoteSubjectData = window.shareUserData;
+          remoteElectives = window.shareElectives || {};
+        }
+        try { renderGroups(d); } catch (e) { console.error('Error renderizando grupos', e); }
+      })
+      .catch(err => {
+        console.error('Error cargando plan desde DATA_URL', err);
+        if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-danger">No se pudo cargar el plan de materias.</div>';
+      });
+  }
+
   // Load the main plan from DATA_URL and render
-  fetch(DATA_URL)
-    .then(r => r.json())
-    .then(d => {
-      planData = d;
-      const modules = Array.isArray(d.modules) ? d.modules : [];
-      const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
-      electivasList = electModule && Array.isArray(electModule.subjects) ? electModule.subjects : [];
-      // If remote data is already available, render with it
-      if (window.shareUserData) {
-        remoteSubjectData = window.shareUserData;
-        remoteElectives = window.shareElectives || {};
-      }
-      try { renderGroups(d); } catch (e) { console.error('Error renderizando grupos', e); }
-    })
-    .catch(err => {
-      console.error('Error cargando plan desde DATA_URL', err);
-      if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-danger">No se pudo cargar el plan de materias.</div>';
-    });
+  loadPlanData();
 });

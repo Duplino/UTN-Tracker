@@ -15,7 +15,8 @@
 			<div class="toolbar d-flex justify-content-between align-items-center">
 				<div class="d-flex align-items-center" role="group" aria-label="Herramientas">
 					<select id="programSelect" class="form-select me-2" aria-label="Programas">
-						<option value="isi-k23">Ingeniería en Sistemas de Información - K23</option>
+						<option value="k23">Ingeniería en Sistemas de Información - K23</option>
+						<option value="k23medio">Analista en Sistemas de Información - K23</option>
 					</select>
 					<button class="btn btn-outline-secondary" id="btn-electivas">electivas</button>
 				</div>
@@ -418,6 +419,15 @@
 				}catch(err){ console.error('firestoreUploadElectives error', err); }
 			};
 
+			// Helper: upload plan selection to user doc
+			window.firestoreUploadPlan = async function(planKey){
+				try{
+					if (!auth || !auth.currentUser) return;
+					const ref = doc(db, 'users', auth.currentUser.uid);
+					await setDoc(ref, { plan: planKey, updatedAt: serverTimestamp() }, { merge: true });
+				}catch(err){ console.error('firestoreUploadPlan error', err); }
+			};
+
 			// Helper: set public flag on user doc
 			window.firestoreSetPublic = async function(flag){
 				try{
@@ -472,6 +482,10 @@
 					if (typeof data.mostrarCorrelativas !== 'undefined'){
 						try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
 					}
+					// Merge plan if present
+					if (typeof data.plan !== 'undefined' && data.plan){
+						try{ localStorage.setItem('plan', data.plan); }catch(e){}
+					}
 					// Note: do NOT dispatch an event here to avoid duplicate reloads; caller may reload or re-render as needed.
 					return data;
 				}catch(err){ console.error('firestoreDownloadAndApply error', err); return null; }
@@ -508,6 +522,7 @@
 							}
 							if (typeof data.electives !== 'undefined') try{ localStorage.setItem('electives', JSON.stringify(data.electives)); }catch(e){}
 							if (typeof data.mostrarCorrelativas !== 'undefined') try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
+							if (typeof data.plan !== 'undefined' && data.plan) try{ localStorage.setItem('plan', data.plan); }catch(e){}
 						}finally{ window.__firestoreApplyingRemote = false; }
 						// notify app to refresh UI (only for subsequent updates)
 						document.dispatchEvent(new CustomEvent('firestore:remote-update', { detail: { from: 'onSnapshot' } }));
