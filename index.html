@@ -317,31 +317,8 @@
 					</div>
 				</form>
 
-				<!-- Dynamic status banner (updated live) -->
+				<!-- Dynamic status banner (updated live) - dropdown is generated dynamically by JS -->
 				<div id="subject-status" class="mt-3" aria-live="polite" aria-atomic="true">
-					<div class="dropdown">
-  <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-    Dropdown button
-  </button>
-  <ul class="dropdown-menu">
-    <li><a class="dropdown-item" href="#">Action</a></li>
-    <li><a class="dropdown-item" href="#">Another action</a></li>
-    <li><a class="dropdown-item" href="#">Something else here</a></li>
-  </ul>
-</div>
-				</div>
-				<!-- Static override control moved to HTML to avoid dynamic injection/removal by JS -->
-				<div id="subject-override-wrap" class="mt-2" style="display:flex;gap:6px;align-items:center;">
-					<label for="subject-override" class="form-label small mb-0" style="margin-bottom:0;">Override:</label>
-					<select id="subject-override" class="form-select form-select-sm" style="width:auto;">
-						<option value="computed">Usar calculado</option>
-						<option value="Aprobada">Aprobada</option>
-						<option value="Promocionada">Promocionada</option>
-						<option value="Regularizada">Regularizada</option>
-						<option value="No regularizada">No regularizada</option>
-						<option value="Desaprobada">Desaprobada</option>
-						<option value="Faltan notas">Faltan notas</option>
-					</select>
 				</div>
 		      </div>
 		      <div class="modal-footer">
