@@ -719,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // Display override status in the banner instead of computed
           setStatusBanner(storedOverride.overrideStatus);
         }
-      }catch(e){}
+      }catch(e){ console.error('Error checking stored override', e); }
       // ensure recursar button reflects current status
       toggleRecursarButton(code);
       // The override dropdown is now inside the banner, handled by setStatusBanner
@@ -881,24 +881,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let prev = [];
     try{ prev = getAvailableSubjectCodes(); }catch(e){}
 
-    let stored = loadSubjectData(effectiveCode) || {};
+    let subjectData = loadSubjectData(effectiveCode) || {};
     if (overrideValue === 'computed'){
       // Clear override and use computed status
-      if (stored.overrideStatus) delete stored.overrideStatus;
+      if (subjectData.overrideStatus) delete subjectData.overrideStatus;
     } else {
       // Set override status
-      stored.overrideStatus = overrideValue;
+      subjectData.overrideStatus = overrideValue;
     }
-    if (!stored.values) stored.values = {};
-    saveSubjectData(effectiveCode, stored);
+    if (!subjectData.values) subjectData.values = {};
+    saveSubjectData(effectiveCode, subjectData);
 
     // Determine what status to display
     const applyStatus = (overrideValue === 'computed') 
-      ? (stored.status || '') 
+      ? (subjectData.status || '') 
       : overrideValue;
     
     setStatusBanner(applyStatus);
-    applyCardStatusStyle(currentCard, (overrideValue === 'computed') ? (stored.status || null) : overrideValue);
+    applyCardStatusStyle(currentCard, (overrideValue === 'computed') ? (subjectData.status || null) : overrideValue);
     try{ computeStats(displayedSubjects); }catch(e){}
     // re-evaluate cursar state and animate newly unlocked subjects
     try{ updateAllCardCursarState(); const now = getAvailableSubjectCodes(); animateNewlyUnlocked(prev, now); }catch(e){}
@@ -909,7 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
         inst.hide();
       }
-    }catch(err){/* ignore */}
+    }catch(err){ console.error('Error closing modal after override selection', err); }
   }
 
   function showFinalsUpTo(n){
