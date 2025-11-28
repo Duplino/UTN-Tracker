@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!Number.isNaN(n)) { p2 = n; break; }
     }
     if (Number.isNaN(p1) || Number.isNaN(p2)) return false;
-    if (p1 < 6 || p2 < 6) return false; // not regularizada
+    //if (p1 < 6 || p2 < 6) return false; // not regularizada
     // If both >=8, it's already promocionada
     if (p1 >= 8 && p2 >= 8) return false;
     // If exactly one >=8 and the other >=6 but <8, they could still promote with a recuperatory
@@ -340,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stored = loadSubjectData(subject.code);
     const status = getStatusText(stored);
     const statusDesc = getStatusDescription(status);
-    const promotable = status === 'Regularizada' && canPromote(stored);
+    const promotable = (status === 'Regularizada' || status === 'No regularizada') && canPromote(stored);
     const statusLabel = statusDesc ? (promotable ? `${escapeHtml(statusDesc)} • Puede promocionar` : escapeHtml(statusDesc)) : '';
 
     card.innerHTML = `
@@ -379,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stored = loadSubjectData(subj.code);
     const status = getStatusText(stored);
     const statusDesc = getStatusDescription(status);
-    const promotable = status === 'Regularizada' && canPromote(stored);
+    const promotable = (status === 'Regularizada' || status === 'No regularizada') && canPromote(stored);
     const statusLabel = statusDesc ? (promotable ? `${escapeHtml(statusDesc)} • Puede promocionar` : escapeHtml(statusDesc)) : '';
 
     card.innerHTML = `
