@@ -2023,7 +2023,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   function saveSelectedStats(arr){
-    try{ localStorage.setItem('selectedStats', JSON.stringify(arr.slice(0, STATS_CONFIG.MAX_STATS))); }catch(e){}
+    const statsToSave = arr.slice(0, STATS_CONFIG.MAX_STATS);
+    try{ localStorage.setItem('selectedStats', JSON.stringify(statsToSave)); }catch(e){}
+    // Upload to Firestore if available (skip when applying remote changes)
+    try{ 
+      if (!window.__firestoreApplyingRemote && window.firestoreUploadSelectedStats) {
+        window.firestoreUploadSelectedStats(statsToSave); 
+      }
+    } catch(e) { console.error('firestoreUploadSelectedStats hook error', e); }
   }
   
   // Load year started from localStorage
