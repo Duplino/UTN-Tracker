@@ -739,8 +739,8 @@ document.addEventListener('DOMContentLoaded', () => {
           });
           // ensure status reflects latest inputs
           updateSubjectStatus();
-          const statusEl = document.getElementById('subject-status');
-          const statusText = statusEl ? statusEl.textContent.trim() : '';
+          const statusTextEl = document.getElementById('subject-status-text');
+          const statusText = statusTextEl ? statusTextEl.textContent.trim() : '';
           // persist to localStorage
           const storedObj = { values, status: statusText, savedAt: (new Date()).toISOString() };
           // Do NOT preserve existing override: saving the modal should clear any manual override
