@@ -31,11 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let columns = 5;
 
   const columnsContainer = document.querySelector('.columns-grid');
-  const statsTotalPeso = document.getElementById('stat-peso');
-  const statsAvg = document.getElementById('stat-promedio');
-  const statPlaceholder1 = document.getElementById('stat-placeholder-1');
-  const statPlaceholder2 = document.getElementById('stat-placeholder-2');
-  const statDisponibles = document.getElementById('stat-disponibles');
   const progressBar = document.getElementById('progress-bar');
   const progressLabel = document.getElementById('progress-label');
   let displayedSubjects = [];
@@ -1669,101 +1664,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const total = baseTotal + electivasRequired;
 
-    // Sum weekly hours for subjects that are 'EN CURSO'
-    // Definition: a subject is considered 'en curso' when there is stored data for it
-    // and its status is NOT one of the terminal statuses (Aprobada, Promocionada, Regularizada, Desaprobada).
-    let inCourseHours = 0;
-    try{
-      for (const subj of (list || [])){
-        const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
-        const stored = key ? loadSubjectData(key) : null;
-        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-        const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
-        if (stored && !terminal.includes(status)){
-          const wh = Number.isFinite(Number(subj.weekHours)) ? Number(subj.weekHours) : 6;
-          inCourseHours += wh;
-        }
-      }
-      // Also include electivas that are placed and have stored data and are in-course
-      const rawElect = localStorage.getItem('electives');
-      if (rawElect){
-        const emap = JSON.parse(rawElect) || {};
-        const electList = Array.isArray(electivasList) ? electivasList : [];
-        const byCode = {};
-        const byName = {};
-        electList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
-        Object.keys(emap).forEach(k => {
-          try{
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
-            if (stored && !terminal.includes(status)){
-              // find metadata to get weekHours
-              const meta = byCode[k] || byName[k] || null;
-              const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : 6;
-              inCourseHours += wh;
-            }
-          }catch(e){/* ignore per-electiva */}
-        });
-      }
-    }catch(e){ inCourseHours = 0; }
-
-    // Update stat cards
-    statsTotalPeso.textContent = inCourseHours > 0 ? (String(inCourseHours) + ' hs') : '—';
-    // Compute average grade for approved subjects (Aprobada and Promocionada) when a numeric grade is available
-    let approvedGradeSum = 0;
-    let approvedGradeCount = 0;
-    try{
-      for (const subj of (list || [])){
-        const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
-        const stored = key ? loadSubjectData(key) : null;
-        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-        if (status === 'Aprobada' || status === 'Promocionada'){
-          // determine grade according to rules: Aprobada -> first final >=6 (final1..4)
-          // Promocionada -> average of last parciales rounded
-          let grade = NaN;
-          try{
-            if (status === 'Aprobada' && stored && stored.values){
-              for (let i = 1; i <= 4; i++){
-                const v = stored.values['final'+i];
-                const n = parseNum(v);
-                if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
-              }
-            } else if (status === 'Promocionada' && stored && stored.values){
-              let p1 = NaN, p2 = NaN;
-              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial1_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p1 = n; break; } }
-              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial2_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p2 = n; break; } }
-              if (!Number.isNaN(p1) && !Number.isNaN(p2)) grade = Math.round((p1 + p2) / 2);
-            }
-          }catch(e){ /* ignore per-subject */ }
-          if (!Number.isNaN(grade)){
-            approvedGradeSum += Number(grade);
-            approvedGradeCount += 1;
-          }
-        }
-      }
-    }catch(e){ /* ignore */ }
-    if (approvedGradeCount > 0){
-  const avg = approvedGradeSum / approvedGradeCount;
-  // show with two decimals, use comma for decimal separator in locale ES
-  statsAvg.textContent = String(avg.toFixed(2)).replace('.', ',');
-    } else {
-      statsAvg.textContent = '—';
-    }
-    statPlaceholder1.textContent = approved + ' / ' + total;
-    statPlaceholder2.textContent = regularized;
-
-    // Count available subjects (cards with .card-available class = meet cursar requirements and not started)
-    // Exclude electiva placeholders (card-electiva-add) from the count
-    let disponibles = 0;
-    try {
-      if (columnsContainer) {
-        const availableCards = columnsContainer.querySelectorAll('.card-subject.card-available:not(.card-electiva-add)');
-        disponibles = availableCards.length;
-      }
-    } catch (e) { disponibles = 0; }
-    if (statDisponibles) statDisponibles.textContent = disponibles;
-
     // Progress formula: (approved + regularized/2) / total
     let progress = 0;
     if (total > 0){
@@ -1774,6 +1674,9 @@ document.addEventListener('DOMContentLoaded', () => {
     progressBar.style.width = `${pct}%`;
     progressBar.setAttribute('aria-valuenow', pct);
     progressLabel.textContent = total > 0 ? `${pct}%` : '—';
+    
+    // Render dynamic stats row cards
+    try{ renderStatsRowCards(); }catch(e){ console.error('Error rendering stats row', e); }
   }
 
   // Simple escape to avoid HTML injection in sample
@@ -2073,6 +1976,469 @@ document.addEventListener('DOMContentLoaded', () => {
     container.insertBefore(a, container.firstChild);
     setTimeout(()=>{ try{ a.remove(); }catch(e){} }, 2500);
   }
+
+  // =====================================================
+  // STATS MODULE: All available stats and dynamic infoboxes
+  // =====================================================
+  
+  // Configuration constants
+  const STATS_CONFIG = {
+    MAX_STATS: 5,                    // Maximum number of stat cards to display
+    DEFAULT_WEEK_HOURS: 6,           // Default weekly hours when not specified
+    MIN_YEAR_STARTED: 1990,          // Minimum year for "year started" input
+    MAX_YEAR_STARTED: 2099,          // Maximum year for "year started" input
+    // Academic weight formula coefficients (Peso = 11*Aprobadas - 5*Años - 3*Desaprobadas)
+    PESO_COEF_APROBADAS: 11,
+    PESO_COEF_ANTIGUEDAD: 5,
+    PESO_COEF_DESAPROBADAS: 3
+  };
+  
+  // All available stats definitions
+  const ALL_STATS = [
+    { id: 'horasSemanales', name: 'Horas semanales', compute: computeHorasSemanales },
+    { id: 'promedio', name: 'Promedio', compute: computePromedio },
+    { id: 'materiasAprobadas', name: 'Materias aprobadas', compute: computeMateriasAprobadas },
+    { id: 'finalesPendientes', name: 'Finales pendientes', compute: computeFinalesPendientes },
+    { id: 'materiasCursables', name: 'Materias que pueden cursarse', compute: computeMateriasCursables },
+    { id: 'puedePromocionar', name: 'Materias en condición de promoción', compute: computePuedePromocionar },
+    { id: 'debeRecuperar', name: 'Materias a recuperar', compute: computeDebeRecuperar },
+    { id: 'desaprobadas', name: 'Cantidad de materias desaprobadas', compute: computeDesaprobadas },
+    { id: 'aniosAntiguedad', name: 'Años de antigüedad', compute: computeAniosAntiguedad },
+    { id: 'pesoAcademico', name: 'Peso académico', compute: computePesoAcademico }
+  ];
+  
+  // Default selected stats (keys)
+  const DEFAULT_SELECTED_STATS = ['horasSemanales', 'promedio', 'materiasAprobadas', 'finalesPendientes', 'materiasCursables'];
+  
+  // Load selected stats from localStorage or use defaults
+  function getSelectedStats(){
+    try{
+      const raw = localStorage.getItem('selectedStats');
+      if (raw){
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length > 0) return arr.slice(0, STATS_CONFIG.MAX_STATS);
+      }
+    }catch(e){}
+    return DEFAULT_SELECTED_STATS.slice();
+  }
+  
+  function saveSelectedStats(arr){
+    try{ localStorage.setItem('selectedStats', JSON.stringify(arr.slice(0, STATS_CONFIG.MAX_STATS))); }catch(e){}
+  }
+  
+  // Load year started from localStorage
+  function getYearStarted(){
+    try{
+      const v = localStorage.getItem('yearStarted');
+      if (v) return parseInt(v, 10);
+    }catch(e){}
+    return null;
+  }
+  
+  function saveYearStarted(year){
+    try{ localStorage.setItem('yearStarted', String(year)); }catch(e){}
+  }
+  
+  // Initialize year started input in profile modal
+  function initYearStartedInput(){
+    const input = document.getElementById('profile-year-started');
+    if (!input) return;
+    const saved = getYearStarted();
+    if (saved) input.value = saved;
+    input.addEventListener('change', () => {
+      const val = parseInt(input.value, 10);
+      if (!Number.isNaN(val) && val >= 1990 && val <= 2099){
+        saveYearStarted(val);
+        // Refresh stats
+        try{ renderStatsRowCards(); populateStatsModalTable(); }catch(e){}
+      }
+    });
+  }
+  
+  // =====================================================
+  // Stats computation functions
+  // =====================================================
+  
+  function computeHorasSemanales(){
+    // Sum weekly hours for subjects in course (same logic as statsTotalPeso)
+    let inCourseHours = 0;
+    try{
+      for (const subj of (displayedSubjects || [])){
+        const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+        const stored = key ? loadSubjectData(key) : null;
+        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+        const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
+        if (stored && !terminal.includes(status)){
+          const wh = Number.isFinite(Number(subj.weekHours)) ? Number(subj.weekHours) : STATS_CONFIG.DEFAULT_WEEK_HOURS;
+          inCourseHours += wh;
+        }
+      }
+      // Also include electivas in course
+      const rawElect = localStorage.getItem('electives');
+      if (rawElect){
+        const emap = JSON.parse(rawElect) || {};
+        const electList = Array.isArray(electivasList) ? electivasList : [];
+        const byCode = {};
+        const byName = {};
+        electList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
+        Object.keys(emap).forEach(k => {
+          try{
+            const stored = loadSubjectData(k);
+            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+            const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
+            if (stored && !terminal.includes(status)){
+              const meta = byCode[k] || byName[k] || null;
+              const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : STATS_CONFIG.DEFAULT_WEEK_HOURS;
+              inCourseHours += wh;
+            }
+          }catch(e){}
+        });
+      }
+    }catch(e){ inCourseHours = 0; }
+    return inCourseHours > 0 ? (String(inCourseHours) + ' hs') : '—';
+  }
+  
+  function computePromedio(){
+    let approvedGradeSum = 0;
+    let approvedGradeCount = 0;
+    try{
+      for (const subj of (displayedSubjects || [])){
+        const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+        const stored = key ? loadSubjectData(key) : null;
+        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+        if (status === 'Aprobada' || status === 'Promocionada'){
+          let grade = NaN;
+          try{
+            if (status === 'Aprobada' && stored && stored.values){
+              for (let i = 1; i <= 4; i++){
+                const v = stored.values['final'+i];
+                const n = parseNum(v);
+                if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
+              }
+            } else if (status === 'Promocionada' && stored && stored.values){
+              let p1 = NaN, p2 = NaN;
+              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial1_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p1 = n; break; } }
+              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial2_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p2 = n; break; } }
+              if (!Number.isNaN(p1) && !Number.isNaN(p2)) grade = Math.round((p1 + p2) / 2);
+            }
+          }catch(e){}
+          if (!Number.isNaN(grade)){
+            approvedGradeSum += Number(grade);
+            approvedGradeCount += 1;
+          }
+        }
+      }
+    }catch(e){}
+    if (approvedGradeCount > 0){
+      const avg = approvedGradeSum / approvedGradeCount;
+      return String(avg.toFixed(2)).replace('.', ',');
+    }
+    return '—';
+  }
+  
+  function computeMateriasAprobadas(){
+    const baseTotal = Array.isArray(displayedSubjects) ? displayedSubjects.length : 0;
+    let approved = 0;
+    for (const subj of (displayedSubjects || [])){
+      const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+      const stored = key ? loadSubjectData(key) : null;
+      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      if (status === 'Aprobada' || status === 'Promocionada') approved++;
+    }
+    // Count electivas approved
+    try{
+      const raw = localStorage.getItem('electives');
+      if (raw){
+        const obj = JSON.parse(raw);
+        Object.keys(obj || {}).forEach(k => {
+          try{
+            const stored = loadSubjectData(k);
+            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+            if (status === 'Aprobada' || status === 'Promocionada') approved++;
+          }catch(e){}
+        });
+      }
+    }catch(e){}
+    // Compute total including electivas required
+    let electivasRequired = 0;
+    try{
+      if (planData && Array.isArray(planData.modules)){
+        const visibleModules = planData.modules.filter(m => m && m.render !== false);
+        visibleModules.forEach(m => {
+          const n = Number.isFinite(Number(m.electivas)) ? Number(m.electivas) : 0;
+          electivasRequired += n;
+        });
+      }
+    }catch(e){}
+    const total = baseTotal + electivasRequired;
+    return approved + ' / ' + total;
+  }
+  
+  function computeFinalesPendientes(){
+    let regularized = 0;
+    for (const subj of (displayedSubjects || [])){
+      const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+      const stored = key ? loadSubjectData(key) : null;
+      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      if (status === 'Regularizada') regularized++;
+    }
+    // Count electivas regularized
+    try{
+      const raw = localStorage.getItem('electives');
+      if (raw){
+        const obj = JSON.parse(raw);
+        Object.keys(obj || {}).forEach(k => {
+          try{
+            const stored = loadSubjectData(k);
+            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+            if (status === 'Regularizada') regularized++;
+          }catch(e){}
+        });
+      }
+    }catch(e){}
+    return String(regularized);
+  }
+  
+  function computeMateriasCursables(){
+    let disponibles = 0;
+    try {
+      if (columnsContainer) {
+        const availableCards = columnsContainer.querySelectorAll('.card-subject.card-available:not(.card-electiva-add)');
+        disponibles = availableCards.length;
+      }
+    } catch (e) { disponibles = 0; }
+    return String(disponibles);
+  }
+  
+  function computePuedePromocionar(){
+    // Count subjects where status is Regularizada or No regularizada AND canPromote() returns true
+    let count = 0;
+    for (const subj of (displayedSubjects || [])){
+      const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+      const stored = key ? loadSubjectData(key) : null;
+      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      if ((status === 'Regularizada' || status === 'No regularizada') && canPromote(stored)){
+        count++;
+      }
+    }
+    // Also count electivas
+    try{
+      const raw = localStorage.getItem('electives');
+      if (raw){
+        const obj = JSON.parse(raw);
+        Object.keys(obj || {}).forEach(k => {
+          try{
+            const stored = loadSubjectData(k);
+            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+            if ((status === 'Regularizada' || status === 'No regularizada') && canPromote(stored)){
+              count++;
+            }
+          }catch(e){}
+        });
+      }
+    }catch(e){}
+    return count > 0 ? String(count) : '—';
+  }
+  
+  function computeDebeRecuperar(){
+    // Count subjects where status is "No regularizada" (must recover to regularize)
+    let count = 0;
+    for (const subj of (displayedSubjects || [])){
+      const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+      const stored = key ? loadSubjectData(key) : null;
+      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      if (status === 'No regularizada'){
+        count++;
+      }
+    }
+    // Also count electivas
+    try{
+      const raw = localStorage.getItem('electives');
+      if (raw){
+        const obj = JSON.parse(raw);
+        Object.keys(obj || {}).forEach(k => {
+          try{
+            const stored = loadSubjectData(k);
+            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+            if (status === 'No regularizada'){
+              count++;
+            }
+          }catch(e){}
+        });
+      }
+    }catch(e){}
+    return count > 0 ? String(count) : '—';
+  }
+  
+  function computeDesaprobadas(){
+    // Sum all recursedCount values for subjects in the current plan
+    let totalRecursed = 0;
+    for (const subj of (displayedSubjects || [])){
+      const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+      const stored = key ? loadSubjectData(key) : null;
+      if (stored && typeof stored.recursedCount === 'number'){
+        totalRecursed += stored.recursedCount;
+      }
+    }
+    // Also count electivas
+    try{
+      const raw = localStorage.getItem('electives');
+      if (raw){
+        const obj = JSON.parse(raw);
+        Object.keys(obj || {}).forEach(k => {
+          try{
+            const stored = loadSubjectData(k);
+            if (stored && typeof stored.recursedCount === 'number'){
+              totalRecursed += stored.recursedCount;
+            }
+          }catch(e){}
+        });
+      }
+    }catch(e){}
+    return String(totalRecursed);
+  }
+  
+  function computeAniosAntiguedad(){
+    const yearStarted = getYearStarted();
+    if (!yearStarted) return '—';
+    const currentYear = new Date().getFullYear();
+    const years = currentYear - yearStarted;
+    return years >= 0 ? String(years) : '—';
+  }
+  
+  function computePesoAcademico(){
+    // Formula: COEF_APROBADAS*Aprobadas - COEF_ANTIGUEDAD*Años - COEF_DESAPROBADAS*Desaprobadas
+    // Get approved count (number only)
+    const aprobStr = computeMateriasAprobadas();
+    const aprobMatch = aprobStr.match(/^(\d+)/);
+    const aprobadas = aprobMatch ? parseInt(aprobMatch[1], 10) : 0;
+    
+    // Get años antiguedad
+    const yearStarted = getYearStarted();
+    let aniosAntiguedad = 0;
+    if (yearStarted){
+      const currentYear = new Date().getFullYear();
+      aniosAntiguedad = currentYear - yearStarted;
+      if (aniosAntiguedad < 0) aniosAntiguedad = 0;
+    }
+    
+    // Get desaprobadas (recursed count)
+    const desaprobadasStr = computeDesaprobadas();
+    const desaprobadas = parseInt(desaprobadasStr, 10) || 0;
+    
+    // Calculate peso using configured coefficients
+    const peso = STATS_CONFIG.PESO_COEF_APROBADAS * aprobadas 
+               - STATS_CONFIG.PESO_COEF_ANTIGUEDAD * aniosAntiguedad 
+               - STATS_CONFIG.PESO_COEF_DESAPROBADAS * desaprobadas;
+    return String(peso);
+  }
+  
+  // =====================================================
+  // Render stats row cards
+  // =====================================================
+  
+  function renderStatsRowCards(){
+    const container = document.getElementById('stats-row-container');
+    if (!container) return;
+    container.innerHTML = '';
+    const selected = getSelectedStats();
+    if (selected.length === 0) return;
+    
+    // Adjust flex based on number of cards
+    const cardCount = selected.length;
+    
+    selected.forEach(statId => {
+      const statDef = ALL_STATS.find(s => s.id === statId);
+      if (!statDef) return;
+      const value = statDef.compute();
+      const card = document.createElement('div');
+      card.className = 'card stat-card p-2';
+      card.dataset.statId = statId;
+      // Adjust card sizing based on count
+      if (cardCount <= 3){
+        card.style.flex = '1 1 200px';
+      } else if (cardCount === 4){
+        card.style.flex = '1 1 180px';
+      } else {
+        card.style.flex = '1 1 160px';
+      }
+      card.innerHTML = `
+        <div class="small text-muted">${escapeHtml(statDef.name)}</div>
+        <div class="h5 mb-0">${escapeHtml(value)}</div>
+      `;
+      container.appendChild(card);
+    });
+  }
+  
+  // =====================================================
+  // Populate stats modal table
+  // =====================================================
+  
+  function populateStatsModalTable(){
+    const tbody = document.getElementById('stats-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const selected = getSelectedStats();
+    const atMax = selected.length >= STATS_CONFIG.MAX_STATS;
+    
+    ALL_STATS.forEach(statDef => {
+      const isSelected = selected.includes(statDef.id);
+      const value = statDef.compute();
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(statDef.name)}</td>
+        <td><strong>${escapeHtml(value)}</strong></td>
+        <td class="text-center"></td>
+      `;
+      const actionCell = tr.querySelector('td:last-child');
+      if (isSelected){
+        // Show X (remove) button
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-outline-danger btn-sm btn-remove-stat';
+        btn.innerHTML = '✕';
+        btn.title = 'Quitar del panel';
+        btn.addEventListener('click', () => {
+          const newSelected = selected.filter(id => id !== statDef.id);
+          saveSelectedStats(newSelected);
+          renderStatsRowCards();
+          populateStatsModalTable();
+        });
+        actionCell.appendChild(btn);
+      } else {
+        // Show + (add) button
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-outline-success btn-sm btn-add-stat';
+        btn.innerHTML = '+';
+        btn.title = 'Agregar al panel';
+        if (atMax){
+          btn.disabled = true;
+          btn.title = 'Ya tenés 5 estadísticas en el panel';
+        }
+        btn.addEventListener('click', () => {
+          if (atMax) return;
+          const newSelected = [...selected, statDef.id];
+          saveSelectedStats(newSelected);
+          renderStatsRowCards();
+          populateStatsModalTable();
+        });
+        actionCell.appendChild(btn);
+      }
+      tbody.appendChild(tr);
+    });
+  }
+  
+  // Initialize stats modal event: populate table when shown
+  const statsModalEl = document.getElementById('statsModal');
+  if (statsModalEl){
+    statsModalEl.addEventListener('show.bs.modal', () => {
+      populateStatsModalTable();
+    });
+  }
+  
+  // Initialize year started input
+  initYearStartedInput();
 
   // Load the main plan (subjects + modules + electivas) from DATA_URL and render
   loadPlanData();
