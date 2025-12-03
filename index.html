@@ -18,6 +18,14 @@
 						<option value="k23">Ingeniería en Sistemas de Información - K23</option>
 						<option value="k23medio">Analista en Sistemas de Información - K23</option>
 					</select>
+					<div class="btn-group me-2" role="group" aria-label="Vista">
+						<button type="button" class="btn btn-outline-secondary active" id="btn-view-grid" title="Vista de tablero">
+							<i class="bi bi-grid-3x3-gap"></i>
+						</button>
+						<button type="button" class="btn btn-outline-secondary" id="btn-view-table" title="Vista de tabla">
+							<i class="bi bi-table"></i>
+						</button>
+					</div>
 					<button class="btn btn-outline-secondary" id="btn-electivas">electivas</button>
 				</div>
 				<div class="btn-group">
@@ -40,6 +48,11 @@
 			<!-- Columns with subject cards -->
 			<section class="columns-grid" aria-label="Materias">
 				<!-- Columns produced dynamically by JS -->
+			</section>
+
+			<!-- Table view (hidden by default) -->
+			<section class="table-view" aria-label="Materias">
+				<!-- Table produced dynamically by JS -->
 			</section>
 
 			<!-- Bottom statistics and progress -->

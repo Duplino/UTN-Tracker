@@ -285,3 +285,103 @@ body{
   width: 100%;
   padding: 1rem;
 }
+
+/* Table view styles */
+.table-view{
+  display: block;
+}
+
+.table-view-group{
+  margin-bottom: 1.5rem;
+}
+
+.table-view-group-header{
+  background-color: #f8f9fa;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: bold;
+  font-size: 1.05rem;
+  margin-bottom: 0;
+}
+
+.table-view-subjects{
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.table-view-subjects thead{
+  background-color: #e9ecef;
+}
+
+.table-view-subjects th{
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  border: 1px solid #dee2e6;
+}
+
+.table-view-subjects td{
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #dee2e6;
+  vertical-align: middle;
+}
+
+.table-view-subjects tbody tr{
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.table-view-subjects tbody tr:hover{
+  background-color: rgba(0, 0, 0, 0.025);
+}
+
+.table-view-subjects tbody tr.table-row-disabled{
+  opacity: 0.45;
+  filter: grayscale(90%);
+}
+
+.table-view-subjects tbody tr.table-row-disabled:hover{
+  opacity: 1;
+  filter: none;
+  background-color: #ffffff;
+}
+
+/* Status backgrounds for table rows */
+.table-row-aprobada{
+  background-color: rgba(40,167,69,0.06);
+}
+
+.table-row-desaprobada{
+  background-color: rgba(220,53,69,0.05);
+}
+
+.table-row-promocionada{
+  background-color: rgba(13,110,253,0.04);
+}
+
+.table-row-regularizada{
+  background-color: rgba(255,193,7,0.04);
+}
+
+.table-view-badge{
+  display: inline-block;
+  min-width: 35px;
+  text-align: center;
+}
+
+.table-view-recursed{
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6c757d;
+  margin-left: 0.25rem;
+  vertical-align: super;
+}
+
+/* Hide grid view when table view is active */
+.view-mode-table .columns-grid{
+  display: none;
+}
+
+.view-mode-grid .table-view{
+  display: none;
+}
