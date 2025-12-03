@@ -31,9 +31,51 @@ document.addEventListener('DOMContentLoaded', () => {
   let columns = 5;
 
   const columnsContainer = document.querySelector('.columns-grid');
+  const tableViewContainer = document.querySelector('.table-view');
   const progressBar = document.getElementById('progress-bar');
   const progressLabel = document.getElementById('progress-label');
   let displayedSubjects = [];
+
+  // View mode management: grid or table
+  let currentViewMode = 'grid'; // default to grid view
+  
+  function getSavedViewMode() {
+    const saved = localStorage.getItem('viewMode');
+    return (saved === 'table' || saved === 'grid') ? saved : 'grid';
+  }
+  
+  function saveViewMode(mode) {
+    localStorage.setItem('viewMode', mode);
+  }
+  
+  function applyViewMode(mode) {
+    currentViewMode = mode;
+    const container = document.querySelector('.container-fluid');
+    if (mode === 'table') {
+      container.classList.add('view-mode-table');
+      container.classList.remove('view-mode-grid');
+    } else {
+      container.classList.add('view-mode-grid');
+      container.classList.remove('view-mode-table');
+    }
+    
+    // Update button states
+    const btnGrid = document.getElementById('btn-view-grid');
+    const btnTable = document.getElementById('btn-view-table');
+    if (btnGrid && btnTable) {
+      if (mode === 'table') {
+        btnGrid.classList.remove('active');
+        btnTable.classList.add('active');
+      } else {
+        btnGrid.classList.add('active');
+        btnTable.classList.remove('active');
+      }
+    }
+  }
+  
+  // Initialize view mode
+  currentViewMode = getSavedViewMode();
+  applyViewMode(currentViewMode);
 
   // When Firestore listener notifies of remote changes, refresh the app state
   document.addEventListener('firestore:remote-update', (ev) => {
@@ -172,6 +214,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   initProgramSelector();
+
+  // View mode toggle buttons
+  const btnViewGrid = document.getElementById('btn-view-grid');
+  const btnViewTable = document.getElementById('btn-view-table');
+  
+  if (btnViewGrid) {
+    btnViewGrid.addEventListener('click', () => {
+      applyViewMode('grid');
+      saveViewMode('grid');
+    });
+  }
+  
+  if (btnViewTable) {
+    btnViewTable.addEventListener('click', () => {
+      applyViewMode('table');
+      saveViewMode('table');
+      // Render table view if planData is available
+      if (planData) {
+        try { renderGroupsAsTable(planData); } catch(e) { console.error('Failed to render table view for current plan:', e); }
+      }
+    });
+  }
 
   // Electivas button: open modal and load electivas from separate file
   const electivasBtn = document.getElementById('btn-electivas');
@@ -612,6 +676,194 @@ document.addEventListener('DOMContentLoaded', () => {
     try{ restoreElectivesFromStorage(); }catch(e){/* ignore */}
     // Compute stats after cursar state is updated (so .card-available classes are present)
     computeStats(displayedSubjects);
+    
+    // Also render table view if in table mode
+    if (currentViewMode === 'table') {
+      try { renderGroupsAsTable(data); } catch(e) { console.error('Failed to render table view after grid update:', e); }
+    }
+  }
+
+  function renderGroupsAsTable(data) {
+    const modules = Array.isArray(data.modules) ? data.modules : [];
+    // filter out modules that should not be rendered
+    const visibleModules = modules.filter(m => m && m.render !== false);
+    
+    if (visibleModules.length === 0) {
+      tableViewContainer.innerHTML = '<div class="alert alert-info">No hay módulos disponibles.</div>';
+      return;
+    }
+
+    tableViewContainer.innerHTML = '';
+
+    visibleModules.forEach(module => {
+      // Create group segment
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'table-view-group';
+
+      // Group header
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'table-view-group-header';
+      headerDiv.textContent = module.name;
+      groupDiv.appendChild(headerDiv);
+
+      // Create table for subjects
+      const table = document.createElement('table');
+      table.className = 'table table-view-subjects';
+
+      // Table header
+      const thead = document.createElement('thead');
+      thead.innerHTML = `
+        <tr>
+          <th style="width: 15%;">Código</th>
+          <th style="width: 45%;">Materia</th>
+          <th style="width: 15%;">Horas</th>
+          <th style="width: 25%;">Estado</th>
+        </tr>
+      `;
+      table.appendChild(thead);
+
+      // Table body
+      const tbody = document.createElement('tbody');
+      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
+      
+      subjects.forEach(subj => {
+        const row = createTableRow(subj, module);
+        tbody.appendChild(row);
+      });
+
+      // Add electivas from storage if any belong to this module
+      try {
+        const electivesStr = localStorage.getItem('electives');
+        if (electivesStr) {
+          const electivesMap = JSON.parse(electivesStr);
+          const moduleIndex = visibleModules.indexOf(module);
+          
+          Object.keys(electivesMap).forEach(key => {
+            const electiveData = electivesMap[key];
+            if (electiveData && electiveData.colIndex === moduleIndex) {
+              // Find the electiva in electivasList
+              const electiva = electivasList.find(e => e.code === key || e.name === key);
+              if (electiva) {
+                const row = createTableRow(electiva, module);
+                tbody.appendChild(row);
+              }
+            }
+          });
+        }
+      } catch(e) { console.error('Failed to load electivas from localStorage for table view:', e); }
+
+      table.appendChild(tbody);
+      groupDiv.appendChild(table);
+      tableViewContainer.appendChild(groupDiv);
+    });
+  }
+
+  function createTableRow(subject, group = null) {
+    const row = document.createElement('tr');
+    row.dataset.code = subject.code || '';
+    row.style.cursor = 'pointer';
+
+    // Get stored data for this subject
+    const stored = loadSubjectData(subject.code);
+    const status = stored ? (stored.overrideStatus || stored.status || null) : null;
+    const statusDesc = getStatusDescription(status);
+    
+    // Apply status background class
+    const statusMapping = {
+      'Aprobada': 'table-row-aprobada',
+      'Desaprobada': 'table-row-desaprobada',
+      'Promocionada': 'table-row-promocionada',
+      'Regularizada': 'table-row-regularizada'
+    };
+    const statusClass = statusMapping[status];
+    if (statusClass) row.classList.add(statusClass);
+
+    // Get recursed count for Roman numeral display
+    const recursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
+    let romanNumeralHtml = '';
+    if (recursedCount > 0) {
+      const cursadaNumber = recursedCount + 1;
+      const cursadaNumeral = toRomanNumeral(cursadaNumber);
+      romanNumeralHtml = `<span class="table-view-recursed" title="Cursada ${cursadaNumeral}">${cursadaNumeral}</span>`;
+    }
+
+    // Code column
+    const codeCell = document.createElement('td');
+    codeCell.textContent = subject.code || '';
+    row.appendChild(codeCell);
+
+    // Name column
+    const nameCell = document.createElement('td');
+    nameCell.innerHTML = `${escapeHtml(subject.name)}${romanNumeralHtml}`;
+    row.appendChild(nameCell);
+
+    // Hours column (plain text, no badge)
+    const hoursCell = document.createElement('td');
+    const weekHours = typeof subject.weekHours === 'number' ? subject.weekHours : 6;
+    hoursCell.textContent = `${weekHours} hs`;
+    row.appendChild(hoursCell);
+
+    // Status column
+    const statusCell = document.createElement('td');
+    const promotable = (status === 'Regularizada' || status === 'No regularizada') && canPromote(stored);
+    if (statusDesc) {
+      statusCell.textContent = promotable ? `${statusDesc} • Puede promocionar` : statusDesc;
+    } else {
+      statusCell.textContent = '-';
+    }
+    row.appendChild(statusCell);
+
+    // Check if subject is disabled (doesn't meet cursar requirements)
+    const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
+    const cursarReqs = reqsObj.cursar || [];
+    let meetsRequirements = true;
+    
+    if (cursarReqs && cursarReqs.length > 0) {
+      for (const req of cursarReqs) {
+        const reqId = (typeof req === 'string') ? req : (req.id || req.code);
+        if (!reqId) continue;
+        const reqStored = loadSubjectData(reqId);
+        const reqStatus = reqStored ? (reqStored.overrideStatus || reqStored.status || null) : null;
+        const reqType = (typeof req === 'object' && req.type) ? req.type : 'aprobada';
+        
+        let reqMet = false;
+        if (reqType === 'regularizada') {
+          reqMet = ['Regularizada', 'Aprobada', 'Promocionada'].includes(reqStatus);
+        } else {
+          reqMet = ['Aprobada', 'Promocionada'].includes(reqStatus);
+        }
+        
+        if (!reqMet) {
+          meetsRequirements = false;
+          break;
+        }
+      }
+    }
+
+    if (!meetsRequirements && !status) {
+      row.classList.add('table-row-disabled');
+    }
+
+    // Add click handler to open modal
+    row.addEventListener('click', (ev) => {
+      // If disabled, do nothing (in grid view, disabled cards show requirements on click)
+      // In table view, we simply don't open the modal for disabled subjects
+      if (row.classList.contains('table-row-disabled')) {
+        return;
+      }
+      
+      // Find the corresponding card in the grid view and trigger its click
+      const code = subject.code || '';
+      if (code) {
+        const card = columnsContainer.querySelector(`.card-subject[data-code="${code}"]`);
+        if (card) {
+          // Trigger the card's click to reuse all existing modal logic
+          card.click();
+        }
+      }
+    });
+
+    return row;
   }
 
   function createCard(subject, group = null){
