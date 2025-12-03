@@ -390,6 +390,7 @@ body{
 @media (max-width: 768px){
   .table-view-group{
     margin-bottom: 1rem;
+    overflow-x: auto; /* Make table horizontally scrollable on small screens */
   }
   
   .table-view-group-header{
@@ -399,21 +400,13 @@ body{
   
   .table-view-subjects{
     font-size: 0.85rem;
+    min-width: 600px;
   }
   
   .table-view-subjects th,
   .table-view-subjects td{
     padding: 0.3rem 0.4rem;
     font-size: 0.8rem;
-  }
-  
-  /* Make table horizontally scrollable on very small screens */
-  .table-view-group{
-    overflow-x: auto;
-  }
-  
-  .table-view-subjects{
-    min-width: 600px;
   }
 }
 
