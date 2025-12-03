@@ -385,3 +385,67 @@ body{
 .view-mode-grid .table-view{
   display: none;
 }
+
+/* Mobile responsiveness for table view */
+@media (max-width: 768px){
+  .table-view-group{
+    margin-bottom: 1rem;
+  }
+  
+  .table-view-group-header{
+    font-size: 0.95rem;
+    padding: 0.4rem 0.5rem;
+  }
+  
+  .table-view-subjects{
+    font-size: 0.85rem;
+  }
+  
+  .table-view-subjects th,
+  .table-view-subjects td{
+    padding: 0.3rem 0.4rem;
+    font-size: 0.8rem;
+  }
+  
+  /* Make table horizontally scrollable on very small screens */
+  .table-view-group{
+    overflow-x: auto;
+  }
+  
+  .table-view-subjects{
+    min-width: 600px;
+  }
+}
+
+@media (max-width: 480px){
+  .table-view-subjects th,
+  .table-view-subjects td{
+    padding: 0.25rem 0.3rem;
+    font-size: 0.75rem;
+  }
+  
+  .table-view-group-header{
+    font-size: 0.9rem;
+  }
+  
+  /* Adjust column widths for better mobile display */
+  .table-view-subjects th:nth-child(1),
+  .table-view-subjects td:nth-child(1){
+    width: 15%;
+  }
+  
+  .table-view-subjects th:nth-child(2),
+  .table-view-subjects td:nth-child(2){
+    width: 40%;
+  }
+  
+  .table-view-subjects th:nth-child(3),
+  .table-view-subjects td:nth-child(3){
+    width: 15%;
+  }
+  
+  .table-view-subjects th:nth-child(4),
+  .table-view-subjects td:nth-child(4){
+    width: 30%;
+  }
+}

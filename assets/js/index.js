@@ -797,50 +797,10 @@ document.addEventListener('DOMContentLoaded', () => {
     nameCell.innerHTML = `${escapeHtml(subject.name)}${romanNumeralHtml}`;
     row.appendChild(nameCell);
 
-    // Hours column with badge
+    // Hours column (plain text, no badge)
     const hoursCell = document.createElement('td');
     const weekHours = typeof subject.weekHours === 'number' ? subject.weekHours : 6;
-    
-    // Determine badge content based on status
-    let badgeHtml = '';
-    if (status === 'Aprobada') {
-      // Show final grade
-      let grade = null;
-      if (stored && stored.values) {
-        for (let i = 1; i <= 4; i++) {
-          const v = stored.values['final' + i];
-          const n = parseNum(v);
-          if (!Number.isNaN(n) && n >= 6) { grade = n; break; }
-        }
-      }
-      if (grade !== null && !Number.isNaN(grade)) {
-        badgeHtml = `<span class="badge bg-success table-view-badge">${grade}</span>`;
-      }
-    } else if (status === 'Promocionada') {
-      // Show average
-      let p1 = NaN, p2 = NaN;
-      if (stored && stored.values) {
-        for (let i = 3; i >= 1; i--) {
-          const v = stored.values['parcial1_' + i];
-          const n = parseNum(v);
-          if (!Number.isNaN(n)) { p1 = n; break; }
-        }
-        for (let i = 3; i >= 1; i--) {
-          const v = stored.values['parcial2_' + i];
-          const n = parseNum(v);
-          if (!Number.isNaN(n)) { p2 = n; break; }
-        }
-      }
-      if (!Number.isNaN(p1) && !Number.isNaN(p2)) {
-        const avg = Math.round((p1 + p2) / 2);
-        badgeHtml = `<span class="badge bg-success table-view-badge">${avg}</span>`;
-      }
-    } else if (status !== 'Regularizada') {
-      // Show hours for non-regularized subjects
-      badgeHtml = `<span class="badge bg-primary table-view-badge">${weekHours} hs</span>`;
-    }
-    
-    hoursCell.innerHTML = badgeHtml;
+    hoursCell.textContent = `${weekHours} hs`;
     row.appendChild(hoursCell);
 
     // Status column
