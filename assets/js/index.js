@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
       saveViewMode('table');
       // Render table view if planData is available
       if (planData) {
-        try { renderGroupsAsTable(planData); } catch(e) { console.error('Error rendering table view', e); }
+        try { renderGroupsAsTable(planData); } catch(e) { console.error('Failed to render table view for current plan:', e); }
       }
     });
   }
@@ -679,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Also render table view if in table mode
     if (currentViewMode === 'table') {
-      try { renderGroupsAsTable(data); } catch(e) { console.error('Error rendering table view', e); }
+      try { renderGroupsAsTable(data); } catch(e) { console.error('Failed to render table view after grid update:', e); }
     }
   }
 
@@ -750,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           });
         }
-      } catch(e) { console.error('Error loading electivas for table', e); }
+      } catch(e) { console.error('Failed to load electivas from localStorage for table view:', e); }
 
       table.appendChild(tbody);
       groupDiv.appendChild(table);
@@ -886,10 +886,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add click handler to open modal
     row.addEventListener('click', (ev) => {
-      // If disabled, highlight missing requirements
+      // If disabled, do nothing (in grid view, disabled cards show requirements on click)
+      // In table view, we simply don't open the modal for disabled subjects
       if (row.classList.contains('table-row-disabled')) {
-        // For table view, we can't easily highlight requirements, so just show a message
-        alert('Esta materia no cumple los requisitos de correlativas para cursar.');
         return;
       }
       
@@ -900,12 +899,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (card) {
           // Trigger the card's click to reuse all existing modal logic
           card.click();
-          return;
         }
       }
-      
-      // Fallback if card not found: at least show a message
-      alert(`Materia: ${subject.name || code}`);
     });
 
     return row;
