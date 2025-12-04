@@ -76,42 +76,118 @@
 		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 		<script src="assets/js/index.js"></script>
 
-		<!-- Help modal explaining correlativas legend -->
+		<!-- Help modal with accordion -->
 		<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
-		  <div class="modal-dialog modal-dialog-centered">
+		  <div class="modal-dialog modal-dialog-centered modal-lg">
 		    <div class="modal-content">
 		      <div class="modal-header">
-		        <h5 class="modal-title" id="helpModalLabel">Leyenda de correlativas</h5>
+		        <h5 class="modal-title" id="helpModalLabel">Ayuda</h5>
 		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
 		      </div>
 		      <div class="modal-body">
-		        <p>Las correlativas se muestran con flechas que indican dependencias entre materias:</p>
-		        <ul>
-		          <li><strong>Flechas negras</strong>: requisito <em>para cursar</em> (asistencia/inscripción).</li>
-		          <li><strong>Flechas verdes</strong>: requisito <em>para aprobar</em> (condición para la calificación final).</li>
-		        </ul>
-		        <p>Para los requisitos <em>para aprobar</em> hay dos estados:</p>
-		        <ul>
-		          <li>Linea continua: la materia debe estar <strong>aprobada</strong>.</li>
-		          <li>Linea punteada: la materia puede estar <strong>regularizada</strong> (no necesariamente aprobada).</li>
-		        </ul>
-		        <p>Ejemplo:</p>
-				<div class="d-flex gap-2 align-items-center">
-					<svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" marker-end="url(#help-arrow-black)"></path></svg>
-					<span>Requisito para cursar - aprobado (negro, continuo)</span>
-				</div>
-				<div class="d-flex gap-2 align-items-center">
-					<svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-black)"></path></svg>
-					<span>Requisito para cursar - regularizada (negro, punteado)</span>
-				</div>
-				<div class="d-flex gap-2 align-items-center mt-2">
-					<svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" marker-end="url(#help-arrow-green)"></path></svg>
-					<span>Requisito para aprobar - aprobado (verde, continuo)</span>
-				</div>
-				<div class="d-flex gap-2 align-items-center mt-2">
-					<svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-green)"></path></svg>
-					<span>Requisito para aprobar - regularizada (verde, punteado)</span>
-				</div>
+		        <div class="accordion" id="helpAccordion">
+		          <!-- Flechas de correlativas -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingCorrelativas">
+		              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCorrelativas" aria-expanded="true" aria-controls="collapseCorrelativas">
+		                Flechas de correlativas
+		              </button>
+		            </h2>
+		            <div id="collapseCorrelativas" class="accordion-collapse collapse show" aria-labelledby="headingCorrelativas" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p>Las correlativas se muestran con flechas que indican dependencias entre materias:</p>
+		                <ul>
+		                  <li><strong>Flechas negras</strong>: requisito <em>para cursar</em> (asistencia/inscripción).</li>
+		                  <li><strong>Flechas verdes</strong>: requisito <em>para aprobar</em> (condición para la calificación final).</li>
+		                </ul>
+		                <p>Para los requisitos <em>para aprobar</em> hay dos estados:</p>
+		                <ul>
+		                  <li>Línea continua: la materia debe estar <strong>aprobada</strong>.</li>
+		                  <li>Línea punteada: la materia puede estar <strong>regularizada</strong> (no necesariamente aprobada).</li>
+		                </ul>
+		                <p><strong>Ejemplo:</strong></p>
+		                <div class="d-flex gap-2 align-items-center">
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" marker-end="url(#help-arrow-black)"></path></svg>
+		                  <span>Requisito para cursar - aprobado (negro, continuo)</span>
+		                </div>
+		                <div class="d-flex gap-2 align-items-center">
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-black)"></path></svg>
+		                  <span>Requisito para cursar - regularizada (negro, punteado)</span>
+		                </div>
+		                <div class="d-flex gap-2 align-items-center mt-2">
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" marker-end="url(#help-arrow-green)"></path></svg>
+		                  <span>Requisito para aprobar - aprobado (verde, continuo)</span>
+		                </div>
+		                <div class="d-flex gap-2 align-items-center mt-2">
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-green)"></path></svg>
+		                  <span>Requisito para aprobar - regularizada (verde, punteado)</span>
+		                </div>
+		              </div>
+		            </div>
+		          </div>
+		          
+		          <!-- Código de color de materias -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingColors">
+		              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseColors" aria-expanded="false" aria-controls="collapseColors">
+		                Código de color de materias
+		              </button>
+		            </h2>
+		            <div id="collapseColors" class="accordion-collapse collapse" aria-labelledby="headingColors" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p>Las materias se destacan con diferentes colores según su estado:</p>
+		                <ul>
+		                  <li><span class="badge" style="background-color: rgba(13,110,253,0.15); color: #0d6efd;">Azul</span> - <strong>Promocionada</strong>: ambos parciales con nota ≥8 en el primer intento (o con un solo recuperatorio permitido).</li>
+		                  <li><span class="badge" style="background-color: rgba(255,193,7,0.2); color: #856404;">Amarillo</span> - <strong>Regularizada</strong>: ambos parciales con nota ≥6, pero aún no aprobaste el final.</li>
+		                  <li><span class="badge" style="background-color: rgba(40,167,69,0.15); color: #28a745;">Verde</span> - <strong>Aprobada</strong>: final aprobado con nota ≥6.</li>
+		                  <li><span class="badge" style="background-color: rgba(220,53,69,0.1); color: #dc3545;">Rojo</span> - <strong>Desaprobada</strong>: agotaste las 3 oportunidades de recuperatorio con nota <6.</li>
+		                </ul>
+		              </div>
+		            </div>
+		          </div>
+		          
+		          <!-- Estados de materias -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingStates">
+		              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStates" aria-expanded="false" aria-controls="collapseStates">
+		                Estados de materias
+		              </button>
+		            </h2>
+		            <div id="collapseStates" class="accordion-collapse collapse" aria-labelledby="headingStates" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p>El sistema calcula automáticamente el estado de cada materia según las notas ingresadas:</p>
+		                <ul>
+		                  <li><strong>Promocionada</strong>: ambos parciales con nota ≥8 en el primer intento. Se permite un solo recuperatorio si uno de los parciales tiene ≥8 y el otro <8, y con el recuperatorio se alcanza ≥8.</li>
+		                  <li><strong>Regularizada</strong>: ambos parciales con promedio ≥6 (considerando hasta 2 recuperatorios por parcial). Permite rendir final.</li>
+		                  <li><strong>Aprobada</strong>: materia regularizada con final aprobado (nota ≥6). Se pueden rendir hasta 4 finales.</li>
+		                  <li><strong>Desaprobada</strong>: después de agotar las 3 oportunidades (1 parcial + 2 recuperatorios) en al menos un parcial con nota <6.</li>
+		                  <li><strong>Debe recuperar</strong>: nota <6 en un parcial pero aún quedan recuperatorios disponibles.</li>
+		                  <li><strong>En curso</strong>: faltan notas o exámenes por rendir.</li>
+		                </ul>
+		                <p class="mb-0"><small class="text-muted">El estado se actualiza automáticamente al ingresar las notas en el modal de cada materia.</small></p>
+		              </div>
+		            </div>
+		          </div>
+		          
+		          <!-- Badges -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingBadges">
+		              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBadges" aria-expanded="false" aria-controls="collapseBadges">
+		                Badges
+		              </button>
+		            </h2>
+		            <div id="collapseBadges" class="accordion-collapse collapse" aria-labelledby="headingBadges" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p>En cada tarjeta de materia se muestran badges con información adicional:</p>
+		                <ul>
+		                  <li><span class="badge bg-primary">Azul</span> - <strong>Carga horaria</strong>: indica las horas semanales de cursada de la materia.</li>
+		                  <li><span class="badge bg-success">Verde</span> - <strong>Nota final</strong>: muestra la nota final obtenida cuando la materia está aprobada.</li>
+		                </ul>
+		                <p class="mb-0"><small class="text-muted">Los badges te ayudan a identificar rápidamente la información clave de cada materia en el tablero.</small></p>
+		              </div>
+		            </div>
+		          </div>
+		        </div>
 		      </div>
 		      <div class="modal-footer">
 		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
