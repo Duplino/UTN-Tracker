@@ -533,7 +533,7 @@
 					try{
 						window.__firestoreApplyingRemote = true;
 						const remote = data.subjectData && typeof data.subjectData === 'object' ? data.subjectData : {};
-						const localNewerCodes = []; // Track subjects where local is newer
+						const localToUpload = []; // Track subjects that need to be uploaded to Firestore
 						
 						// Process remote entries: keep remote if newer, or track if local is newer
 						Object.keys(remote).forEach(code => {
@@ -557,7 +557,7 @@
 											shouldUpdate = true;
 										} else if (localSavedAt > remoteSavedAt) {
 											// Local is newer, mark for upload
-											localNewerCodes.push(code);
+											localToUpload.push(code);
 										}
 									} catch(parseErr) {
 										// If parsing fails, use remote as fallback
@@ -579,14 +579,16 @@
 								const code = k.replace('subjectData:','');
 								if (!remote.hasOwnProperty(code)){
 									// Local subject not in remote, should upload
-									localNewerCodes.push(code);
+									localToUpload.push(code);
 								}
 							}
 						}
 						
 						// Upload local data that is newer than remote
-						if (localNewerCodes.length > 0) {
-							localNewerCodes.forEach(code => {
+						// Note: These async uploads write to different Firestore document paths (subjectData.{code})
+						// so they don't cause conflicts with each other
+						if (localToUpload.length > 0) {
+							localToUpload.forEach(code => {
 								try {
 									const localRaw = localStorage.getItem('subjectData:' + code);
 									if (localRaw) {
@@ -639,7 +641,7 @@
 						try{
 							window.__firestoreApplyingRemote = true;
 							const remote = data.subjectData && typeof data.subjectData === 'object' ? data.subjectData : {};
-							const localNewerCodes = []; // Track subjects where local is newer
+							const localToUpload = []; // Track subjects that need to be uploaded to Firestore
 							
 							// Process remote entries: keep remote if newer, or track if local is newer
 							Object.keys(remote).forEach(code => {
@@ -663,7 +665,7 @@
 												shouldUpdate = true;
 											} else if (localSavedAt > remoteSavedAt) {
 												// Local is newer, mark for upload
-												localNewerCodes.push(code);
+												localToUpload.push(code);
 											}
 										} catch(parseErr) {
 											// If parsing fails, use remote as fallback
@@ -685,14 +687,16 @@
 									const code = k.replace('subjectData:','');
 									if (!remote.hasOwnProperty(code)){
 										// Local subject not in remote, should upload
-										localNewerCodes.push(code);
+										localToUpload.push(code);
 									}
 								}
 							}
 							
 							// Upload local data that is newer than remote
-							if (localNewerCodes.length > 0) {
-								localNewerCodes.forEach(code => {
+							// Note: These async uploads write to different Firestore document paths (subjectData.{code})
+							// so they don't cause conflicts with each other
+							if (localToUpload.length > 0) {
+								localToUpload.forEach(code => {
 									try {
 										const localRaw = localStorage.getItem('subjectData:' + code);
 										if (localRaw) {
