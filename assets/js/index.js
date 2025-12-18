@@ -378,6 +378,21 @@ document.addEventListener('DOMContentLoaded', () => {
     return false;
   }
 
+  // Calculate remaining final attempts for a regularized subject (up to 4 finals total)
+  function getRemainingFinalAttempts(stored) {
+    if (!stored || !stored.values) return 4; // No attempts used yet
+    // Count how many finals have been attempted (have a value)
+    let attemptsUsed = 0;
+    for (let i = 1; i <= 4; i++) {
+      const finalKey = 'final' + i;
+      const finalValue = stored.values[finalKey];
+      if (finalValue !== undefined && finalValue !== null && finalValue !== '') {
+        attemptsUsed++;
+      }
+    }
+    return 4 - attemptsUsed;
+  }
+
   // Apply a very light status background class to a card (except 'Faltan notas')
   function applyCardStatusStyle(card, status){
     if (!card) return;
@@ -885,7 +900,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const promotable = (status === 'Regularizada' || status === 'No regularizada') && canPromote(stored);
     let statusLabel = '';
     if (showStatusEnabled && statusDesc) {
-      statusLabel = promotable ? `<small class="text-muted status-label">${escapeHtml(statusDesc)} • Puede promocionar</small>` : `<small class="text-muted status-label">${escapeHtml(statusDesc)}</small>`;
+      // Calculate remaining final attempts for regularized subjects
+      const remainingAttempts = status === 'Regularizada' ? getRemainingFinalAttempts(stored) : null;
+      
+      if (status === 'Regularizada' && remainingAttempts !== null) {
+        // For regularized subjects, show status on left and attempts on right
+        const statusText = promotable ? `${escapeHtml(statusDesc)} • Puede promocionar` : escapeHtml(statusDesc);
+        statusLabel = `<div class="d-flex justify-content-between align-items-center status-label"><small class="text-muted">${statusText}</small><small class="text-muted">${remainingAttempts}/4</small></div>`;
+      } else {
+        // For other statuses, show normally
+        statusLabel = promotable ? `<small class="text-muted status-label">${escapeHtml(statusDesc)} • Puede promocionar</small>` : `<small class="text-muted status-label">${escapeHtml(statusDesc)}</small>`;
+      }
     }
     
     // Get recursed count for Roman numeral display - only show on cards when recursedCount > 0 (II, III, etc.)
