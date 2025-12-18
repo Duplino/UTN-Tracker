@@ -521,7 +521,7 @@
 				}catch(err){ console.error('firestoreDeleteElective error', err); }
 			};
 
-			// Helper: download user doc and merge into localStorage (overwrite local keys)
+			// Helper: download user doc and merge into localStorage (keeping newer version)
 			window.firestoreDownloadAndApply = async function(){
 				try{
 					if (!auth || !auth.currentUser) return null;
@@ -529,24 +529,77 @@
 					const snap = await getDoc(ref);
 					if (!snap.exists()) return null;
 					const data = snap.data() || {};
-					// Apply subjectData: overwrite local keys with remote and remove local keys that no longer exist remotely
+					// Apply subjectData: compare timestamps and keep newer version
 					try{
 						window.__firestoreApplyingRemote = true;
 						const remote = data.subjectData && typeof data.subjectData === 'object' ? data.subjectData : {};
-						// set/overwrite remote entries
+						const localToUpload = []; // Track subjects that need to be uploaded to Firestore
+						
+						// Process remote entries: keep remote if newer, or track if local is newer
 						Object.keys(remote).forEach(code => {
-							try{ localStorage.setItem('subjectData:' + code, JSON.stringify(remote[code])); }catch(e){}
+							try{
+								const localKey = 'subjectData:' + code;
+								const localRaw = localStorage.getItem(localKey);
+								let shouldUpdate = false;
+								
+								if (!localRaw) {
+									// No local version, use remote
+									shouldUpdate = true;
+								} else {
+									// Compare timestamps (savedAt)
+									try {
+										const localData = JSON.parse(localRaw);
+										const localSavedAt = localData && localData.savedAt ? new Date(localData.savedAt) : new Date(0);
+										const remoteSavedAt = remote[code] && remote[code].savedAt ? new Date(remote[code].savedAt) : new Date(0);
+										
+										// Keep remote if it's newer
+										if (remoteSavedAt > localSavedAt) {
+											shouldUpdate = true;
+										} else if (localSavedAt > remoteSavedAt) {
+											// Local is newer, mark for upload
+											localToUpload.push(code);
+										}
+									} catch(parseErr) {
+										// If parsing fails, use remote as fallback
+										shouldUpdate = true;
+									}
+								}
+								
+								if (shouldUpdate) {
+									localStorage.setItem(localKey, JSON.stringify(remote[code]));
+								}
+							}catch(e){ console.error('Error processing subject', code, e); }
 						});
-						// remove any local subjectData keys not present in remote
+						
+						// Check for local subjects not in remote and add them to upload list
 						for (let i = 0; i < localStorage.length; i++){
 							const k = localStorage.key(i);
 							if (!k) continue;
 							if (k.startsWith('subjectData:')){
 								const code = k.replace('subjectData:','');
 								if (!remote.hasOwnProperty(code)){
-									try{ localStorage.removeItem(k); }catch(e){}
+									// Local subject not in remote, should upload
+									localToUpload.push(code);
 								}
 							}
+						}
+						
+						// Upload local data that is newer than remote
+						// Note: These async uploads write to different Firestore document paths (subjectData.{code})
+						// so they don't cause conflicts with each other
+						if (localToUpload.length > 0) {
+							localToUpload.forEach(code => {
+								try {
+									const localRaw = localStorage.getItem('subjectData:' + code);
+									if (localRaw) {
+										const localData = JSON.parse(localRaw);
+										// Use firestoreUploadSubject to sync newer local data to Firestore
+										window.firestoreUploadSubject(code, localData);
+									}
+								} catch(e) {
+									console.error('Error uploading newer local subject', code, e);
+								}
+							});
 						}
 					}finally{ window.__firestoreApplyingRemote = false; }
 					// Merge electives and mostrarCorrelativas if present
@@ -584,24 +637,79 @@
 						// ignore the initial snapshot delivered immediately after subscribing
 						if (first){ first = false; return; }
 						const data = snap.data() || {};
-						// apply remote changes to localStorage (set remote keys and remove local keys that no longer exist)
+						// apply remote changes to localStorage (keeping newer version)
 						try{
 							window.__firestoreApplyingRemote = true;
 							const remote = data.subjectData && typeof data.subjectData === 'object' ? data.subjectData : {};
+							const localToUpload = []; // Track subjects that need to be uploaded to Firestore
+							
+							// Process remote entries: keep remote if newer, or track if local is newer
 							Object.keys(remote).forEach(code => {
-								try{ localStorage.setItem('subjectData:' + code, JSON.stringify(remote[code])); }catch(e){}
+								try{
+									const localKey = 'subjectData:' + code;
+									const localRaw = localStorage.getItem(localKey);
+									let shouldUpdate = false;
+									
+									if (!localRaw) {
+										// No local version, use remote
+										shouldUpdate = true;
+									} else {
+										// Compare timestamps (savedAt)
+										try {
+											const localData = JSON.parse(localRaw);
+											const localSavedAt = localData && localData.savedAt ? new Date(localData.savedAt) : new Date(0);
+											const remoteSavedAt = remote[code] && remote[code].savedAt ? new Date(remote[code].savedAt) : new Date(0);
+											
+											// Keep remote if it's newer
+											if (remoteSavedAt > localSavedAt) {
+												shouldUpdate = true;
+											} else if (localSavedAt > remoteSavedAt) {
+												// Local is newer, mark for upload
+												localToUpload.push(code);
+											}
+										} catch(parseErr) {
+											// If parsing fails, use remote as fallback
+											shouldUpdate = true;
+										}
+									}
+									
+									if (shouldUpdate) {
+										localStorage.setItem(localKey, JSON.stringify(remote[code]));
+									}
+								}catch(e){ console.error('Error processing subject', code, e); }
 							});
-							// remove local keys not present in remote
+							
+							// Check for local subjects not in remote and add them to upload list
 							for (let i = 0; i < localStorage.length; i++){
 								const k = localStorage.key(i);
 								if (!k) continue;
 								if (k.startsWith('subjectData:')){
 									const code = k.replace('subjectData:','');
 									if (!remote.hasOwnProperty(code)){
-										try{ localStorage.removeItem(k); }catch(e){}
+										// Local subject not in remote, should upload
+										localToUpload.push(code);
 									}
 								}
 							}
+							
+							// Upload local data that is newer than remote
+							// Note: These async uploads write to different Firestore document paths (subjectData.{code})
+							// so they don't cause conflicts with each other
+							if (localToUpload.length > 0) {
+								localToUpload.forEach(code => {
+									try {
+										const localRaw = localStorage.getItem('subjectData:' + code);
+										if (localRaw) {
+											const localData = JSON.parse(localRaw);
+											// Use firestoreUploadSubject to sync newer local data to Firestore
+											window.firestoreUploadSubject(code, localData);
+										}
+									} catch(e) {
+										console.error('Error uploading newer local subject', code, e);
+									}
+								});
+							}
+							
 							if (typeof data.electives !== 'undefined') try{ localStorage.setItem('electives', JSON.stringify(data.electives)); }catch(e){}
 							if (typeof data.mostrarCorrelativas !== 'undefined') try{ localStorage.setItem('mostrarCorrelativas', data.mostrarCorrelativas ? '1' : '0'); }catch(e){}
 							if (typeof data.plan !== 'undefined' && data.plan) try{ localStorage.setItem('plan', data.plan); }catch(e){}
