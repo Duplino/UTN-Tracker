@@ -30,16 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let electivasList = [];
   let columns = 5;
 
-  // Helper function to determine if a subject is Cuatrimestral (C) or Anual (A)
-  // Cuatrimestrales: IyS, SSOO, PyE, ECO, DdS, BD, CD, RD, AN, IyCS, Sim, IO, TpA, CdC, IA, SG, SSI and all electives for k23
-  function isCuatrimestral(code, isElective = false) {
-    // All electives in k23 plan are Cuatrimestral
-    if (isElective && currentPlan === 'k23') return true;
-    
-    const cuatrimestrales = ['IyS', 'SSOO', 'PyE', 'ECO', 'DdS', 'BD', 'CD', 'RD', 'AN', 'IyCS', 'Sim', 'IO', 'TpA', 'CdC', 'IA', 'SG', 'SSI'];
-    return cuatrimestrales.includes(code);
-  }
-
   const columnsContainer = document.querySelector('.columns-grid');
   const tableViewContainer = document.querySelector('.table-view');
   const progressBar = document.getElementById('progress-bar');
@@ -495,10 +485,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const span = document.createElement('span');
         span.className = 'badge bg-primary';
         span.style.fontSize = '0.8rem';
-        // Determine if subject is an elective
-        const isElective = card.classList.contains('card-electiva') || (card.dataset && card.dataset.electiva === '1');
-        const cuatrimestralesIndicator = isCuatrimestral(code, isElective) ? 'C' : 'A';
-        span.textContent = `${weekHours} hs - ${cuatrimestralesIndicator}`;
+        // Get duration from card dataset (cuatrimestral or anual)
+        const duration = card.dataset.duration || 'anual';
+        const durationIndicator = duration === 'cuatrimestral' ? 'C' : 'A';
+        span.textContent = `${weekHours} hs - ${durationIndicator}`;
         bc.appendChild(span);
       }
     }catch(e){/* ignore badge errors */}
@@ -828,17 +818,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Hours column (plain text with C/A indicator)
     const hoursCell = document.createElement('td');
     const weekHours = typeof subject.weekHours === 'number' ? subject.weekHours : 6;
-    // Check if subject is an elective by looking for it in the electives map
-    let isElective = false;
-    try {
-      const electivesStr = localStorage.getItem('electives');
-      if (electivesStr) {
-        const electivesMap = JSON.parse(electivesStr);
-        isElective = !!(subject.code && electivesMap[subject.code]);
-      }
-    } catch(e) {/* ignore */}
-    const cuatrimestralesIndicator = isCuatrimestral(subject.code, isElective) ? 'C' : 'A';
-    hoursCell.textContent = `${weekHours} hs - ${cuatrimestralesIndicator}`;
+    const duration = subject.duration || 'anual';
+    const durationIndicator = duration === 'cuatrimestral' ? 'C' : 'A';
+    hoursCell.textContent = `${weekHours} hs - ${durationIndicator}`;
     row.appendChild(hoursCell);
 
     // Status column
@@ -911,6 +893,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (subject.code) card.dataset.code = subject.code;
     // store weekHours for badge display (default to 6 when not provided)
     card.dataset.weekHours = typeof subject.weekHours === 'number' ? String(subject.weekHours) : '6';
+    // store duration for badge display (cuatrimestral or anual, default to anual)
+    card.dataset.duration = subject.duration || 'anual';
     // store requirements object (cursar/aprobar)
     const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
     card.dataset.requirements = JSON.stringify(reqsObj);
