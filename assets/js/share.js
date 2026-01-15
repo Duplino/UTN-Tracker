@@ -198,11 +198,14 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (status === 'Regularizada') {
         // No badge for Regularizada
       } else {
-        // Not approved -> show weekHours badge (blue)
+        // Not approved -> show weekHours badge (blue) with C/A indicator
         const span = document.createElement('span');
         span.className = 'badge bg-primary';
         span.style.fontSize = '0.8rem';
-        span.textContent = `${weekHours} hs`;
+        // Get duration from card dataset (cuatrimestral or anual)
+        const duration = card.dataset.duration || 'anual';
+        const durationIndicator = duration === 'cuatrimestral' ? 'C' : 'A';
+        span.textContent = `${weekHours} hs - ${durationIndicator}`;
         bc.appendChild(span);
       }
     } catch (e) {/* ignore badge errors */}
@@ -350,6 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
     card.className = 'card card-subject card-readonly';
     if (subject.code) card.dataset.code = subject.code;
     card.dataset.weekHours = typeof subject.weekHours === 'number' ? String(subject.weekHours) : '6';
+    card.dataset.duration = subject.duration || 'anual';
     const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
     card.dataset.requirements = JSON.stringify(reqsObj);
     if (group && group.color) card.dataset.groupColor = group.color;
@@ -390,6 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
     card.className = 'card card-subject card-electiva card-readonly';
     if (subj.code) card.dataset.code = subj.code;
     card.dataset.weekHours = typeof subj.weekHours === 'number' ? String(subj.weekHours) : '6';
+    card.dataset.duration = subj.duration || 'anual';
     const reqsObj = subj.requirements || { cursar: [], aprobar: [] };
     card.dataset.requirements = JSON.stringify(reqsObj);
 

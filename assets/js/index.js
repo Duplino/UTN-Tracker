@@ -481,11 +481,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Do not show any badge for Regularizada subjects (user requested no badge)
         // Intentionally left blank: no badge appended for this status.
       } else {
-        // not approved -> show weekHours badge (blue)
+        // not approved -> show weekHours badge (blue) with C/A indicator
         const span = document.createElement('span');
         span.className = 'badge bg-primary';
         span.style.fontSize = '0.8rem';
-        span.textContent = `${weekHours} hs`;
+        // Get duration from card dataset (cuatrimestral or anual)
+        const duration = card.dataset.duration || 'anual';
+        const durationIndicator = duration === 'cuatrimestral' ? 'C' : 'A';
+        span.textContent = `${weekHours} hs - ${durationIndicator}`;
         bc.appendChild(span);
       }
     }catch(e){/* ignore badge errors */}
@@ -812,10 +815,12 @@ document.addEventListener('DOMContentLoaded', () => {
     nameCell.innerHTML = `${escapeHtml(subject.name)}${romanNumeralHtml}`;
     row.appendChild(nameCell);
 
-    // Hours column (plain text, no badge)
+    // Hours column (plain text with C/A indicator)
     const hoursCell = document.createElement('td');
     const weekHours = typeof subject.weekHours === 'number' ? subject.weekHours : 6;
-    hoursCell.textContent = `${weekHours} hs`;
+    const duration = subject.duration || 'anual';
+    const durationIndicator = duration === 'cuatrimestral' ? 'C' : 'A';
+    hoursCell.textContent = `${weekHours} hs - ${durationIndicator}`;
     row.appendChild(hoursCell);
 
     // Status column
@@ -888,6 +893,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (subject.code) card.dataset.code = subject.code;
     // store weekHours for badge display (default to 6 when not provided)
     card.dataset.weekHours = typeof subject.weekHours === 'number' ? String(subject.weekHours) : '6';
+    // store duration for badge display (cuatrimestral or anual, default to anual)
+    card.dataset.duration = subject.duration || 'anual';
     // store requirements object (cursar/aprobar)
     const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
     card.dataset.requirements = JSON.stringify(reqsObj);
