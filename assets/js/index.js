@@ -30,6 +30,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let electivasList = [];
   let columns = 5;
 
+  // Helper function to determine if a subject is Cuatrimestral (C) or Anual (A)
+  // Cuatrimestrales: IyS, SSOO, PyE, ECO, DdS, BD, CD, RD, AN, IyCS, Sim, IO, TpA, CdC, IA, SG, SSI and all electives for k23
+  function isCuatrimestral(code, isElective = false) {
+    // All electives in k23 plan are Cuatrimestral
+    if (isElective && currentPlan === 'k23') return true;
+    
+    const cuatrimestrales = ['IyS', 'SSOO', 'PyE', 'ECO', 'DdS', 'BD', 'CD', 'RD', 'AN', 'IyCS', 'Sim', 'IO', 'TpA', 'CdC', 'IA', 'SG', 'SSI'];
+    return cuatrimestrales.includes(code);
+  }
+
   const columnsContainer = document.querySelector('.columns-grid');
   const tableViewContainer = document.querySelector('.table-view');
   const progressBar = document.getElementById('progress-bar');
@@ -481,11 +491,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Do not show any badge for Regularizada subjects (user requested no badge)
         // Intentionally left blank: no badge appended for this status.
       } else {
-        // not approved -> show weekHours badge (blue)
+        // not approved -> show weekHours badge (blue) with C/A indicator
         const span = document.createElement('span');
         span.className = 'badge bg-primary';
         span.style.fontSize = '0.8rem';
-        span.textContent = `${weekHours} hs`;
+        // Determine if subject is an elective
+        const isElective = card.classList.contains('card-electiva') || (card.dataset && card.dataset.electiva === '1');
+        const cuatrimestralesIndicator = isCuatrimestral(code, isElective) ? 'C' : 'A';
+        span.textContent = `${weekHours} hs - ${cuatrimestralesIndicator}`;
         bc.appendChild(span);
       }
     }catch(e){/* ignore badge errors */}
@@ -812,10 +825,20 @@ document.addEventListener('DOMContentLoaded', () => {
     nameCell.innerHTML = `${escapeHtml(subject.name)}${romanNumeralHtml}`;
     row.appendChild(nameCell);
 
-    // Hours column (plain text, no badge)
+    // Hours column (plain text with C/A indicator)
     const hoursCell = document.createElement('td');
     const weekHours = typeof subject.weekHours === 'number' ? subject.weekHours : 6;
-    hoursCell.textContent = `${weekHours} hs`;
+    // Check if subject is an elective by looking for it in the electives map
+    let isElective = false;
+    try {
+      const electivesStr = localStorage.getItem('electives');
+      if (electivesStr) {
+        const electivesMap = JSON.parse(electivesStr);
+        isElective = !!(subject.code && electivesMap[subject.code]);
+      }
+    } catch(e) {/* ignore */}
+    const cuatrimestralesIndicator = isCuatrimestral(subject.code, isElective) ? 'C' : 'A';
+    hoursCell.textContent = `${weekHours} hs - ${cuatrimestralesIndicator}`;
     row.appendChild(hoursCell);
 
     // Status column

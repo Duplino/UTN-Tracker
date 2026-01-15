@@ -15,6 +15,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let electivasList = [];
   let columns = 5;
 
+  // Helper function to determine if a subject is Cuatrimestral (C) or Anual (A)
+  // Cuatrimestrales: IyS, SSOO, PyE, ECO, DdS, BD, CD, RD, AN, IyCS, Sim, IO, TpA, CdC, IA, SG, SSI and all electives for k23
+  function isCuatrimestral(code, isElective = false) {
+    // All electives in k23 plan are Cuatrimestral
+    if (isElective && currentPlan === 'k23') return true;
+    
+    const cuatrimestrales = ['IyS', 'SSOO', 'PyE', 'ECO', 'DdS', 'BD', 'CD', 'RD', 'AN', 'IyCS', 'Sim', 'IO', 'TpA', 'CdC', 'IA', 'SG', 'SSI'];
+    return cuatrimestrales.includes(code);
+  }
+
   const columnsContainer = document.querySelector('.columns-grid');
   const statsTotalPeso = document.getElementById('stat-peso');
   const statsAvg = document.getElementById('stat-promedio');
@@ -198,11 +208,14 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (status === 'Regularizada') {
         // No badge for Regularizada
       } else {
-        // Not approved -> show weekHours badge (blue)
+        // Not approved -> show weekHours badge (blue) with C/A indicator
         const span = document.createElement('span');
         span.className = 'badge bg-primary';
         span.style.fontSize = '0.8rem';
-        span.textContent = `${weekHours} hs`;
+        // Determine if subject is an elective
+        const isElective = card.classList.contains('card-electiva');
+        const cuatrimestralesIndicator = isCuatrimestral(code, isElective) ? 'C' : 'A';
+        span.textContent = `${weekHours} hs - ${cuatrimestralesIndicator}`;
         bc.appendChild(span);
       }
     } catch (e) {/* ignore badge errors */}
