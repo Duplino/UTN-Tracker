@@ -32,10 +32,6 @@
 
 			// Function to calculate statistics from subject data
 			function calculateStats(subjectData, planData) {
-				if (!subjectData || !planData) {
-					return null;
-				}
-
 				const stats = {
 					totalSubjects: 0,
 					approvedSubjects: 0,
@@ -47,8 +43,13 @@
 					grades: []
 				};
 
+				// If no subject data, return default stats
+				if (!subjectData) {
+					return stats;
+				}
+
 				// Count subjects from plan
-				if (planData.modules) {
+				if (planData && planData.modules) {
 					planData.modules.forEach(module => {
 						if (module.subjects && Array.isArray(module.subjects)) {
 							stats.totalSubjects += module.subjects.length;
@@ -109,7 +110,7 @@
 						stats.inProgressSubjects++;
 						// For in-progress subjects, count weekly hours
 						// Need to find the subject in plan data to get weekHours
-						if (planData.modules) {
+						if (planData && planData.modules) {
 							for (const module of planData.modules) {
 								if (module.subjects) {
 									const subject = module.subjects.find(s => s.code === code);
@@ -204,9 +205,6 @@
 
 			// Execute and output JSON
 			loadUserData().then(result => {
-				// Set content type to JSON
-				document.contentType = 'application/json';
-				
 				// Clear body and write JSON
 				document.body.innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
 				
