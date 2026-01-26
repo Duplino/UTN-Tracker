@@ -43,18 +43,19 @@
 					grades: []
 				};
 
-				// If no subject data, return default stats
-				if (!subjectData) {
-					return stats;
-				}
-
-				// Count subjects from plan
+				// Count subjects from plan (always, regardless of subjectData)
 				if (planData && planData.modules) {
 					planData.modules.forEach(module => {
 						if (module.subjects && Array.isArray(module.subjects)) {
 							stats.totalSubjects += module.subjects.length;
 						}
 					});
+				}
+
+				// If no subject data, return stats with just total subjects count
+				if (!subjectData) {
+					delete stats.grades;
+					return stats;
 				}
 
 				// Calculate stats from subject data
@@ -183,13 +184,11 @@
 					// Calculate statistics
 					const stats = calculateStats(data.subjectData || {}, planData);
 
-					// Return public data as JSON
+					// Return public data as JSON (only stats, not subject details)
 					return {
 						uid: uid,
 						plan: data.plan || null,
 						yearStarted: data.yearStarted || null,
-						subjectData: data.subjectData || {},
-						electives: data.electives || {},
 						selectedStats: data.selectedStats || [],
 						stats: stats,
 						public: true
