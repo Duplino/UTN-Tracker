@@ -8,6 +8,7 @@ Pequeña aplicación cliente para planificar y seguir cursadas de materias (tabl
 - Descripción breve
 - Cómo usar (rápido)
 - Funcionalidades
+- API Pública
 - Estructura del plan (`assets/data/k23.json`)
 	- Formato de `modules` y `subjects`
 - Persistencia (dónde se guarda qué)
@@ -39,6 +40,110 @@ UTN-Tracker es una SPA ligera (vanilla JS + Bootstrap) que carga un "plan" en fo
 - Toggle "Mostrar correlativas": activa/desactiva visualización de flechas y efectos hover (persistido en localStorage).
 - Animación al desbloquear materias: cuando una materia cambia de estado se recalculan las materias disponibles para cursar y se anima las que acaban de desbloquearse.
 - Estadísticas abajo: Horas semanales en curso, Promedio de aprobadas, conteos (aprobadas/total), barra de progreso.
+
+---
+
+## API Pública
+
+La aplicación proporciona una API pública para obtener los datos de usuario en formato JSON. Esto permite a los usuarios compartir sus estadísticas y progreso de manera programática.
+
+### Endpoint
+
+```
+https://duplino.github.io/UTN-Tracker/api/user.html?uid=<USER_ID>
+```
+
+### Parámetros
+
+- `uid` (requerido): El ID único del usuario en Firebase. Este ID se puede obtener al iniciar sesión en la aplicación.
+
+### Requisitos
+
+- El perfil del usuario debe estar configurado como público (opción "Hacer mi perfil público" en la aplicación).
+- Solo los perfiles públicos retornarán datos; los perfiles privados retornarán un mensaje de error.
+
+### Formato de respuesta
+
+La API retorna un objeto JSON con la siguiente estructura:
+
+```json
+{
+  "uid": "string",
+  "plan": "string",
+  "yearStarted": "number",
+  "subjectData": {
+    "<codigo_materia>": {
+      "values": {},
+      "status": "string",
+      "overrideStatus": "string",
+      "savedAt": "string"
+    }
+  },
+  "electives": {},
+  "selectedStats": [],
+  "stats": {
+    "totalSubjects": 0,
+    "approvedSubjects": 0,
+    "promotedSubjects": 0,
+    "regularizedSubjects": 0,
+    "inProgressSubjects": 0,
+    "weeklyHours": 0,
+    "averageGrade": 0
+  },
+  "public": true
+}
+```
+
+### Campos de respuesta
+
+- **uid**: ID único del usuario
+- **plan**: Plan de estudios seleccionado (ej: "k23", "k23medio")
+- **yearStarted**: Año de inicio de la carrera
+- **subjectData**: Objeto con los datos de cada materia (parciales, finales, estado)
+- **electives**: Electivas colocadas en el tablero
+- **selectedStats**: Estadísticas seleccionadas para mostrar
+- **stats**: Estadísticas calculadas automáticamente:
+  - `totalSubjects`: Total de materias en el plan
+  - `approvedSubjects`: Materias aprobadas
+  - `promotedSubjects`: Materias promocionadas
+  - `regularizedSubjects`: Materias regularizadas
+  - `inProgressSubjects`: Materias en curso
+  - `weeklyHours`: Horas semanales de materias en curso
+  - `averageGrade`: Promedio de notas de materias aprobadas/promocionadas
+- **public**: Siempre `true` si se retornan datos
+
+### Mensajes de error
+
+Si el perfil no existe, no es público, o hay un error, la API retorna un objeto con los campos `error` y `message`:
+
+```json
+{
+  "error": "Private profile",
+  "message": "This profile is not public"
+}
+```
+
+Posibles errores:
+- **Missing uid parameter**: No se proporcionó el parámetro `uid`
+- **User not found**: El usuario no existe
+- **Private profile**: El perfil no es público
+- **Server error**: Error al cargar los datos
+
+### Ejemplo de uso
+
+```javascript
+// Obtener datos de un usuario público
+fetch('https://duplino.github.io/UTN-Tracker/api/user.html?uid=ABC123')
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      console.error('Error:', data.message);
+    } else {
+      console.log('Promedio:', data.stats.averageGrade);
+      console.log('Materias aprobadas:', data.stats.approvedSubjects);
+    }
+  });
+```
 
 ---
 
