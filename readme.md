@@ -71,15 +71,6 @@ La API retorna un objeto JSON con la siguiente estructura:
   "uid": "string",
   "plan": "string",
   "yearStarted": "number",
-  "subjectData": {
-    "<codigo_materia>": {
-      "values": {},
-      "status": "string",
-      "overrideStatus": "string",
-      "savedAt": "string"
-    }
-  },
-  "electives": {},
   "selectedStats": [],
   "stats": {
     "totalSubjects": 0,
@@ -99,8 +90,6 @@ La API retorna un objeto JSON con la siguiente estructura:
 - **uid**: ID único del usuario
 - **plan**: Plan de estudios seleccionado (ej: "k23", "k23medio")
 - **yearStarted**: Año de inicio de la carrera
-- **subjectData**: Objeto con los datos de cada materia (parciales, finales, estado)
-- **electives**: Electivas colocadas en el tablero
 - **selectedStats**: Estadísticas seleccionadas para mostrar
 - **stats**: Estadísticas calculadas automáticamente:
   - `totalSubjects`: Total de materias en el plan

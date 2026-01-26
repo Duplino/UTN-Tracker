@@ -54,8 +54,6 @@ The API endpoint is located at `/api/user.html` and requires a `uid` parameter.
      "uid": "<public-user-id>",
      "plan": "k23",
      "yearStarted": 2023,
-     "subjectData": { ... },
-     "electives": { ... },
      "selectedStats": [ ... ],
      "stats": {
        "totalSubjects": 45,
@@ -157,7 +155,8 @@ describe('Public API', () => {
     const data = await extractJSON(response);
     expect(data.public).toBe(true);
     expect(data.stats).toBeDefined();
-    expect(data.subjectData).toBeDefined();
+    expect(data.subjectData).toBeUndefined(); // Should NOT include subject data
+    expect(data.electives).toBeUndefined(); // Should NOT include electives
   });
 });
 ```
