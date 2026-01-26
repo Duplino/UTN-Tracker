@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>UTN Tracker - Public API</title>
+	</head>
+	<body>
+		<script type="module">
+			// Import the functions you need from the SDKs you need
+			import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+			import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+			// Your web app's Firebase configuration
+			const firebaseConfig = {
+				apiKey: "AIzaSyB4n2_ZY0tBjwMzoQqvjjUHlqD0Yu6Dr0A",
+				authDomain: "utntracker.firebaseapp.com",
+				projectId: "utntracker",
+				storageBucket: "utntracker.firebasestorage.app",
+				messagingSenderId: "791264678302",
+				appId: "1:791264678302:web:e637c2e3b499614683868f",
+				measurementId: "G-T4WYQC67SW"
+			};
+
+			// Initialize Firebase
+			const app = initializeApp(firebaseConfig);
+			const db = getFirestore(app);
+
+			// Get uid from URL
+			const urlParams = new URLSearchParams(window.location.search);
+			const uid = urlParams.get('uid');
+
+			// Function to calculate statistics from subject data
+			function calculateStats(subjectData, planData) {
+				const stats = {
+					totalSubjects: 0,
+					approvedSubjects: 0,
+					promotedSubjects: 0,
+					regularizedSubjects: 0,
+					inProgressSubjects: 0,
+					weeklyHours: 0,
+					averageGrade: 0,
+					grades: []
+				};
+
+				// If no subject data, return default stats
+				if (!subjectData) {
+					return stats;
+				}
+
+				// Count subjects from plan
+				if (planData && planData.modules) {
+					planData.modules.forEach(module => {
+						if (module.subjects && Array.isArray(module.subjects)) {
+							stats.totalSubjects += module.subjects.length;
+						}
+					});
+				}
+
+				// Calculate stats from subject data
+				Object.entries(subjectData).forEach(([code, data]) => {
+					if (!data) return;
+
+					const status = data.overrideStatus || data.status;
+					
+					// Count by status
+					if (status === 'Aprobada') {
+						stats.approvedSubjects++;
+						// Extract grade for approved subjects
+						if (data.values) {
+							// Check for final exam grade
+							for (let i = 1; i <= 4; i++) {
+								const finalKey = 'final' + i;
+								if (data.values[finalKey]) {
+									const grade = parseFloat(data.values[finalKey].replace(',', '.'));
+									if (!isNaN(grade) && grade >= 6) {
+										stats.grades.push(grade);
+										break;
+									}
+								}
+							}
+						}
+					} else if (status === 'Promocionada') {
+						stats.promotedSubjects++;
+						// Extract grade for promoted subjects (average of parciales)
+						if (data.values) {
+							let p1 = NaN, p2 = NaN;
+							// Get best parcial values
+							for (let i = 3; i >= 1; i--) {
+								const v = data.values['parcial1_' + i];
+								if (v) {
+									const n = parseFloat(String(v).replace(',', '.'));
+									if (!isNaN(n)) { p1 = n; break; }
+								}
+							}
+							for (let i = 3; i >= 1; i--) {
+								const v = data.values['parcial2_' + i];
+								if (v) {
+									const n = parseFloat(String(v).replace(',', '.'));
+									if (!isNaN(n)) { p2 = n; break; }
+								}
+							}
+							if (!isNaN(p1) && !isNaN(p2)) {
+								stats.grades.push(Math.round((p1 + p2) / 2));
+							}
+						}
+					} else if (status === 'Regularizada') {
+						stats.regularizedSubjects++;
+					} else if (status === 'Faltan notas' || status === 'Faltan examenes') {
+						stats.inProgressSubjects++;
+						// For in-progress subjects, count weekly hours
+						// Need to find the subject in plan data to get weekHours
+						if (planData && planData.modules) {
+							for (const module of planData.modules) {
+								if (module.subjects) {
+									const subject = module.subjects.find(s => s.code === code);
+									if (subject && subject.weekHours) {
+										stats.weeklyHours += subject.weekHours;
+										break;
+									}
+								}
+							}
+						}
+					}
+				});
+
+				// Calculate average grade
+				if (stats.grades.length > 0) {
+					const sum = stats.grades.reduce((acc, val) => acc + val, 0);
+					stats.averageGrade = parseFloat((sum / stats.grades.length).toFixed(2));
+				}
+
+				// Remove internal grades array from final output
+				delete stats.grades;
+
+				return stats;
+			}
+
+			// Main execution
+			async function loadUserData() {
+				if (!uid) {
+					return {
+						error: 'Missing uid parameter',
+						message: 'Please provide a uid parameter in the URL'
+					};
+				}
+
+				try {
+					const userRef = doc(db, 'users', uid);
+					const snap = await getDoc(userRef);
+					
+					if (!snap.exists()) {
+						return {
+							error: 'User not found',
+							message: 'This profile does not exist'
+						};
+					}
+
+					const data = snap.data();
+					
+					// Check if profile is public
+					if (data.public !== true) {
+						return {
+							error: 'Private profile',
+							message: 'This profile is not public'
+						};
+					}
+
+					// Load plan data if available
+					let planData = null;
+					if (data.plan) {
+						try {
+							const planUrl = `../assets/data/${data.plan}.json`;
+							const response = await fetch(planUrl);
+							if (response.ok) {
+								planData = await response.json();
+							}
+						} catch (err) {
+							console.error('Error loading plan data:', err);
+						}
+					}
+
+					// Calculate statistics
+					const stats = calculateStats(data.subjectData || {}, planData);
+
+					// Return public data as JSON
+					return {
+						uid: uid,
+						plan: data.plan || null,
+						yearStarted: data.yearStarted || null,
+						subjectData: data.subjectData || {},
+						electives: data.electives || {},
+						selectedStats: data.selectedStats || [],
+						stats: stats,
+						public: true
+					};
+				} catch (err) {
+					console.error('Error fetching user data:', err);
+					return {
+						error: 'Server error',
+						message: 'Error loading profile data'
+					};
+				}
+			}
+
+			// Execute and output JSON
+			loadUserData().then(result => {
+				// Clear body and write JSON
+				document.body.innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+				
+				// Also log to console for debugging
+				console.log('API Response:', result);
+			});
+		</script>
+	</body>
+</html>
