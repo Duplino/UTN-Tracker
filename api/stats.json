@@ -1,0 +1,97 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "description": "UTN-Tracker Statistics API - Returns available statistics and their definitions",
+    "generatedAt": "2026-01-26T23:33:00Z"
+  },
+  "stats": [
+    {
+      "id": "horasSemanales",
+      "name": "Horas semanales",
+      "description": "Total weekly hours for subjects currently in progress (not approved, promoted, regularized, or failed)",
+      "unit": "hours",
+      "category": "workload"
+    },
+    {
+      "id": "promedio",
+      "name": "Promedio",
+      "description": "Average grade of approved and promoted subjects",
+      "unit": "grade",
+      "category": "performance"
+    },
+    {
+      "id": "materiasAprobadas",
+      "name": "Materias aprobadas",
+      "description": "Number of approved subjects out of total required (including electives)",
+      "unit": "count",
+      "category": "progress"
+    },
+    {
+      "id": "finalesPendientes",
+      "name": "Finales pendientes",
+      "description": "Number of subjects that are regularized and pending final exam",
+      "unit": "count",
+      "category": "progress"
+    },
+    {
+      "id": "materiasCursables",
+      "name": "Materias que pueden cursarse",
+      "description": "Number of subjects available to start based on fulfilled requirements",
+      "unit": "count",
+      "category": "planning"
+    },
+    {
+      "id": "puedePromocionar",
+      "name": "Materias en condición de promoción",
+      "description": "Number of subjects currently in condition to be promoted (both first partials >= 8)",
+      "unit": "count",
+      "category": "performance"
+    },
+    {
+      "id": "debeRecuperar",
+      "name": "Materias a recuperar",
+      "description": "Number of subjects that require recovery exams",
+      "unit": "count",
+      "category": "progress"
+    },
+    {
+      "id": "desaprobadas",
+      "name": "Cantidad de materias desaprobadas",
+      "description": "Number of subjects that have been failed",
+      "unit": "count",
+      "category": "performance"
+    },
+    {
+      "id": "aniosAntiguedad",
+      "name": "Años de antigüedad",
+      "description": "Years since starting the degree program",
+      "unit": "years",
+      "category": "planning"
+    },
+    {
+      "id": "pesoAcademico",
+      "name": "Peso académico",
+      "description": "Academic weight calculated as: 11 * Approved - 5 * Years - 3 * Failed",
+      "unit": "points",
+      "category": "performance",
+      "formula": {
+        "coefficients": {
+          "approved": 11,
+          "yearsOld": -5,
+          "failed": -3
+        }
+      }
+    }
+  ],
+  "config": {
+    "maxStatsDisplayed": 5,
+    "defaultWeekHours": 6,
+    "defaultSelectedStats": [
+      "horasSemanales",
+      "promedio",
+      "materiasAprobadas",
+      "finalesPendientes",
+      "materiasCursables"
+    ]
+  }
+}
