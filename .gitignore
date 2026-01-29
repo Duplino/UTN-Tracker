@@ -1,0 +1,13 @@
+# Test data for API
+api/test-data/
+
+# OS files
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+
+# PHP
+vendor/
+composer.lock

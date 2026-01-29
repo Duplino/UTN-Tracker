@@ -47,11 +47,25 @@ UTN-Tracker es una SPA ligera (vanilla JS + Bootstrap) que carga un "plan" en fo
 
 La aplicación proporciona una API pública para obtener los datos de usuario en formato JSON. Esto permite a los usuarios compartir sus estadísticas y progreso de manera programática.
 
-### Endpoint
+### Endpoints Disponibles
+
+La aplicación ofrece dos endpoints con la misma funcionalidad:
+
+#### 1. Endpoint PHP (Recomendado para servidores PHP)
+
+```
+/api/stats.php?uid=<USER_ID>
+```
+
+Este endpoint está implementado en PHP y puede ser usado en cualquier servidor con soporte PHP 8.0 o superior. Retorna JSON puro y es ideal para integraciones backend.
+
+#### 2. Endpoint JavaScript (Para hosting estático)
 
 ```
 https://duplino.github.io/UTN-Tracker/api/user.html?uid=<USER_ID>
 ```
+
+Este endpoint usa Firebase client SDK y funciona en hosting estático (como GitHub Pages). Retorna JSON formateado en un tag `<pre>`.
 
 ### Parámetros
 
@@ -131,6 +145,32 @@ Posibles errores:
 
 ### Ejemplo de uso
 
+**Con el endpoint PHP:**
+
+```bash
+# cURL
+curl "https://your-domain.com/api/stats.php?uid=ABC123"
+
+# Con jq para formatear
+curl -s "https://your-domain.com/api/stats.php?uid=ABC123" | jq .
+```
+
+```javascript
+// JavaScript/Node.js
+fetch('https://your-domain.com/api/stats.php?uid=ABC123')
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      console.error('Error:', data.message);
+    } else {
+      console.log('Promedio:', data.stats.averageGrade);
+      console.log('Materias aprobadas:', data.stats.approvedSubjects);
+    }
+  });
+```
+
+**Con el endpoint JavaScript:**
+
 ```javascript
 // Obtener datos de un usuario público
 fetch('https://duplino.github.io/UTN-Tracker/api/user.html?uid=ABC123')
@@ -144,6 +184,10 @@ fetch('https://duplino.github.io/UTN-Tracker/api/user.html?uid=ABC123')
     }
   });
 ```
+
+### Configuración del Endpoint PHP
+
+Para más detalles sobre cómo configurar el endpoint PHP con Firebase, consulta la [documentación de la API](api/README.md).
 
 ---
 
