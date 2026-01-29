@@ -60,7 +60,7 @@ Error response:
 #### Requirements
 
 The PHP endpoint requires:
-1. PHP 7.4 or higher
+1. PHP 8.0 or higher
 2. Access to the Firebase Firestore database
 
 #### Firebase Setup (Production)
@@ -69,7 +69,7 @@ To connect to Firebase Firestore in production, you need to:
 
 1. Install the Firebase Admin SDK for PHP:
    ```bash
-   composer require google/cloud-firestore
+   composer require kreait/firebase-php
    ```
 
 2. Download your Firebase service account key:
@@ -80,6 +80,14 @@ To connect to Firebase Firestore in production, you need to:
 3. Update `stats.php` to use the Firebase Admin SDK:
    - Uncomment the Firebase Admin SDK code in the `getUserDataFromFirestore()` function
    - Set the correct path to your service account key file
+
+#### Allowed Plans
+
+For security reasons, the API only allows specific plan names:
+- `k23`
+- `k23medio`
+
+If you need to add more plans, update the `$allowedPlans` array in the `loadPlanData()` function.
 
 #### Testing Locally
 

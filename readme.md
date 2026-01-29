@@ -57,7 +57,7 @@ La aplicación ofrece dos endpoints con la misma funcionalidad:
 /api/stats.php?uid=<USER_ID>
 ```
 
-Este endpoint está implementado en PHP y puede ser usado en cualquier servidor con soporte PHP 7.4 o superior. Retorna JSON puro y es ideal para integraciones backend.
+Este endpoint está implementado en PHP y puede ser usado en cualquier servidor con soporte PHP 8.0 o superior. Retorna JSON puro y es ideal para integraciones backend.
 
 #### 2. Endpoint JavaScript (Para hosting estático)
 

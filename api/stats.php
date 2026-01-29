@@ -150,18 +150,32 @@ function calculateStats($subjectData, $planData) {
  * @return array|null Plan data or null if not found
  */
 function loadPlanData($planName) {
-    if (empty($planName)) {
+    if ($planName === null || $planName === '') {
         return null;
     }
     
-    $planPath = __DIR__ . '/../assets/data/' . basename($planName) . '.json';
+    // Whitelist of allowed plan names for security
+    $allowedPlans = ['k23', 'k23medio'];
+    if (!in_array($planName, $allowedPlans, true)) {
+        return null;
+    }
+    
+    $planPath = __DIR__ . '/../assets/data/' . $planName . '.json';
     
     if (!file_exists($planPath)) {
         return null;
     }
     
     $jsonContent = file_get_contents($planPath);
-    return json_decode($jsonContent, true);
+    $planData = json_decode($jsonContent, true);
+    
+    // Check for JSON parsing errors
+    if ($planData === null && json_last_error() !== JSON_ERROR_NONE) {
+        error_log('JSON parsing error in plan file: ' . json_last_error_msg());
+        return null;
+    }
+    
+    return $planData;
 }
 
 /**
@@ -174,16 +188,17 @@ function loadPlanData($planName) {
  */
 function getUserDataFromFirestore($uid) {
     // NOTE: This is a placeholder implementation
-    // In production, you would use Firebase Admin SDK:
+    // In production, you would use Firebase Admin SDK for PHP:
     /*
-    use Google\Cloud\Firestore\FirestoreClient;
+    use Kreait\Firebase\Factory;
     
-    $firestore = new FirestoreClient([
-        'projectId' => 'utntracker',
-        'keyFilePath' => __DIR__ . '/path/to/service-account-key.json'
-    ]);
+    $factory = (new Factory)
+        ->withServiceAccount(__DIR__ . '/path/to/service-account-key.json');
     
-    $docRef = $firestore->collection('users')->document($uid);
+    $firestore = $factory->createFirestore();
+    $database = $firestore->database();
+    
+    $docRef = $database->collection('users')->document($uid);
     $snapshot = $docRef->snapshot();
     
     if (!$snapshot->exists()) {
@@ -194,10 +209,23 @@ function getUserDataFromFirestore($uid) {
     */
     
     // For development/testing: Check if there's a test data file
-    $testDataPath = __DIR__ . '/test-data/' . basename($uid) . '.json';
+    // Validate uid format for security (alphanumeric, underscore, hyphen only)
+    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $uid)) {
+        return null;
+    }
+    
+    $testDataPath = __DIR__ . '/test-data/' . $uid . '.json';
     if (file_exists($testDataPath)) {
         $jsonContent = file_get_contents($testDataPath);
-        return json_decode($jsonContent, true);
+        $userData = json_decode($jsonContent, true);
+        
+        // Check for JSON parsing errors
+        if ($userData === null && json_last_error() !== JSON_ERROR_NONE) {
+            error_log('JSON parsing error in user data file: ' . json_last_error_msg());
+            return null;
+        }
+        
+        return $userData;
     }
     
     // Return null if user not found
@@ -209,7 +237,9 @@ try {
     // Get uid from GET parameter
     $uid = $_GET['uid'] ?? null;
     
-    if (empty($uid)) {
+    // Validate uid parameter
+    if (!isset($_GET['uid']) || trim($_GET['uid']) === '') {
+        http_response_code(400);
         echo json_encode([
             'error' => 'Missing uid parameter',
             'message' => 'Please provide a uid parameter in the URL'
@@ -217,10 +247,13 @@ try {
         exit;
     }
     
+    $uid = trim($_GET['uid']);
+    
     // Fetch user data from Firestore
     $userData = getUserDataFromFirestore($uid);
     
     if ($userData === null) {
+        http_response_code(404);
         echo json_encode([
             'error' => 'User not found',
             'message' => 'This profile does not exist'
@@ -230,6 +263,7 @@ try {
     
     // Check if profile is public
     if (!isset($userData['public']) || $userData['public'] !== true) {
+        http_response_code(403);
         echo json_encode([
             'error' => 'Private profile',
             'message' => 'This profile is not public'
@@ -259,11 +293,14 @@ try {
         'public' => true
     ];
     
-    // Return JSON response
+    // Return JSON response with 200 OK
+    http_response_code(200);
     echo json_encode($response, JSON_PRETTY_PRINT);
     
 } catch (Exception $e) {
     // Handle any errors
+    error_log('API error: ' . $e->getMessage() . ' - ' . $e->getTraceAsString());
+    http_response_code(500);
     echo json_encode([
         'error' => 'Server error',
         'message' => 'Error loading profile data'
