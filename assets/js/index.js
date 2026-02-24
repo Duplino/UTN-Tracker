@@ -293,6 +293,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }).length;
   }
 
+  function countPassedElectivasForColumn(colIndex){
+    try{
+      const raw = localStorage.getItem('electives');
+      if (!raw) return 0;
+      const obj = JSON.parse(raw);
+      let count = 0;
+      Object.keys(obj || {}).forEach(k => {
+        if (obj[k] && obj[k].colIndex === colIndex){
+          const stored = loadSubjectData(k);
+          const st = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+          if (st === 'Aprobada' || st === 'Promocionada') count++;
+        }
+      });
+      return count;
+    }catch(e){ return 0; }
+  }
+
   function saveSubjectData(code, payload){
     const key = getSubjectStorageKey(code);
     if (!key) return;
@@ -677,15 +694,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const header = document.createElement('div');
       header.className = 'mb-2';
       const subjects = Array.isArray(module.subjects) ? module.subjects : [];
-      const modulePassed = countPassedSubjects(subjects);
-      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong> <span class="text-muted small">${modulePassed}/${subjects.length}</span>`;
+      const electivasCount = Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0;
+      const modulePassed = countPassedSubjects(subjects) + countPassedElectivasForColumn(visIdx);
+      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong> <span class="text-muted small">${modulePassed}/${subjects.length + electivasCount}</span>`;
       col.appendChild(header);
 
       // Render all subjects per module
       subjects.forEach(subj => col.appendChild(createCard(subj, module)));
 
       // Insert electiva placeholders according to module.electivas (if present)
-      const electivasCount = Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0;
       for (let i = 0; i < electivasCount; i++){
         col.appendChild(createAddElectivaPlaceholder(visIdx));
       }
@@ -733,8 +750,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const headerDiv = document.createElement('div');
       headerDiv.className = 'table-view-group-header';
       const tableSubjects = Array.isArray(module.subjects) ? module.subjects : [];
-      const tableModulePassed = countPassedSubjects(tableSubjects);
-      headerDiv.innerHTML = `${escapeHtml(module.name)} <span class="text-muted fw-normal small">${tableModulePassed}/${tableSubjects.length}</span>`;
+      const moduleIndex = visibleModules.indexOf(module);
+      const tableElectivasCount = Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0;
+      const tableModulePassed = countPassedSubjects(tableSubjects) + countPassedElectivasForColumn(moduleIndex);
+      headerDiv.innerHTML = `${escapeHtml(module.name)} <span class="text-muted fw-normal small">${tableModulePassed}/${tableSubjects.length + tableElectivasCount}</span>`;
       groupDiv.appendChild(headerDiv);
 
       // Create table for subjects
@@ -767,7 +786,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const electivesStr = localStorage.getItem('electives');
         if (electivesStr) {
           const electivesMap = JSON.parse(electivesStr);
-          const moduleIndex = visibleModules.indexOf(module);
           
           Object.keys(electivesMap).forEach(key => {
             const electiveData = electivesMap[key];
