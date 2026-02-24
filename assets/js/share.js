@@ -69,6 +69,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return status;
   }
 
+  function countPassedSubjects(subjects) {
+    if (!Array.isArray(subjects)) return 0;
+    return subjects.filter(s => {
+      const key = (s.code && s.code.trim()) ? s.code : (s.name || '');
+      const stored = key ? loadSubjectData(key) : null;
+      const st = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      return st === 'Aprobada' || st === 'Promocionada';
+    }).length;
+  }
+
   // Get a user-friendly description for the status
   function getStatusDescription(status) {
     switch (status) {
@@ -290,10 +300,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const header = document.createElement('div');
       header.className = 'mb-2';
-      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong>`;
+      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
+      const modulePassed = countPassedSubjects(subjects);
+      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong> <span class="text-muted small">${modulePassed}/${subjects.length}</span>`;
       col.appendChild(header);
 
-      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
       subjects.forEach(subj => col.appendChild(createCard(subj, module)));
 
       // Insert electiva cards for placed electives in this column

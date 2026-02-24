@@ -283,6 +283,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return false;
   }
 
+  function countPassedSubjects(subjects){
+    if (!Array.isArray(subjects)) return 0;
+    return subjects.filter(s => {
+      const key = (s.code && s.code.trim()) ? s.code : (s.name || '');
+      const stored = key ? loadSubjectData(key) : null;
+      const st = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      return st === 'Aprobada' || st === 'Promocionada';
+    }).length;
+  }
+
   function saveSubjectData(code, payload){
     const key = getSubjectStorageKey(code);
     if (!key) return;
@@ -666,11 +676,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Column header with module name (no color in new format)
       const header = document.createElement('div');
       header.className = 'mb-2';
-      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong>`;
+      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
+      const modulePassed = countPassedSubjects(subjects);
+      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong> <span class="text-muted small">${modulePassed}/${subjects.length}</span>`;
       col.appendChild(header);
 
       // Render all subjects per module
-      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
       subjects.forEach(subj => col.appendChild(createCard(subj, module)));
 
       // Insert electiva placeholders according to module.electivas (if present)
@@ -721,7 +732,9 @@ document.addEventListener('DOMContentLoaded', () => {
       // Group header
       const headerDiv = document.createElement('div');
       headerDiv.className = 'table-view-group-header';
-      headerDiv.textContent = module.name;
+      const tableSubjects = Array.isArray(module.subjects) ? module.subjects : [];
+      const tableModulePassed = countPassedSubjects(tableSubjects);
+      headerDiv.innerHTML = `${escapeHtml(module.name)} <span class="text-muted fw-normal small">${tableModulePassed}/${tableSubjects.length}</span>`;
       groupDiv.appendChild(headerDiv);
 
       // Create table for subjects
