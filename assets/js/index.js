@@ -277,10 +277,20 @@ document.addEventListener('DOMContentLoaded', () => {
     return model === 'three_partials' ? 3 : 2;
   }
 
+  const PARTIAL_INSTANCE_KEYS = ['instance1', 'instance2', 'instance3'];
+
+  function createEmptyPartial(){
+    return {
+      instance1: { date: null, grade: null, attended: null },
+      instance2: { date: null, grade: null, attended: null },
+      instance3: { date: null, grade: null, attended: null }
+    };
+  }
+
   function createEmptyExams(model){
     const count = partialCountForModel(model);
     return {
-      partials: Array.from({ length: count }, () => []),
+      partials: Array.from({ length: count }, () => createEmptyPartial()),
       finals: []
     };
   }
@@ -311,6 +321,19 @@ document.addEventListener('DOMContentLoaded', () => {
     return at;
   }
 
+  function normalizePartial(raw){
+    const base = createEmptyPartial();
+    if (!raw || typeof raw !== 'object') return base;
+    PARTIAL_INSTANCE_KEYS.forEach((key) => {
+      base[key] = normalizeAttempt(raw[key]);
+    });
+    return base;
+  }
+
+  function getPartialAttemptKey(attemptIndex){
+    return PARTIAL_INSTANCE_KEYS[attemptIndex] || 'instance1';
+  }
+
   function ensureSubjectDataShape(stored, modelHint){
     const candidateModel = modelHint || (stored && stored.approvalModel) || 'standard';
     const model = isValidApprovalModel(candidateModel) ? candidateModel : 'standard';
@@ -321,8 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const wantedPartials = partialCountForModel(model);
     const normalizedPartials = [];
     for (let i = 0; i < wantedPartials; i++){
-      const row = Array.isArray(partials[i]) ? partials[i].map(normalizeAttempt) : [];
-      normalizedPartials.push(row);
+      normalizedPartials.push(normalizePartial(partials[i]));
     }
     return {
       ...base,
@@ -337,7 +359,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getPartialAttempts(stored, partialIndex){
     const s = ensureSubjectDataShape(stored);
-    return s.exams.partials[partialIndex - 1] || [];
+    const partial = normalizePartial(s.exams.partials[partialIndex - 1]);
+    return PARTIAL_INSTANCE_KEYS.map((key) => partial[key]);
   }
 
   function getFinalAttempts(stored){
@@ -366,7 +389,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const stored = ensureSubjectDataShape(loadSubjectData(code));
     if (!stored) return false;
     if (stored.status || stored.overrideStatus) return true;
-    const hasPartials = (stored.exams.partials || []).some((arr) => Array.isArray(arr) && arr.length > 0);
+    const hasPartials = (stored.exams.partials || []).some((partial) => {
+      const p = normalizePartial(partial);
+      return PARTIAL_INSTANCE_KEYS.some((key) => {
+        const at = p[key] || {};
+        return !!at.date || at.grade !== null || at.attended === false;
+      });
+    });
     const hasFinals = Array.isArray(stored.exams.finals) && stored.exams.finals.length > 0;
     if (hasPartials || hasFinals) return true;
     return false;
@@ -1460,13 +1489,12 @@ document.addEventListener('DOMContentLoaded', () => {
               const dateEl = document.getElementById((PARTIAL_DATE_IDS[p] || [])[i] || '');
               const grade = gradeEl ? parseNum(gradeEl.value) : NaN;
               const date = dateEl && dateEl.value ? dateEl.value : null;
-              if (!Number.isNaN(grade) || date){
-                storedObj.exams.partials[p - 1].push({
-                  date,
-                  grade: Number.isNaN(grade) ? null : grade,
-                  attended: Number.isNaN(grade) ? null : true
-                });
-              }
+              const key = getPartialAttemptKey(i);
+              storedObj.exams.partials[p - 1][key] = {
+                date,
+                grade: Number.isNaN(grade) ? null : grade,
+                attended: Number.isNaN(grade) ? null : true
+              };
             }
           }
           for (let i = 0; i < 4; i++){
@@ -2992,8 +3020,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const pushPendingFromSubject = (subjectCode, subjectName, stored) => {
       if (!stored) return;
       const normalized = ensureSubjectDataShape(stored);
-      (normalized.exams.partials || []).forEach((attempts, pIdx) => {
-        (attempts || []).forEach((raw, aIdx) => {
+      (normalized.exams.partials || []).forEach((partialObj, pIdx) => {
+        const partial = normalizePartial(partialObj);
+        PARTIAL_INSTANCE_KEYS.forEach((key, aIdx) => {
+          const raw = partial[key];
           if (!isPendingAttempt(raw)) return;
           pending.push({
             code: subjectCode,
@@ -3068,9 +3098,10 @@ document.addEventListener('DOMContentLoaded', () => {
             ...payload
           };
         } else {
-          if (!Array.isArray(current.exams.partials[row.partialIndex])) current.exams.partials[row.partialIndex] = [];
-          current.exams.partials[row.partialIndex][row.attemptIndex] = {
-            ...(current.exams.partials[row.partialIndex][row.attemptIndex] || {}),
+          current.exams.partials[row.partialIndex] = normalizePartial(current.exams.partials[row.partialIndex]);
+          const attemptKey = getPartialAttemptKey(row.attemptIndex);
+          current.exams.partials[row.partialIndex][attemptKey] = {
+            ...(current.exams.partials[row.partialIndex][attemptKey] || {}),
             ...payload
           };
         }

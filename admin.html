@@ -75,19 +75,21 @@
       function buildPartials(values, partialCount) {
         const partials = [];
         for (let p = 1; p <= partialCount; p++) {
-          const attempts = [];
+          const partial = {
+            instance1: { date: null, grade: null, attended: null },
+            instance2: { date: null, grade: null, attended: null },
+            instance3: { date: null, grade: null, attended: null }
+          };
           for (let a = 1; a <= 3; a++) {
             const grade = toNumOrNull(values[`parcial${p}_${a}`]);
             const date = values[`parcial${p}_${a}_date`] || null;
-            if (grade !== null || date) {
-              attempts.push({
-                date,
-                grade,
-                attended: grade !== null ? true : null
-              });
-            }
+            partial[`instance${a}`] = {
+              date,
+              grade,
+              attended: grade !== null ? true : null
+            };
           }
-          partials.push(attempts);
+          partials.push(partial);
         }
         return partials;
       }
