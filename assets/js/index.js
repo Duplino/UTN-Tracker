@@ -273,13 +273,100 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function partialCountForModel(model){
+    return model === 'three_partials' ? 3 : 2;
+  }
+
+  function createEmptyExams(model){
+    const count = partialCountForModel(model);
+    return {
+      partials: Array.from({ length: count }, () => []),
+      finals: []
+    };
+  }
+
+  function isFutureExamDate(dateStr){
+    if (!dateStr) return false;
+    const d = new Date(`${dateStr}T23:59:59`);
+    if (Number.isNaN(d.getTime())) return false;
+    return d > new Date();
+  }
+
+  function normalizeAttempt(raw){
+    if (!raw || typeof raw !== 'object') return { date: null, grade: null, attended: null };
+    const date = raw.date || null;
+    const gradeNum = parseNum(raw.grade);
+    return {
+      date,
+      grade: Number.isNaN(gradeNum) ? null : gradeNum,
+      attended: typeof raw.attended === 'boolean' ? raw.attended : null
+    };
+  }
+
+  function getAttemptForCalc(raw){
+    const at = normalizeAttempt(raw);
+    if (isFutureExamDate(at.date)) return { date: at.date, grade: null, attended: null };
+    return at;
+  }
+
+  function ensureSubjectDataShape(stored, modelHint){
+    const candidateModel = modelHint || (stored && stored.approvalModel) || 'standard';
+    const model = isValidApprovalModel(candidateModel) ? candidateModel : 'standard';
+    const base = stored && typeof stored === 'object' ? { ...stored } : {};
+    const exams = (base.exams && typeof base.exams === 'object') ? base.exams : {};
+    const partials = Array.isArray(exams.partials) ? exams.partials : [];
+    const finals = Array.isArray(exams.finals) ? exams.finals : [];
+    const wantedPartials = partialCountForModel(model);
+    const normalizedPartials = [];
+    for (let i = 0; i < wantedPartials; i++){
+      const row = Array.isArray(partials[i]) ? partials[i].map(normalizeAttempt) : [];
+      normalizedPartials.push(row);
+    }
+    return {
+      ...base,
+      approvalModel: model,
+      labApproved: base.labApproved === true,
+      exams: {
+        partials: normalizedPartials,
+        finals: finals.map(normalizeAttempt)
+      }
+    };
+  }
+
+  function getPartialAttempts(stored, partialIndex){
+    const s = ensureSubjectDataShape(stored);
+    return s.exams.partials[partialIndex - 1] || [];
+  }
+
+  function getFinalAttempts(stored){
+    const s = ensureSubjectDataShape(stored);
+    return s.exams.finals || [];
+  }
+
+  function getLastPassingOrLatestGrade(attempts){
+    let latestGrade = NaN;
+    attempts.forEach((raw) => {
+      const at = getAttemptForCalc(raw);
+      if (at.grade !== null && !Number.isNaN(at.grade)) latestGrade = at.grade;
+    });
+    return latestGrade;
+  }
+
+  function isPendingAttempt(raw){
+    const at = normalizeAttempt(raw);
+    if (!at.date) return false;
+    if (isFutureExamDate(at.date)) return false;
+    return at.grade === null && at.attended === null;
+  }
+
   // Check if subject has actual progress (grades or status), not just recursedCount
   function hasSubjectProgress(code){
-    const stored = loadSubjectData(code);
+    const stored = ensureSubjectDataShape(loadSubjectData(code));
     if (!stored) return false;
-    // Check if there's a status or any values (grades)
     if (stored.status || stored.overrideStatus) return true;
-    if (stored.values && Object.keys(stored.values).some(k => stored.values[k] !== null && stored.values[k] !== undefined && stored.values[k] !== '')) return true;
+    const hasPartials = (stored.exams.partials || []).some((arr) => Array.isArray(arr) && arr.length > 0);
+    const hasFinals = Array.isArray(stored.exams.finals) && stored.exams.finals.length > 0;
+    if (hasPartials || hasFinals) return true;
     return false;
   }
 
@@ -314,6 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const key = getSubjectStorageKey(code);
     if (!key) return;
     try{
+      payload = ensureSubjectDataShape(payload, payload && payload.approvalModel);
       // Preserve recursedCount if it exists in current storage and not in payload
       const existingData = loadSubjectData(code);
       if (existingData && typeof existingData.recursedCount === 'number' && !('recursedCount' in payload)) {
@@ -364,45 +452,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check if a subject can be promoted (both parciales >=6 but at least one <8)
   function canPromote(stored) {
-    if (!stored || !stored.values) return false;
-    const model = stored.approvalModel || 'standard';
+    const normalized = ensureSubjectDataShape(stored);
+    if (!normalized) return false;
+    const model = normalized.approvalModel || 'standard';
     if (model === 'three_partials') return false;
-    if (model === 'with_lab' && stored.labApproved !== true) return false;
-    // Get best parcial values
-    let p1 = NaN, p2 = NaN;
-    for (let i = 3; i >= 1; i--) {
-      const v = stored.values['parcial1_' + i];
-      const n = parseNum(v);
-      if (!Number.isNaN(n)) { p1 = n; break; }
-    }
-    for (let i = 3; i >= 1; i--) {
-      const v = stored.values['parcial2_' + i];
-      const n = parseNum(v);
-      if (!Number.isNaN(n)) { p2 = n; break; }
-    }
-    // Can promote if: both >=6, AND at least one >= 8 already OR exactly one <8 with recuperatory chance
-    // Simplified: if regularizada (both >=6) and both >= 8 already -> would be promocionada, not this case
-    // If regularizada and at least one >=8 and other <8 -> can try to recover to >=8
+    if (model === 'with_lab' && normalized.labApproved !== true) return false;
+    const p1 = getLastPassingOrLatestGrade(getPartialAttempts(normalized, 1));
+    const p2 = getLastPassingOrLatestGrade(getPartialAttempts(normalized, 2));
     if (Number.isNaN(p1) || Number.isNaN(p2)) return false;
-    //if (p1 < 6 || p2 < 6) return false; // not regularizada
-    // If both >=8, it's already promocionada
     if (p1 >= 8 && p2 >= 8) return false;
-    // If exactly one >=8 and the other >=6 but <8, they could still promote with a recuperatory
-    // Check if there's still a recuperatory attempt available
-    // According to promotion logic: only ONE recuperatory is allowed across both parcials to try to reach >=8
-    // So if one is <8 and hasn't used its recuperatory for promotion yet, can promote
     if (p1 >= 8 && p2 < 8) {
-      // Check if p2 attempt 2 has been used
-      const p2_2 = stored.values['parcial2_2'];
-      const n2_2 = parseNum(p2_2);
-      // If attempt 2 not used yet, can still try to promote
-      if (Number.isNaN(n2_2)) return true;
+      const p2Attempts = getPartialAttempts(normalized, 2);
+      if (!p2Attempts[1] || getAttemptForCalc(p2Attempts[1]).grade === null) return true;
       return false;
     }
     if (p2 >= 8 && p1 < 8) {
-      const p1_2 = stored.values['parcial1_2'];
-      const n1_2 = parseNum(p1_2);
-      if (Number.isNaN(n1_2)) return true;
+      const p1Attempts = getPartialAttempts(normalized, 1);
+      if (!p1Attempts[1] || getAttemptForCalc(p1Attempts[1]).grade === null) return true;
       return false;
     }
     return false;
@@ -410,17 +476,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Calculate remaining final attempts for a regularized subject (up to 4 finals total)
   function getRemainingFinalAttempts(stored) {
-    if (!stored || !stored.values) return 4; // No attempts used yet
-    // Count how many finals have been attempted (have a value)
-    let attemptsUsed = 0;
-    for (let i = 1; i <= 4; i++) {
-      const finalKey = 'final' + i;
-      const finalValue = stored.values[finalKey];
-      if (finalValue !== undefined && finalValue !== null && finalValue !== '') {
-        attemptsUsed++;
-      }
-    }
-    return 4 - attemptsUsed;
+    const normalized = ensureSubjectDataShape(stored);
+    if (!normalized) return 4;
+    const attemptsUsed = getFinalAttempts(normalized).filter((at) => {
+      const resolved = getAttemptForCalc(at);
+      return resolved.grade !== null || resolved.attended === false;
+    }).length;
+    return Math.max(0, 4 - attemptsUsed);
   }
 
   // Apply a very light status background class to a card (except 'Faltan notas')
@@ -464,12 +526,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (status === 'Aprobada'){
         let grade = null;
         try{
-          if (stored && stored.values){
-            // search final1..final4 for the first numeric >= 6 (this is where the subject was approved)
-            for (let i = 1; i <= 4; i++){
-              const v = stored.values['final'+i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
+          if (stored){
+            const finals = getFinalAttempts(stored);
+            for (let i = 0; i < finals.length; i++){
+              const at = getAttemptForCalc(finals[i]);
+              if (at.grade !== null && at.grade >= 6){ grade = at.grade; break; }
             }
           }
         }catch(e){/* ignore */}
@@ -485,19 +546,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Promocionada => average of both parciales (use the last attempt value for each parcial), rounded
         let p1 = NaN, p2 = NaN;
         try{
-          if (stored && stored.values){
-            // find last non-empty attempt for parcial1 (parcial1_3..parcial1_1)
-            for (let i = 3; i >= 1; i--){
-              const v = stored.values['parcial1_'+i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n)){ p1 = n; break; }
-            }
-            for (let i = 3; i >= 1; i--){
-              const v = stored.values['parcial2_'+i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n)){ p2 = n; break; }
-            }
-          }
+          if (stored){
+            p1 = getLastPassingOrLatestGrade(getPartialAttempts(stored, 1));
+            p2 = getLastPassingOrLatestGrade(getPartialAttempts(stored, 2));
+          }          
         }catch(e){/* ignore */}
         if (!Number.isNaN(p1) && !Number.isNaN(p2)){
           const avg = Math.round((p1 + p2) / 2);
@@ -579,7 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // clear inputs
-      ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','parcial3_1','parcial3_2','parcial3_3','final1','final2','final3','final4'].forEach(id => {
+      Object.values(PARTIAL_INPUT_IDS).flat().concat(FINAL_INPUT_IDS, Object.values(PARTIAL_DATE_IDS).flat(), FINAL_DATE_IDS).forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -1020,6 +1072,18 @@ document.addEventListener('DOMContentLoaded', () => {
     with_lab: 'Con laboratorio',
     three_partials: '3 parciales'
   };
+  const PARTIAL_INPUT_IDS = {
+    1: ['parcial1_1','parcial1_2','parcial1_3'],
+    2: ['parcial2_1','parcial2_2','parcial2_3'],
+    3: ['parcial3_1','parcial3_2','parcial3_3']
+  };
+  const PARTIAL_DATE_IDS = {
+    1: ['parcial1_1_date','parcial1_2_date','parcial1_3_date'],
+    2: ['parcial2_1_date','parcial2_2_date','parcial2_3_date'],
+    3: ['parcial3_1_date','parcial3_2_date','parcial3_3_date']
+  };
+  const FINAL_INPUT_IDS = ['final1','final2','final3','final4'];
+  const FINAL_DATE_IDS = ['final1_date','final2_date','final3_date','final4_date'];
 
   function isValidApprovalModel(model){
     return APPROVAL_MODELS.includes(model);
@@ -1029,11 +1093,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const stored = loadSubjectData(code || '');
     if (!stored) return 'standard';
     if (isValidApprovalModel(stored.approvalModel)) return stored.approvalModel;
-    try{
-      const values = stored.values || {};
-      const hasThirdPartial = ['parcial3_1','parcial3_2','parcial3_3'].some(k => values[k] !== null && values[k] !== undefined && values[k] !== '');
-      if (hasThirdPartial) return 'three_partials';
-    }catch(e){}
     return 'standard';
   }
 
@@ -1051,6 +1110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const labWrap = document.getElementById('lab-approved-wrap');
     if (btn){
       btn.dataset.model = normalizedModel;
+      btn.innerHTML = `<i class="bi bi-gear"></i> ${APPROVAL_MODEL_LABELS[normalizedModel] || 'Estándar'}`;
       btn.title = `Modelo: ${APPROVAL_MODEL_LABELS[normalizedModel] || 'Estándar'}`;
       btn.setAttribute('aria-label', `Modelo: ${APPROVAL_MODEL_LABELS[normalizedModel] || 'Estándar'}`);
     }
@@ -1089,9 +1149,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const nextModel = item.dataset.model || 'standard';
         applyApprovalModelUI(nextModel);
         syncApprovalMenuState(nextModel);
-        const stored = loadSubjectData(code) || { values: {} };
+        const stored = ensureSubjectDataShape(loadSubjectData(code), nextModel);
         stored.approvalModel = nextModel;
-        if (!stored.values) stored.values = {};
+        if (stored.exams.partials.length !== partialCountForModel(nextModel)) {
+          stored.exams = createEmptyExams(nextModel);
+        }
         saveSubjectData(code, stored);
         updateSubjectStatus();
       };
@@ -1172,7 +1234,7 @@ document.addEventListener('DOMContentLoaded', () => {
     titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
 
     // clear inputs for now (new layout: parciales with 3 fields each)
-    ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','parcial3_1','parcial3_2','parcial3_3','final1','final2','final3','final4'].forEach(id => {
+    Object.values(PARTIAL_INPUT_IDS).flat().concat(FINAL_INPUT_IDS, Object.values(PARTIAL_DATE_IDS).flat(), FINAL_DATE_IDS).forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
@@ -1202,8 +1264,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const bsModal = new bootstrap.Modal(modalEl);
       bsModal.show();
       // wire live status updates: listen to partials and finals and recalc
-      const partialIds = ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','parcial3_1','parcial3_2','parcial3_3'];
-      const finalIds = ['final1','final2','final3','final4'];
+      const partialIds = Object.values(PARTIAL_INPUT_IDS).flat().concat(Object.values(PARTIAL_DATE_IDS).flat());
+      const finalIds = FINAL_INPUT_IDS.concat(FINAL_DATE_IDS);
       function bindLiveInputs(){
         partialIds.concat(finalIds).forEach(id => {
           const inp = document.getElementById(id);
@@ -1219,10 +1281,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const labEl = document.getElementById('lab-approved');
         if (labEl){
           labEl.onchange = () => {
-            const currentStored = loadSubjectData(code) || { values: {} };
+            const currentStored = ensureSubjectDataShape(loadSubjectData(code), getCurrentApprovalModel());
             currentStored.labApproved = !!labEl.checked;
             currentStored.approvalModel = getCurrentApprovalModel();
-            if (!currentStored.values) currentStored.values = {};
             saveSubjectData(code, currentStored);
             clearOverrideFor(code);
             updateSubjectStatus();
@@ -1230,23 +1291,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
       // If we have saved data for this subject, populate fields
-      const stored = loadSubjectData(code || name);
-      if (stored && stored.values){
-        Object.keys(stored.values).forEach(id => {
-          const el = document.getElementById(id);
-            if (el && stored.values[id] !== null && stored.values[id] !== undefined){
-              el.value = stored.values[id];
-              // Ensure visibility for attempts/finals that were stored
-              if (id.startsWith('parcial1_')) showPartialAttemptsUpTo(1, Math.max(1, parseInt(id.split('_')[1] || '1')));
-              if (id.startsWith('parcial2_')) showPartialAttemptsUpTo(2, Math.max(1, parseInt(id.split('_')[1] || '1')));
-              if (id.startsWith('parcial3_')) showPartialAttemptsUpTo(3, Math.max(1, parseInt(id.split('_')[1] || '1')));
-              if (id.startsWith('final')){
-                // determine how many finals should be visible based on highest final index with value
-                const idx = parseInt(id.replace('final','') || '1');
-              showFinalsUpTo(idx);
+      const stored = ensureSubjectDataShape(loadSubjectData(code || name), getCurrentApprovalModel());
+      if (stored){
+        let maxFinalVisible = 1;
+        for (let p = 1; p <= 3; p++){
+          const attempts = getPartialAttempts(stored, p);
+          attempts.forEach((raw, idx) => {
+            const at = normalizeAttempt(raw);
+            const gradeInputId = (PARTIAL_INPUT_IDS[p] || [])[idx];
+            const dateInputId = (PARTIAL_DATE_IDS[p] || [])[idx];
+            const gradeEl = gradeInputId ? document.getElementById(gradeInputId) : null;
+            const dateEl = dateInputId ? document.getElementById(dateInputId) : null;
+            if (gradeEl && at.grade !== null) gradeEl.value = at.grade;
+            if (dateEl && at.date) dateEl.value = at.date;
+            if ((at.grade !== null || at.date) && p <= partialCountForModel(stored.approvalModel)) {
+              showPartialAttemptsUpTo(p, Math.max(1, idx + 1));
             }
-          }
+          });
+        }
+        getFinalAttempts(stored).forEach((raw, idx) => {
+          const at = normalizeAttempt(raw);
+          const gradeEl = document.getElementById(FINAL_INPUT_IDS[idx] || '');
+          const dateEl = document.getElementById(FINAL_DATE_IDS[idx] || '');
+          if (gradeEl && at.grade !== null) gradeEl.value = at.grade;
+          if (dateEl && at.date) dateEl.value = at.date;
+          if (at.grade !== null || at.date) maxFinalVisible = Math.max(maxFinalVisible, idx + 1);
         });
+        showFinalsUpTo(maxFinalVisible);
       }
       if (stored && typeof stored.labApproved !== 'undefined' && labInput){
         labInput.checked = !!stored.labApproved;
@@ -1298,7 +1369,10 @@ document.addEventListener('DOMContentLoaded', () => {
           let prevAvailable = [];
           try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
           // create minimal stored object
-          const obj = { values: {}, status: 'Faltan examenes', savedAt: (new Date()).toISOString(), approvalModel: getCurrentApprovalModel(), labApproved: !!(document.getElementById('lab-approved') && document.getElementById('lab-approved').checked) };
+          const obj = ensureSubjectDataShape({}, getCurrentApprovalModel());
+          obj.status = 'Faltan examenes';
+          obj.savedAt = (new Date()).toISOString();
+          obj.labApproved = !!(document.getElementById('lab-approved') && document.getElementById('lab-approved').checked);
           saveSubjectData(effectiveCode, obj);
 
           // If this modal was opened for an electiva selection and we have a pending insert target,
@@ -1376,28 +1450,49 @@ document.addEventListener('DOMContentLoaded', () => {
           // capture available-before to animate newly unlocked after save
           let prevAvailable = [];
           try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
-          const values = {};
-          ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','parcial3_1','parcial3_2','parcial3_3','final1','final2','final3','final4'].forEach(id => {
-            const i = document.getElementById(id);
-            values[id] = i ? i.value : null;
-          });
+          const storedObj = ensureSubjectDataShape(loadSubjectData(code || name), getCurrentApprovalModel());
+          storedObj.exams = createEmptyExams(getCurrentApprovalModel());
+          for (let p = 1; p <= partialCountForModel(getCurrentApprovalModel()); p++){
+            for (let i = 0; i < 3; i++){
+              const gradeEl = document.getElementById((PARTIAL_INPUT_IDS[p] || [])[i] || '');
+              const dateEl = document.getElementById((PARTIAL_DATE_IDS[p] || [])[i] || '');
+              const grade = gradeEl ? parseNum(gradeEl.value) : NaN;
+              const date = dateEl && dateEl.value ? dateEl.value : null;
+              if (!Number.isNaN(grade) || date){
+                storedObj.exams.partials[p - 1].push({
+                  date,
+                  grade: Number.isNaN(grade) ? null : grade,
+                  attended: Number.isNaN(grade) ? null : true
+                });
+              }
+            }
+          }
+          for (let i = 0; i < 4; i++){
+            const gradeEl = document.getElementById(FINAL_INPUT_IDS[i] || '');
+            const dateEl = document.getElementById(FINAL_DATE_IDS[i] || '');
+            const grade = gradeEl ? parseNum(gradeEl.value) : NaN;
+            const date = dateEl && dateEl.value ? dateEl.value : null;
+            if (!Number.isNaN(grade) || date){
+              storedObj.exams.finals.push({
+                date,
+                grade: Number.isNaN(grade) ? null : grade,
+                attended: Number.isNaN(grade) ? null : true
+              });
+            }
+          }
           // ensure status reflects latest inputs
           updateSubjectStatus();
           const statusTextEl = document.getElementById('subject-status-text');
           const statusText = statusTextEl ? statusTextEl.textContent.trim() : '';
-          // persist to localStorage
-          const storedObj = {
-            values,
-            status: statusText,
-            savedAt: (new Date()).toISOString(),
-            approvalModel: getCurrentApprovalModel(),
-            labApproved: !!(document.getElementById('lab-approved') && document.getElementById('lab-approved').checked)
-          };
+          storedObj.status = statusText;
+          storedObj.savedAt = (new Date()).toISOString();
+          storedObj.approvalModel = getCurrentApprovalModel();
+          storedObj.labApproved = !!(document.getElementById('lab-approved') && document.getElementById('lab-approved').checked);
           // Do NOT preserve existing override: saving the modal should clear any manual override
           // so the computed status (from the entered notes) becomes the source of truth.
           saveSubjectData(code || name, storedObj);
           // The override dropdown is now inside the banner, no separate control to reset
-          console.log('Guardado subject:', code || name, { values, status: statusText });
+          console.log('Guardado subject:', code || name, { exams: storedObj.exams, status: statusText });
           // update card style in dashboard
           applyCardStatusStyle(currentCard, statusText);
           // after saving, re-evaluate cursar state for all cards (some may unlock)
@@ -1531,7 +1626,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let prev = [];
     try{ prev = getAvailableSubjectCodes(); }catch(e){}
 
-    let subjectData = loadSubjectData(effectiveCode) || {};
+    let subjectData = ensureSubjectDataShape(loadSubjectData(effectiveCode), getCurrentApprovalModel());
     if (overrideValue === 'computed'){
       // Clear override and use computed status
       if (subjectData.overrideStatus) delete subjectData.overrideStatus;
@@ -1539,7 +1634,6 @@ document.addEventListener('DOMContentLoaded', () => {
       // Set override status
       subjectData.overrideStatus = overrideValue;
     }
-    if (!subjectData.values) subjectData.values = {};
     saveSubjectData(effectiveCode, subjectData);
 
     // Determine what status to display
@@ -1563,8 +1657,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showFinalsUpTo(n){
-    const finals = [1,2,3,4].map(i => document.getElementById('final'+i)).filter(Boolean);
+    const finals = FINAL_INPUT_IDS.map(id => document.getElementById(id)).filter(Boolean);
+    const finalsDates = FINAL_DATE_IDS.map(id => document.getElementById(id)).filter(Boolean);
     finals.forEach((el, idx) => {
+      if (idx < n) el.classList.remove('d-none'); else el.classList.add('d-none');
+    });
+    finalsDates.forEach((el, idx) => {
       if (idx < n) el.classList.remove('d-none'); else el.classList.add('d-none');
     });
     const finalsContainer = document.getElementById('finals-container');
@@ -1581,15 +1679,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showPartialAttemptsUpTo(partialIndex, n){
-    // partialIndex: 1 or 2, n: number of attempts to show (1..3)
-    const ids = [1,2,3].map(i => document.getElementById(`parcial${partialIndex}_${i}`)).filter(Boolean);
+    const ids = (PARTIAL_INPUT_IDS[partialIndex] || []).map(id => document.getElementById(id)).filter(Boolean);
+    const dateIds = (PARTIAL_DATE_IDS[partialIndex] || []).map(id => document.getElementById(id)).filter(Boolean);
     ids.forEach((el, idx) => {
       if (idx < n) el.classList.remove('d-none'); else el.classList.add('d-none');
     });
+    dateIds.forEach((el, idx) => {
+      if (idx < n) el.classList.remove('d-none'); else el.classList.add('d-none');
+    });
     const group = document.getElementById(`parcial${partialIndex}-group`);
+    const dateGroup = document.getElementById(`parcial${partialIndex}-date-group`);
     if (group){
-      // keep group visible if at least one attempt visible
       if (n > 0) group.classList.remove('d-none'); else group.classList.add('d-none');
+    }
+    if (dateGroup){
+      if (n > 0) dateGroup.classList.remove('d-none'); else dateGroup.classList.add('d-none');
     }
   }
 
@@ -1599,20 +1703,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const labApproved = !!(document.getElementById('lab-approved') && document.getElementById('lab-approved').checked);
     const partialGroups = [];
     for (let p = 1; p <= partialTotal; p++){
-      partialGroups.push({
-        idx: p,
-        els: [1,2,3].map(i => document.getElementById(`parcial${p}_${i}`)).filter(Boolean)
-      });
       showPartialAttemptsUpTo(p, 1);
+      const attempts = [0,1,2].map((i) => {
+        const gradeEl = document.getElementById((PARTIAL_INPUT_IDS[p] || [])[i] || '');
+        const dateEl = document.getElementById((PARTIAL_DATE_IDS[p] || [])[i] || '');
+        const date = dateEl && dateEl.value ? dateEl.value : null;
+        const future = isFutureExamDate(date);
+        const grade = gradeEl ? parseNum(gradeEl.value) : NaN;
+        return { grade: future ? NaN : grade, date, future };
+      });
+      partialGroups.push({ idx: p, attempts });
     }
     if (partialTotal !== 3) showPartialAttemptsUpTo(3, 0);
 
-    const finals = [document.getElementById('final1'),document.getElementById('final2'),document.getElementById('final3'),document.getElementById('final4')].filter(Boolean);
-    const finalsVals = finals.map(f => parseNum(f.value));
+    const finalsVals = [0,1,2,3].map((i) => {
+      const gradeEl = document.getElementById(FINAL_INPUT_IDS[i] || '');
+      const dateEl = document.getElementById(FINAL_DATE_IDS[i] || '');
+      const date = dateEl && dateEl.value ? dateEl.value : null;
+      const future = isFutureExamDate(date);
+      const grade = gradeEl ? parseNum(gradeEl.value) : NaN;
+      return future ? NaN : grade;
+    });
 
-    function lastAttemptValue(attemptEls){
-      for (let i = attemptEls.length - 1; i >= 0; i--){
-        const v = attemptEls[i] ? parseNum(attemptEls[i].value) : NaN;
+    function lastAttemptValue(attempts){
+      for (let i = attempts.length - 1; i >= 0; i--){
+        const v = attempts[i].grade;
         if (!Number.isNaN(v)) return { value: v, index: i + 1 };
       }
       return { value: NaN, index: 0 };
@@ -1630,15 +1745,15 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
       }
-      if (attemptsToShow > finals.length) attemptsToShow = finals.length;
+      if (attemptsToShow > FINAL_INPUT_IDS.length) attemptsToShow = FINAL_INPUT_IDS.length;
       showFinalsUpTo(attemptsToShow);
       setStatusBanner('Regularizada');
     }
 
     let promotionCandidate = null;
     if (model !== 'three_partials'){
-      const p1First = partialGroups[0] && partialGroups[0].els[0] ? parseNum(partialGroups[0].els[0].value) : NaN;
-      const p2First = partialGroups[1] && partialGroups[1].els[0] ? parseNum(partialGroups[1].els[0].value) : NaN;
+      const p1First = partialGroups[0].attempts[0].grade;
+      const p2First = partialGroups[1].attempts[0].grade;
       const labOkForPromo = model !== 'with_lab' || labApproved;
 
       if (!Number.isNaN(p1First) && !Number.isNaN(p2First) && p1First >= 8 && p2First >= 8 && labOkForPromo){
@@ -1656,11 +1771,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const candidate = partialGroups.find(g => g.idx === promotionCandidate);
         if (candidate){
           showPartialAttemptsUpTo(candidate.idx, 2);
-          const attempt2 = candidate.els[1];
+          const attempt2 = document.getElementById((PARTIAL_INPUT_IDS[candidate.idx] || [])[1] || '');
           if (attempt2){
             attempt2.placeholder = 'Puede promocionar';
             attempt2.classList.remove('d-none');
-            const attempt2Val = parseNum(attempt2.value);
+            const attempt2Val = candidate.attempts[1].grade;
             if (!Number.isNaN(attempt2Val) && attempt2Val >= 8 && labOkForPromo){
               showFinalsUpTo(0);
               setStatusBanner('Promocionada');
@@ -1672,26 +1787,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     partialGroups.forEach((part) => {
-      const firstVal = part.els[0] ? parseNum(part.els[0].value) : NaN;
+      const firstVal = part.attempts[0].grade;
       if (!Number.isNaN(firstVal) && firstVal < 6){
         showPartialAttemptsUpTo(part.idx, 2);
-        const a2 = part.els[1];
+        const a2 = document.getElementById((PARTIAL_INPUT_IDS[part.idx] || [])[1] || '');
         if (a2){
           a2.placeholder = (promotionCandidate === part.idx) ? 'Puede promocionar' : 'Debe Recuperar';
           a2.classList.remove('d-none');
         }
-        const a2Val = a2 ? parseNum(a2.value) : NaN;
+        const a2Val = part.attempts[1].grade;
         if (!Number.isNaN(a2Val) && a2Val < 6){
           showPartialAttemptsUpTo(part.idx, 3);
-          const a3 = part.els[2];
+          const a3 = document.getElementById((PARTIAL_INPUT_IDS[part.idx] || [])[2] || '');
           if (a3) a3.classList.remove('d-none');
         }
       }
     });
 
-    const lastInfos = partialGroups.map((p) => lastAttemptValue(p.els));
+    const lastInfos = partialGroups.map((p) => lastAttemptValue(p.attempts));
     const effective = lastInfos.map((info) => info.value);
-    const hasAllRequiredNotes = partialGroups.every((p) => p.els.some((el) => !Number.isNaN(parseNum(el.value))));
+    const hasAllRequiredNotes = partialGroups.every((p) => p.attempts.some((at) => !Number.isNaN(at.grade)));
     const anyExhaustedFailed = lastInfos.some((info) => info.index === 3 && !Number.isNaN(info.value) && info.value < 6);
 
     if (model === 'three_partials'){
@@ -2541,19 +2656,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (status === 'Aprobada' || status === 'Promocionada'){
           let grade = NaN;
           try{
-            if (status === 'Aprobada' && stored && stored.values){
-              for (let i = 1; i <= 4; i++){
-                const v = stored.values['final'+i];
-                const n = parseNum(v);
-                if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
+            const normalized = ensureSubjectDataShape(stored);
+            if (status === 'Aprobada' && normalized){
+              const finals = getFinalAttempts(normalized);
+              for (let i = 0; i < finals.length; i++){
+                const at = getAttemptForCalc(finals[i]);
+                if (at.grade !== null && at.grade >= 6){ grade = at.grade; break; }
               }
-            } else if (status === 'Promocionada' && stored && stored.values){
-              const model = stored.approvalModel || 'standard';
+            } else if (status === 'Promocionada' && normalized){
+              const model = normalized.approvalModel || 'standard';
               let p1 = NaN, p2 = NaN, p3 = NaN;
-              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial1_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p1 = n; break; } }
-              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial2_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p2 = n; break; } }
+              p1 = getLastPassingOrLatestGrade(getPartialAttempts(normalized, 1));
+              p2 = getLastPassingOrLatestGrade(getPartialAttempts(normalized, 2));
               if (model === 'three_partials'){
-                for (let i = 3; i >= 1; i--){ const v = stored.values['parcial3_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p3 = n; break; } }
+                p3 = getLastPassingOrLatestGrade(getPartialAttempts(normalized, 3));
               }
               if (model === 'three_partials'){
                 if (!Number.isNaN(p1) && !Number.isNaN(p2) && !Number.isNaN(p3)) grade = Math.round((p1 + p2 + p3) / 3);
@@ -2868,12 +2984,124 @@ document.addEventListener('DOMContentLoaded', () => {
       tbody.appendChild(tr);
     });
   }
+
+  function collectPendingExams(){
+    const pending = [];
+    const pushPendingFromSubject = (subjectCode, subjectName, stored) => {
+      if (!stored) return;
+      const normalized = ensureSubjectDataShape(stored);
+      (normalized.exams.partials || []).forEach((attempts, pIdx) => {
+        (attempts || []).forEach((raw, aIdx) => {
+          if (!isPendingAttempt(raw)) return;
+          pending.push({
+            code: subjectCode,
+            name: subjectName || subjectCode,
+            kind: 'Parcial',
+            partialIndex: pIdx,
+            attemptIndex: aIdx,
+            date: normalizeAttempt(raw).date || '',
+            isFinal: false
+          });
+        });
+      });
+      (normalized.exams.finals || []).forEach((raw, fIdx) => {
+        if (!isPendingAttempt(raw)) return;
+        pending.push({
+          code: subjectCode,
+          name: subjectName || subjectCode,
+          kind: 'Final',
+          partialIndex: null,
+          attemptIndex: fIdx,
+          date: normalizeAttempt(raw).date || '',
+          isFinal: true
+        });
+      });
+    };
+
+    for (const subj of (displayedSubjects || [])){
+      const code = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+      if (!code) continue;
+      pushPendingFromSubject(code, subj.name || code, loadSubjectData(code));
+    }
+    return pending;
+  }
+
+  function renderPendingExamsModal(){
+    const tbody = document.getElementById('pending-exams-table-body');
+    const empty = document.getElementById('pending-exams-empty');
+    if (!tbody || !empty) return;
+    tbody.innerHTML = '';
+    const pending = collectPendingExams();
+    if (!pending.length){
+      empty.classList.remove('d-none');
+      return;
+    }
+    empty.classList.add('d-none');
+
+    pending.forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(row.name)} <small class="text-muted d-block">${escapeHtml(row.code)}</small></td>
+        <td>${escapeHtml(row.kind)}</td>
+        <td>${row.isFinal ? String(row.attemptIndex + 1) : `${row.partialIndex + 1}.${row.attemptIndex + 1}`}</td>
+        <td>${escapeHtml(row.date || '—')}</td>
+        <td><input type="number" min="0" max="10" step="0.1" class="form-control form-control-sm pending-grade-input"></td>
+        <td class="d-flex gap-1">
+          <button type="button" class="btn btn-sm btn-success pending-save-note">Guardar nota</button>
+          <button type="button" class="btn btn-sm btn-outline-danger pending-mark-absent">Ausente</button>
+        </td>
+      `;
+      const input = tr.querySelector('.pending-grade-input');
+      const saveBtn = tr.querySelector('.pending-save-note');
+      const absentBtn = tr.querySelector('.pending-mark-absent');
+
+      const persistAttempt = (payload) => {
+        const current = ensureSubjectDataShape(loadSubjectData(row.code));
+        if (row.isFinal){
+          current.exams.finals[row.attemptIndex] = {
+            ...(current.exams.finals[row.attemptIndex] || {}),
+            ...payload
+          };
+        } else {
+          if (!Array.isArray(current.exams.partials[row.partialIndex])) current.exams.partials[row.partialIndex] = [];
+          current.exams.partials[row.partialIndex][row.attemptIndex] = {
+            ...(current.exams.partials[row.partialIndex][row.attemptIndex] || {}),
+            ...payload
+          };
+        }
+        current.savedAt = (new Date()).toISOString();
+        saveSubjectData(row.code, current);
+      };
+
+      saveBtn.addEventListener('click', () => {
+        const n = parseNum(input.value);
+        if (Number.isNaN(n)) return;
+        persistAttempt({ grade: n, attended: true });
+        renderPendingExamsModal();
+        try{ if (planData) renderGroups(planData); }catch(e){}
+      });
+
+      absentBtn.addEventListener('click', () => {
+        persistAttempt({ grade: null, attended: false });
+        renderPendingExamsModal();
+        try{ if (planData) renderGroups(planData); }catch(e){}
+      });
+
+      tbody.appendChild(tr);
+    });
+  }
   
   // Initialize stats modal event: populate table when shown
   const statsModalEl = document.getElementById('statsModal');
   if (statsModalEl){
     statsModalEl.addEventListener('show.bs.modal', () => {
       populateStatsModalTable();
+    });
+  }
+  const pendingModalEl = document.getElementById('pendingExamsModal');
+  if (pendingModalEl){
+    pendingModalEl.addEventListener('show.bs.modal', () => {
+      renderPendingExamsModal();
     });
   }
   

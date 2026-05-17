@@ -41,6 +41,9 @@
 					<button type="button" class="btn btn-outline-secondary" id="btn-stats" data-bs-toggle="modal" data-bs-target="#statsModal" aria-label="Estadísticas">
 						<i class="bi bi-bar-chart"></i>
 					</button>
+					<button type="button" class="btn btn-outline-warning" id="btn-pending-exams" data-bs-toggle="modal" data-bs-target="#pendingExamsModal" aria-label="Exámenes pendientes">
+						<i class="bi bi-clock-history"></i>
+					</button>
 				</div>
 	
 			</div>
@@ -320,6 +323,39 @@
 		  </div>
 		</div>
 
+		<!-- Pending exams modal -->
+		<div class="modal fade" id="pendingExamsModal" tabindex="-1" aria-labelledby="pendingExamsModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered modal-lg">
+			<div class="modal-content">
+			  <div class="modal-header">
+				<h5 class="modal-title" id="pendingExamsModalLabel">Exámenes pendientes</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			  </div>
+			  <div class="modal-body">
+				<div class="table-responsive">
+				  <table class="table table-sm table-hover">
+					<thead>
+					  <tr>
+						<th>Materia</th>
+						<th>Tipo</th>
+						<th>Instancia</th>
+						<th>Fecha</th>
+						<th style="width: 120px;">Nota</th>
+						<th style="width: 200px;">Acción</th>
+					  </tr>
+					</thead>
+					<tbody id="pending-exams-table-body"></tbody>
+				  </table>
+				</div>
+				<div id="pending-exams-empty" class="text-muted small d-none">No hay exámenes pendientes.</div>
+			  </div>
+			  <div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			  </div>
+			</div>
+		  </div>
+		</div>
+
 		<!-- Small footer -->
 		<footer class="app-footer mt-3">
 			<div class="container-fluid d-flex justify-content-between align-items-center">
@@ -382,6 +418,11 @@
 							<input id="parcial1_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
 							<input id="parcial1_3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
 						</div>
+						<div id="parcial1-date-group" class="input-group mt-1" role="group" aria-label="Fechas primer parcial">
+							<input id="parcial1_1_date" data-attempt="1" type="date" class="form-control" />
+							<input id="parcial1_2_date" data-attempt="2" type="date" class="form-control d-none" />
+							<input id="parcial1_3_date" data-attempt="3" type="date" class="form-control d-none" />
+						</div>
 					</div>
 
 					<!-- SEGUNDO PARCIAL: input-group with three inputs -->
@@ -392,6 +433,11 @@
 							<input id="parcial2_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
 							<input id="parcial2_3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
 						</div>
+						<div id="parcial2-date-group" class="input-group mt-1" role="group" aria-label="Fechas segundo parcial">
+							<input id="parcial2_1_date" data-attempt="1" type="date" class="form-control" />
+							<input id="parcial2_2_date" data-attempt="2" type="date" class="form-control d-none" />
+							<input id="parcial2_3_date" data-attempt="3" type="date" class="form-control d-none" />
+						</div>
 					</div>
 
 					<div class="mb-3 d-none" id="parcial3-wrap">
@@ -400,6 +446,11 @@
 							<input id="parcial3_1" data-attempt="1" type="number" min="0" max="10" step="0.1" class="form-control" placeholder="Ingrese nota" />
 							<input id="parcial3_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
 							<input id="parcial3_3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
+						</div>
+						<div id="parcial3-date-group" class="input-group mt-1" role="group" aria-label="Fechas tercer parcial">
+							<input id="parcial3_1_date" data-attempt="1" type="date" class="form-control" />
+							<input id="parcial3_2_date" data-attempt="2" type="date" class="form-control d-none" />
+							<input id="parcial3_3_date" data-attempt="3" type="date" class="form-control d-none" />
 						</div>
 					</div>
 
@@ -418,6 +469,12 @@
 							<input id="final2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Final 2">
 							<input id="final3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Final 3">
 							<input id="final4" data-attempt="4" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Final 4">
+						</div>
+						<div id="finals-date-group" class="input-group mt-1" role="group" aria-label="Fechas de finales">
+							<input id="final1_date" data-attempt="1" type="date" class="form-control">
+							<input id="final2_date" data-attempt="2" type="date" class="form-control d-none">
+							<input id="final3_date" data-attempt="3" type="date" class="form-control d-none">
+							<input id="final4_date" data-attempt="4" type="date" class="form-control d-none">
 						</div>
 					</div>
 				</form>

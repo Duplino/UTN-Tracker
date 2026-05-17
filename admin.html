@@ -61,164 +61,71 @@
         return Number.isFinite(n) ? n : null;
       }
 
-      function normalizeInstances(value) {
-        if (Array.isArray(value)) {
-          return [toNumOrNull(value[0]), toNumOrNull(value[1]), toNumOrNull(value[2])];
+      function detectModel(entry) {
+        if (entry && (entry.approvalModel === 'standard' || entry.approvalModel === 'with_lab' || entry.approvalModel === 'three_partials')) {
+          return entry.approvalModel;
         }
-        if (value && typeof value === 'object' && Array.isArray(value.instances)) {
-          return [toNumOrNull(value.instances[0]), toNumOrNull(value.instances[1]), toNumOrNull(value.instances[2])];
-        }
-        return [toNumOrNull(value), null, null];
-      }
-
-      function lastNonNull(arr) {
-        for (let i = arr.length - 1; i >= 0; i--) {
-          if (arr[i] !== null) return arr[i];
-        }
-        return null;
-      }
-
-      function extractSubjectEntries(userData) {
-        if (Array.isArray(userData?.subject_data)) return userData.subject_data;
-        const subjectData = userData?.subjectData;
-        if (!subjectData || typeof subjectData !== 'object') return [];
-
-        return Object.keys(subjectData).map((code) => {
-          const entry = subjectData[code] || {};
-          const values = entry.values && typeof entry.values === 'object' ? entry.values : {};
-          let maxPartial = 0;
-          Object.keys(values).forEach((k) => {
-            const m = k.match(/^parcial(\d+)_(\d+)$/);
-            if (m) {
-              const p = Number.parseInt(m[1], 10);
-              if (Number.isFinite(p) && p > maxPartial) maxPartial = p;
-            }
-          });
-          if (maxPartial < 2) maxPartial = 2;
-          const partials = [];
-          for (let p = 1; p <= maxPartial; p++) {
-            partials.push([
-              toNumOrNull(values[`parcial${p}_1`]),
-              toNumOrNull(values[`parcial${p}_2`]),
-              toNumOrNull(values[`parcial${p}_3`])
-            ]);
-          }
-
-          const finalAttempts = [
-            toNumOrNull(values.final1),
-            toNumOrNull(values.final2),
-            toNumOrNull(values.final3),
-            toNumOrNull(values.final4)
-          ].filter((n) => n !== null);
-          const firstFinalPass = finalAttempts.find((n) => n >= 6);
-          const finalGrade = firstFinalPass ?? (finalAttempts.length ? finalAttempts[finalAttempts.length - 1] : null);
-          const status = entry.overrideStatus || entry.status || '';
-
-          return {
-            subject_id: code,
-            partials,
-            final_grade: finalGrade,
-            final_attempts: finalAttempts,
-            regularized: status === 'Regularizada' || status === 'Aprobada' || status === 'Promocionada',
-            approved: status === 'Aprobada' || status === 'Promocionada' || firstFinalPass !== undefined,
-            lab_approved: entry.labApproved === true,
-            approval_model: entry.approvalModel || null,
-            timestamp: entry.savedAt || null
-          };
-        });
-      }
-
-      function detectModel(subject, normalizedPartials) {
-        if (subject?.approval_model === 'with_lab' || subject?.approval_model === 'three_partials' || subject?.approval_model === 'standard') {
-          return subject.approval_model;
-        }
-        if (subject?.lab_approved === true || subject?.has_lab === true || subject?.requires_lab === true) return 'with_lab';
-        if (normalizedPartials.length >= 3) return 'three_partials';
         return 'standard';
       }
 
-      function migrateSubject(subject, events, fallbackTimestamp) {
-        const subjectId = subject?.subject_id || subject?.code || '';
-        const originalPartials = Array.isArray(subject?.partials) ? subject.partials : [];
-        const normalizedPartials = originalPartials.map((p) => normalizeInstances(p));
-        const model = detectModel(subject, normalizedPartials);
-        const targetPartials = model === 'three_partials' ? 3 : 2;
+      function partialCountForModel(model) {
+        return model === 'three_partials' ? 3 : 2;
+      }
+
+      function buildPartials(values, partialCount) {
         const partials = [];
-        for (let i = 0; i < targetPartials; i++) {
-          partials.push(normalizedPartials[i] || [null, null, null]);
+        for (let p = 1; p <= partialCount; p++) {
+          const attempts = [];
+          for (let a = 1; a <= 3; a++) {
+            const grade = toNumOrNull(values[`parcial${p}_${a}`]);
+            const date = values[`parcial${p}_${a}_date`] || null;
+            if (grade !== null || date) {
+              attempts.push({
+                date,
+                grade,
+                attended: grade !== null ? true : null
+              });
+            }
+          }
+          partials.push(attempts);
         }
+        return partials;
+      }
 
-        const first = partials.map((p) => p[0]);
-        const second = partials.map((p) => p[1]);
-        const effective = partials.map((p) => lastNonNull(p));
-        const labApproved = subject?.lab_approved === true;
-
-        let regularized = false;
-        let promoted = false;
-
-        if (model === 'three_partials') {
-          regularized = effective.length === 3 && effective.every((n) => n !== null && n >= 6);
-          promoted = regularized && effective.filter((n) => n !== null && n >= 8).length >= 2;
-        } else {
-          const p1 = effective[0];
-          const p2 = effective[1];
-          regularized = p1 !== null && p2 !== null && p1 >= 6 && p2 >= 6;
-          promoted = (
-            (first[0] !== null && first[1] !== null && first[0] >= 8 && first[1] >= 8) ||
-            (first[0] !== null && first[0] >= 8 && second[1] !== null && second[1] >= 8) ||
-            (first[1] !== null && first[1] >= 8 && second[0] !== null && second[0] >= 8)
-          );
-          if (model === 'with_lab') {
-            regularized = regularized && labApproved;
-            promoted = promoted && labApproved;
+      function buildFinals(values) {
+        const finals = [];
+        for (let i = 1; i <= 4; i++) {
+          const grade = toNumOrNull(values[`final${i}`]);
+          const date = values[`final${i}_date`] || null;
+          if (grade !== null || date) {
+            finals.push({
+              date,
+              grade,
+              attended: grade !== null ? true : null
+            });
           }
         }
-
-        const finalAttempts = Array.isArray(subject?.final_attempts)
-          ? subject.final_attempts.map((n) => toNumOrNull(n)).filter((n) => n !== null)
-          : [];
-        const finalGrade = toNumOrNull(subject?.final_grade);
-        const finalAttemptsUsed = finalAttempts.length || (finalGrade !== null ? 1 : 0);
-        const finalPassed = !promoted && ((subject?.approved === true) || (finalGrade !== null && finalGrade >= 6));
-        const finalFailed = !promoted && !finalPassed && finalGrade !== null && finalGrade < 6;
-        const timestamp = subject?.timestamp || fallbackTimestamp;
-
-        if (subjectId) {
-          if (finalPassed) {
-            events.push({ type: "final_passed", subject_id: subjectId, timestamp });
-          } else if (finalFailed) {
-            events.push({ type: "final_failed", subject_id: subjectId, timestamp });
-          }
-        }
-
-        return {
-          subject_id: subjectId,
-          rule: model === 'with_lab'
-            ? { type: 'with_lab', partials_required: 2, max_instances_per_partial: 3, requires_lab: true }
-            : model === 'three_partials'
-              ? { type: 'three_partials', partials_required: 3, max_instances_per_partial: 3 }
-              : { type: 'standard', partials_required: 2, max_instances_per_partial: 3 },
-          evaluations: {
-            partials: partials.map((instances) => ({ instances })),
-            ...(model === 'with_lab' ? { lab_approved: labApproved } : {})
-          },
-          status: {
-            regularized,
-            promoted,
-            final_required: regularized && !promoted && !finalPassed,
-            final_attempts_used: finalAttemptsUsed
-          }
-        };
+        return finals;
       }
 
       function migrateUserData(userData) {
-        const timestamp = new Date().toISOString();
-        const sourceSubjects = extractSubjectEntries(userData);
-        const academicEvents = [];
-        const subjects = sourceSubjects
-          .map((subject) => migrateSubject(subject || {}, academicEvents, timestamp))
-          .filter((subject) => subject.subject_id);
-        return { subjects, academic_events: academicEvents };
+        const source = userData && userData.subjectData && typeof userData.subjectData === 'object' ? userData.subjectData : {};
+        const subjects = Object.keys(source).map((subjectId) => {
+          const entry = source[subjectId] || {};
+          const values = entry.values && typeof entry.values === 'object' ? entry.values : {};
+          const model = detectModel(entry);
+          const partialCount = partialCountForModel(model);
+          return {
+            subject_id: subjectId,
+            approval_model: model,
+            exams: {
+              partials: buildPartials(values, partialCount),
+              finals: buildFinals(values)
+            },
+            lab_approved: entry.labApproved === true
+          };
+        });
+        return { subjects };
       }
 
       async function runMigration() {
