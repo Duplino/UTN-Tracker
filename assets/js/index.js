@@ -1489,11 +1489,12 @@ document.addEventListener('DOMContentLoaded', () => {
               const dateEl = document.getElementById((PARTIAL_DATE_IDS[p] || [])[i] || '');
               const grade = gradeEl ? parseNum(gradeEl.value) : NaN;
               const date = dateEl && dateEl.value ? dateEl.value : null;
+              const normalizedGrade = Number.isNaN(grade) ? null : grade;
               const key = getPartialAttemptKey(i);
               storedObj.exams.partials[p - 1][key] = {
                 date,
-                grade: Number.isNaN(grade) ? null : grade,
-                attended: Number.isNaN(grade) ? null : true
+                grade: normalizedGrade,
+                attended: normalizedGrade !== null ? true : null
               };
             }
           }
@@ -1503,10 +1504,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const grade = gradeEl ? parseNum(gradeEl.value) : NaN;
             const date = dateEl && dateEl.value ? dateEl.value : null;
             if (!Number.isNaN(grade) || date){
+              const normalizedGrade = Number.isNaN(grade) ? null : grade;
               storedObj.exams.finals.push({
                 date,
-                grade: Number.isNaN(grade) ? null : grade,
-                attended: Number.isNaN(grade) ? null : true
+                grade: normalizedGrade,
+                attended: normalizedGrade !== null ? true : null
               });
             }
           }
