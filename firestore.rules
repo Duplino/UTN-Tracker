@@ -2,6 +2,9 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAdminEmail() {
+      return request.auth != null && request.auth.token.email == "fscaliseg@gmail.com";
+    }
 
     // Users documents: allow read if the user document has `public == true`,
     // otherwise only the authenticated owner (uid == userId) can read/write.
@@ -12,6 +15,11 @@ service cloud.firestore {
 
       // Writes (create/update/delete) are only allowed to the owner.
       allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // users-dev documents: admin-only access for migration/testing.
+    match /users-dev/{userId} {
+      allow read, write: if isAdminEmail();
     }
 
     // Default: deny access to other collections unless explicitly allowed below.

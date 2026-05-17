@@ -365,6 +365,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check if a subject can be promoted (both parciales >=6 but at least one <8)
   function canPromote(stored) {
     if (!stored || !stored.values) return false;
+    const model = stored.approvalModel || 'standard';
+    if (model === 'three_partials') return false;
+    if (model === 'with_lab' && stored.labApproved !== true) return false;
     // Get best parcial values
     let p1 = NaN, p2 = NaN;
     for (let i = 3; i >= 1; i--) {
@@ -576,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // clear inputs
-      ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
+      ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','parcial3_1','parcial3_2','parcial3_3','final1','final2','final3','final4'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -585,13 +588,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const p1_3 = document.getElementById('parcial1_3');
       const p2_2 = document.getElementById('parcial2_2');
       const p2_3 = document.getElementById('parcial2_3');
+      const p3_2 = document.getElementById('parcial3_2');
+      const p3_3 = document.getElementById('parcial3_3');
       if (p1_2) { p1_2.placeholder = 'Debe Recuperar'; p1_2.classList.add('d-none'); }
       if (p1_3) { p1_3.placeholder = 'Debe Recuperar'; p1_3.classList.add('d-none'); }
       if (p2_2) { p2_2.placeholder = 'Debe Recuperar'; p2_2.classList.add('d-none'); }
       if (p2_3) { p2_3.placeholder = 'Debe Recuperar'; p2_3.classList.add('d-none'); }
+      if (p3_2) { p3_2.placeholder = 'Debe Recuperar'; p3_2.classList.add('d-none'); }
+      if (p3_3) { p3_3.placeholder = 'Debe Recuperar'; p3_3.classList.add('d-none'); }
+      const labEl = document.getElementById('lab-approved');
+      if (labEl) labEl.checked = false;
       // ensure only first parcial attempt visible initially
       showPartialAttemptsUpTo(1,1);
       showPartialAttemptsUpTo(2,1);
+      showPartialAttemptsUpTo(3,0);
       // hide finals
       showFinalsUpTo(0);
       // clear status banner
@@ -1004,6 +1014,86 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Subject modal behavior
   let currentCard = null;
+  const APPROVAL_MODEL_LABELS = {
+    standard: 'Estándar',
+    with_lab: 'Con laboratorio',
+    three_partials: '3 parciales'
+  };
+
+  function getStoredApprovalModel(code){
+    const stored = loadSubjectData(code || '');
+    if (!stored) return 'standard';
+    if (stored.approvalModel === 'standard' || stored.approvalModel === 'with_lab' || stored.approvalModel === 'three_partials') return stored.approvalModel;
+    try{
+      const values = stored.values || {};
+      const hasThirdPartial = ['parcial3_1','parcial3_2','parcial3_3'].some(k => values[k] !== null && values[k] !== undefined && values[k] !== '');
+      if (hasThirdPartial) return 'three_partials';
+    }catch(e){}
+    return 'standard';
+  }
+
+  function getCurrentApprovalModel(){
+    const btn = document.getElementById('subject-approval-model-btn');
+    const m = btn && btn.dataset ? btn.dataset.model : '';
+    if (m === 'with_lab' || m === 'three_partials' || m === 'standard') return m;
+    return 'standard';
+  }
+
+  function applyApprovalModelUI(model){
+    const normalizedModel = (model === 'with_lab' || model === 'three_partials') ? model : 'standard';
+    const btn = document.getElementById('subject-approval-model-btn');
+    const partial3Wrap = document.getElementById('parcial3-wrap');
+    const labWrap = document.getElementById('lab-approved-wrap');
+    if (btn){
+      btn.dataset.model = normalizedModel;
+      btn.title = `Modelo: ${APPROVAL_MODEL_LABELS[normalizedModel] || 'Estándar'}`;
+      btn.setAttribute('aria-label', `Modelo: ${APPROVAL_MODEL_LABELS[normalizedModel] || 'Estándar'}`);
+    }
+    if (partial3Wrap){
+      if (normalizedModel === 'three_partials') partial3Wrap.classList.remove('d-none');
+      else partial3Wrap.classList.add('d-none');
+    }
+    if (labWrap){
+      if (normalizedModel === 'with_lab') labWrap.classList.remove('d-none');
+      else labWrap.classList.add('d-none');
+    }
+    if (normalizedModel !== 'three_partials'){
+      showPartialAttemptsUpTo(3, 0);
+    } else {
+      showPartialAttemptsUpTo(3, 1);
+    }
+  }
+
+  function syncApprovalMenuState(model){
+    const menu = document.getElementById('subject-approval-model-menu');
+    if (!menu) return;
+    const items = menu.querySelectorAll('[data-model]');
+    items.forEach((it) => {
+      const itemModel = it.dataset.model || 'standard';
+      it.classList.toggle('active', itemModel === model);
+    });
+  }
+
+  function bindApprovalModelMenu(code){
+    const menu = document.getElementById('subject-approval-model-menu');
+    if (!menu) return;
+    const items = menu.querySelectorAll('[data-model]');
+    items.forEach((item) => {
+      item.onclick = (ev) => {
+        ev.preventDefault();
+        const nextModel = item.dataset.model || 'standard';
+        applyApprovalModelUI(nextModel);
+        syncApprovalMenuState(nextModel);
+        const stored = loadSubjectData(code) || { values: {} };
+        stored.approvalModel = nextModel;
+        if (nextModel !== 'with_lab') stored.labApproved = false;
+        if (!stored.values) stored.values = {};
+        saveSubjectData(code, stored);
+        updateSubjectStatus();
+      };
+    });
+  }
+
   function onCardClick(e){
     // open modal and populate minimal info
     currentCard = e.currentTarget;
@@ -1025,6 +1115,10 @@ document.addEventListener('DOMContentLoaded', () => {
       name = clone.textContent.trim() || code;
     }
     titleEl.textContent = `${name} ${code ? '(' + code + ')' : ''}`;
+    const initialModel = getStoredApprovalModel(code);
+    applyApprovalModelUI(initialModel);
+    syncApprovalMenuState(initialModel);
+    bindApprovalModelMenu(code);
     
     // Always display recursedCount badge in modal header (starting from "Cursada I"), make it clickable to edit
     const existingRecursedBadge = document.getElementById('subject-recursed-badge');
@@ -1074,7 +1168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
 
     // clear inputs for now (new layout: parciales with 3 fields each)
-    ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
+    ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','parcial3_1','parcial3_2','parcial3_3','final1','final2','final3','final4'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
@@ -1083,10 +1177,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const p1_3 = document.getElementById('parcial1_3');
     const p2_2 = document.getElementById('parcial2_2');
     const p2_3 = document.getElementById('parcial2_3');
+    const p3_2 = document.getElementById('parcial3_2');
+    const p3_3 = document.getElementById('parcial3_3');
     if (p1_2) { p1_2.placeholder = 'Debe Recuperar'; p1_2.classList.add('d-none'); }
     if (p1_3) { p1_3.placeholder = 'Debe Recuperar'; p1_3.classList.add('d-none'); }
     if (p2_2) { p2_2.placeholder = 'Debe Recuperar'; p2_2.classList.add('d-none'); }
     if (p2_3) { p2_3.placeholder = 'Debe Recuperar'; p2_3.classList.add('d-none'); }
+    if (p3_2) { p3_2.placeholder = 'Debe Recuperar'; p3_2.classList.add('d-none'); }
+    if (p3_3) { p3_3.placeholder = 'Debe Recuperar'; p3_3.classList.add('d-none'); }
+    const labInput = document.getElementById('lab-approved');
+    if (labInput) labInput.checked = false;
     // ensure only first parcial attempt visible initially
     const p1group = document.getElementById('parcial1-group'); if (p1group) p1group.classList.remove('d-none');
     const p2group = document.getElementById('parcial2-group'); if (p2group) p2group.classList.remove('d-none');
@@ -1098,7 +1198,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const bsModal = new bootstrap.Modal(modalEl);
       bsModal.show();
       // wire live status updates: listen to partials and finals and recalc
-      const partialIds = ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3'];
+      const partialIds = ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','parcial3_1','parcial3_2','parcial3_3'];
       const finalIds = ['final1','final2','final3','final4'];
       function bindLiveInputs(){
         partialIds.concat(finalIds).forEach(id => {
@@ -1112,24 +1212,44 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleRecursarButton(code);
           });
         });
+        const labEl = document.getElementById('lab-approved');
+        if (labEl){
+          labEl.onchange = () => {
+            const currentStored = loadSubjectData(code) || { values: {} };
+            currentStored.labApproved = !!labEl.checked;
+            currentStored.approvalModel = getCurrentApprovalModel();
+            if (!currentStored.values) currentStored.values = {};
+            saveSubjectData(code, currentStored);
+            clearOverrideFor(code);
+            updateSubjectStatus();
+          };
+        }
       }
       // If we have saved data for this subject, populate fields
       const stored = loadSubjectData(code || name);
       if (stored && stored.values){
         Object.keys(stored.values).forEach(id => {
           const el = document.getElementById(id);
-          if (el && stored.values[id] !== null && stored.values[id] !== undefined){
-            el.value = stored.values[id];
-            // Ensure visibility for attempts/finals that were stored
-            if (id.startsWith('parcial1_')) showPartialAttemptsUpTo(1, Math.max(1, parseInt(id.split('_')[1] || '1')));
-            if (id.startsWith('parcial2_')) showPartialAttemptsUpTo(2, Math.max(1, parseInt(id.split('_')[1] || '1')));
-            if (id.startsWith('final')){
-              // determine how many finals should be visible based on highest final index with value
-              const idx = parseInt(id.replace('final','') || '1');
+            if (el && stored.values[id] !== null && stored.values[id] !== undefined){
+              el.value = stored.values[id];
+              // Ensure visibility for attempts/finals that were stored
+              if (id.startsWith('parcial1_')) showPartialAttemptsUpTo(1, Math.max(1, parseInt(id.split('_')[1] || '1')));
+              if (id.startsWith('parcial2_')) showPartialAttemptsUpTo(2, Math.max(1, parseInt(id.split('_')[1] || '1')));
+              if (id.startsWith('parcial3_')) showPartialAttemptsUpTo(3, Math.max(1, parseInt(id.split('_')[1] || '1')));
+              if (id.startsWith('final')){
+                // determine how many finals should be visible based on highest final index with value
+                const idx = parseInt(id.replace('final','') || '1');
               showFinalsUpTo(idx);
             }
           }
         });
+      }
+      if (stored && typeof stored.labApproved !== 'undefined' && labInput){
+        labInput.checked = !!stored.labApproved;
+      }
+      if (stored && stored.approvalModel){
+        applyApprovalModelUI(stored.approvalModel);
+        syncApprovalMenuState(stored.approvalModel);
       }
       // ensure finals container initially hidden until status logic decides
       const finalsContainer = document.getElementById('finals-container');
@@ -1174,7 +1294,7 @@ document.addEventListener('DOMContentLoaded', () => {
           let prevAvailable = [];
           try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
           // create minimal stored object
-          const obj = { values: {}, status: 'Faltan examenes', savedAt: (new Date()).toISOString() };
+          const obj = { values: {}, status: 'Faltan examenes', savedAt: (new Date()).toISOString(), approvalModel: getCurrentApprovalModel(), labApproved: !!(document.getElementById('lab-approved') && document.getElementById('lab-approved').checked) };
           saveSubjectData(effectiveCode, obj);
 
           // If this modal was opened for an electiva selection and we have a pending insert target,
@@ -1253,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', () => {
           let prevAvailable = [];
           try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
           const values = {};
-          ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
+          ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','parcial3_1','parcial3_2','parcial3_3','final1','final2','final3','final4'].forEach(id => {
             const i = document.getElementById(id);
             values[id] = i ? i.value : null;
           });
@@ -1262,7 +1382,13 @@ document.addEventListener('DOMContentLoaded', () => {
           const statusTextEl = document.getElementById('subject-status-text');
           const statusText = statusTextEl ? statusTextEl.textContent.trim() : '';
           // persist to localStorage
-          const storedObj = { values, status: statusText, savedAt: (new Date()).toISOString() };
+          const storedObj = {
+            values,
+            status: statusText,
+            savedAt: (new Date()).toISOString(),
+            approvalModel: getCurrentApprovalModel(),
+            labApproved: !!(document.getElementById('lab-approved') && document.getElementById('lab-approved').checked)
+          };
           // Do NOT preserve existing override: saving the modal should clear any manual override
           // so the computed status (from the entered notes) becomes the source of truth.
           saveSubjectData(code || name, storedObj);
@@ -1464,102 +1590,94 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateSubjectStatus(){
-    // read partial attempts (attempts are ordered: 1=first try, 2=recup1, 3=recup2)
-    const p1 = [document.getElementById('parcial1_1'),document.getElementById('parcial1_2'),document.getElementById('parcial1_3')];
-    const p2 = [document.getElementById('parcial2_1'),document.getElementById('parcial2_2'),document.getElementById('parcial2_3')];
-    const p1_vals = p1.map(i => i ? i.value : '');
-    const p2_vals = p2.map(i => i ? i.value : '');
-    const p1_first = parseNum(p1_vals[0]);
-    const p2_first = parseNum(p2_vals[0]);
+    const model = getCurrentApprovalModel();
+    const partialTotal = model === 'three_partials' ? 3 : 2;
+    const labApproved = !!(document.getElementById('lab-approved') && document.getElementById('lab-approved').checked);
+    const partialGroups = [];
+    for (let p = 1; p <= partialTotal; p++){
+      partialGroups.push({
+        idx: p,
+        els: [1,2,3].map(i => document.getElementById(`parcial${p}_${i}`)).filter(Boolean)
+      });
+      showPartialAttemptsUpTo(p, 1);
+    }
+    if (partialTotal !== 3) showPartialAttemptsUpTo(3, 0);
 
-    // compute averages across provided attempts for regularizada check
-    const p1_avg = avgOf(p1_vals);
-    const p2_avg = avgOf(p2_vals);
+    const finals = [document.getElementById('final1'),document.getElementById('final2'),document.getElementById('final3'),document.getElementById('final4')].filter(Boolean);
+    const finalsVals = finals.map(f => parseNum(f.value));
 
-    // finals values
-    const finals = [document.getElementById('final1'),document.getElementById('final2'),document.getElementById('final3'),document.getElementById('final4')];
-    const finalsVals = finals.map(f => f ? parseNum(f.value) : NaN);
-
-    // Reset: hide all partial recuperatories; we will reveal those needed
-    showPartialAttemptsUpTo(1,1);
-    showPartialAttemptsUpTo(2,1);
-
-    // Helper to detect filled attempts count per parcial
     function lastAttemptValue(attemptEls){
       for (let i = attemptEls.length - 1; i >= 0; i--){
         const v = attemptEls[i] ? parseNum(attemptEls[i].value) : NaN;
-        if (!Number.isNaN(v)) return {value: v, index: i+1};
+        if (!Number.isNaN(v)) return { value: v, index: i + 1 };
       }
-      return {value: NaN, index: 0};
+      return { value: NaN, index: 0 };
     }
 
-    // Promotion logic with at most ONE recuperatory allowed across both partials
-    // Case 1: both first tries >=8 => promocionada
-    if (!Number.isNaN(p1_first) && !Number.isNaN(p2_first) && p1_first >= 8 && p2_first >= 8){
-      showFinalsUpTo(0);
-      setStatusBanner('Promocionada');
-      return;
-    }
-
-    // Detect presence of notas per parcial. If some notas are missing we still want to
-    // run the recovery / "Debe Recuperar" calculation for the parcial(s) that have values.
-    // We will mark a 'faltanNotas' flag and avoid early returning so the UI shows recuperatories
-    // while keeping finals hidden and the banner as 'Faltan notas' when appropriate.
-    const p1_hasNote = p1_vals.map(v=>parseNum(v)).some(n=>!Number.isNaN(n));
-    const p2_hasNote = p2_vals.map(v=>parseNum(v)).some(n=>!Number.isNaN(n));
-    const faltanNotas = (!p1_hasNote || !p2_hasNote);
-    if (faltanNotas){
-      // keep finals hidden while notes are incomplete, but continue computing recuperatories
-      showFinalsUpTo(0);
-      // don't return here; continue to run recovery/placeholder logic below
-    }
-
-    // Case 2: one first >=8 and the other <8 -> allow ONE recuperatory on the lower one to try to reach >=8
-    let promotionCandidate = null; // {partialIndex:1|2}
-    if (!Number.isNaN(p1_first) && !Number.isNaN(p2_first)){
-      if (p1_first >= 8 && p2_first < 8) promotionCandidate = 2;
-      else if (p2_first >= 8 && p1_first < 8) promotionCandidate = 1;
-    }
-
-    if (promotionCandidate){
-      // show recuperatory attempt 2 for the candidate with placeholder 'Puede promocionar'
-      const candidateEls = promotionCandidate === 1 ? p1 : p2;
-      const otherFirst = promotionCandidate === 1 ? p2_first : p1_first;
-      // reveal attempt2 for the candidate
-      showPartialAttemptsUpTo(promotionCandidate, 2);
-      const attempt2 = candidateEls[1];
-      if (attempt2){
-        attempt2.placeholder = 'Puede promocionar';
-        attempt2.classList.remove('d-none');
+    function resolveRegularizedWithFinals(){
+      let attemptsToShow = 1;
+      for (let i = 0; i < finalsVals.length; i++){
+        const v = finalsVals[i];
+        if (Number.isNaN(v)) break;
+        if (v < 6) attemptsToShow = i + 2;
+        else {
+          showFinalsUpTo(i + 1);
+          setStatusBanner('Aprobada');
+          return;
+        }
       }
-      // check if attempt2 filled and >=8 -> promocionada
-      const attempt2val = attempt2 ? parseNum(attempt2.value) : NaN;
-      if (!Number.isNaN(attempt2val) && attempt2val >= 8){
-        // promotion achieved via single recuperatory
+      if (attemptsToShow > finals.length) attemptsToShow = finals.length;
+      showFinalsUpTo(attemptsToShow);
+      setStatusBanner('Regularizada');
+    }
+
+    let promotionCandidate = null;
+    if (model !== 'three_partials'){
+      const p1First = partialGroups[0] && partialGroups[0].els[0] ? parseNum(partialGroups[0].els[0].value) : NaN;
+      const p2First = partialGroups[1] && partialGroups[1].els[0] ? parseNum(partialGroups[1].els[0].value) : NaN;
+      const labOkForPromo = model !== 'with_lab' || labApproved;
+
+      if (!Number.isNaN(p1First) && !Number.isNaN(p2First) && p1First >= 8 && p2First >= 8 && labOkForPromo){
         showFinalsUpTo(0);
         setStatusBanner('Promocionada');
         return;
       }
-      // If attempt2 filled but <8, promotion lost for this subject; fall through to recovery/regularized logic below
+
+      if (!Number.isNaN(p1First) && !Number.isNaN(p2First)){
+        if (p1First >= 8 && p2First < 8) promotionCandidate = 2;
+        else if (p2First >= 8 && p1First < 8) promotionCandidate = 1;
+      }
+
+      if (promotionCandidate){
+        const candidate = partialGroups.find(g => g.idx === promotionCandidate);
+        if (candidate){
+          showPartialAttemptsUpTo(candidate.idx, 2);
+          const attempt2 = candidate.els[1];
+          if (attempt2){
+            attempt2.placeholder = 'Puede promocionar';
+            attempt2.classList.remove('d-none');
+            const attempt2Val = parseNum(attempt2.value);
+            if (!Number.isNaN(attempt2Val) && attempt2Val >= 8 && labOkForPromo){
+              showFinalsUpTo(0);
+              setStatusBanner('Promocionada');
+              return;
+            }
+          }
+        }
+      }
     }
 
-    // Recovery logic for partials: if a parcial's (latest visible) attempt < 6, reveal next recuperatory(s)
-    // For each parcial, reveal next attempt when needed and set proper placeholders
-    [ {els: p1, idx:1}, {els: p2, idx:2} ].forEach(part => {
-      const firstVal = parseNum(part.els[0] ? part.els[0].value : '');
-      // If first attempt <6 or if second attempt already filled and <6, reveal next
+    partialGroups.forEach((part) => {
+      const firstVal = part.els[0] ? parseNum(part.els[0].value) : NaN;
       if (!Number.isNaN(firstVal) && firstVal < 6){
-        // reveal attempt2
         showPartialAttemptsUpTo(part.idx, 2);
         const a2 = part.els[1];
         if (a2){
-          // If this parcial was the promotion candidate, show 'Puede promocionar', otherwise 'Debe Recuperar'
-          if (promotionCandidate === part.idx) a2.placeholder = 'Puede promocionar'; else a2.placeholder = 'Debe Recuperar';
+          a2.placeholder = (promotionCandidate === part.idx) ? 'Puede promocionar' : 'Debe Recuperar';
           a2.classList.remove('d-none');
         }
-        const a2val = a2 ? parseNum(a2.value) : NaN;
-        if (!Number.isNaN(a2val) && a2val < 6){
-          // reveal third recuperatory
+        const a2Val = a2 ? parseNum(a2.value) : NaN;
+        if (!Number.isNaN(a2Val) && a2Val < 6){
           showPartialAttemptsUpTo(part.idx, 3);
           const a3 = part.els[2];
           if (a3) a3.classList.remove('d-none');
@@ -1567,59 +1685,41 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // After recovery attempts visibility, compute effective last-attempt values for regularizada
-    const p1_last_info = lastAttemptValue(p1);
-    const p2_last_info = lastAttemptValue(p2);
-    const p1_last = p1_last_info.value;
-    const p2_last = p2_last_info.value;
-    if (!Number.isNaN(p1_last) && !Number.isNaN(p2_last) && p1_last >= 6 && p2_last >= 6){
-      // Regularizada path: show finals progressively as before
-      let attemptsToShow = 1;
-      for (let i=0;i<finalsVals.length;i++){
-        const v = finalsVals[i];
-        if (Number.isNaN(v)) break;
-        if (v < 6) attemptsToShow = i+2; else { showFinalsUpTo(i+1); setStatusBanner('Aprobada'); return; }
-      }
-      if (attemptsToShow > finals.length) attemptsToShow = finals.length;
-      showFinalsUpTo(attemptsToShow);
-      setStatusBanner('Regularizada');
-      return;
-    }
+    const lastInfos = partialGroups.map((p) => lastAttemptValue(p.els));
+    const effective = lastInfos.map((info) => info.value);
+    const hasAllRequiredNotes = partialGroups.every((p) => p.els.some((el) => !Number.isNaN(parseNum(el.value))));
+    const anyExhaustedFailed = lastInfos.some((info) => info.index === 3 && !Number.isNaN(info.value) && info.value < 6);
 
-    // If any parcial has exhausted all attempts (index === 3) and the last value is <6, the subject is Desaprobada
-    if ((p1_last_info.index === 3 && !Number.isNaN(p1_last_info.value) && p1_last_info.value < 6) ||
-        (p2_last_info.index === 3 && !Number.isNaN(p2_last_info.value) && p2_last_info.value < 6)){
+    if (model === 'three_partials'){
+      const regularized = effective.length === 3 && effective.every((n) => !Number.isNaN(n) && n >= 6);
+      if (regularized){
+        const promotedCount = effective.filter((n) => !Number.isNaN(n) && n >= 8).length;
+        if (promotedCount >= 2){
+          showFinalsUpTo(0);
+          setStatusBanner('Promocionada');
+          return;
+        }
+        resolveRegularizedWithFinals();
+        return;
+      }
       showFinalsUpTo(0);
-      // If notes are missing, prefer showing 'Faltan notas' instead of marking Desaprobada
-      if (faltanNotas){
-        setStatusBanner('Faltan notas');
-      } else {
-        setStatusBanner('Desaprobada');
-      }
+      if (!hasAllRequiredNotes) setStatusBanner('Faltan notas');
+      else if (anyExhaustedFailed) setStatusBanner('Desaprobada');
+      else setStatusBanner('No regularizada');
       return;
     }
 
-    // Fallback: not regularizada, not promocionada -> either 'No regularizada' if there are remaining attempts, or 'Desaprobada' when all attempts exhausted
-    // Check if any partial or final attempt slots are still available (empty)
-    const partialAttemptEls = p1.concat(p2).filter(Boolean);
-    const partialRemaining = partialAttemptEls.some(el => {
-      const v = el.value; return v === null || v === undefined || v === '';
-    });
-    const finalEls = finals.filter(Boolean);
-    const finalRemaining = finalEls.some(el => {
-      const v = el.value; return v === null || v === undefined || v === '';
-    });
-    showFinalsUpTo(0);
-    // If some notas are missing, show that message instead of inferring No regularizada / Desaprobada
-    if (faltanNotas){
-      setStatusBanner('Faltan notas');
+    const regularizedBase = effective.length >= 2 && !Number.isNaN(effective[0]) && !Number.isNaN(effective[1]) && effective[0] >= 6 && effective[1] >= 6;
+    const regularized = model === 'with_lab' ? (regularizedBase && labApproved) : regularizedBase;
+    if (regularized){
+      resolveRegularizedWithFinals();
       return;
     }
-    if (partialRemaining || finalRemaining){
-      setStatusBanner('No regularizada');
-    } else {
-      setStatusBanner('Desaprobada');
-    }
+
+    showFinalsUpTo(0);
+    if (!hasAllRequiredNotes) setStatusBanner('Faltan notas');
+    else if (anyExhaustedFailed) setStatusBanner('Desaprobada');
+    else setStatusBanner('No regularizada');
   }
 
   // Overlay and arrows
@@ -2444,10 +2544,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
               }
             } else if (status === 'Promocionada' && stored && stored.values){
-              let p1 = NaN, p2 = NaN;
+              const model = stored.approvalModel || 'standard';
+              let p1 = NaN, p2 = NaN, p3 = NaN;
               for (let i = 3; i >= 1; i--){ const v = stored.values['parcial1_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p1 = n; break; } }
               for (let i = 3; i >= 1; i--){ const v = stored.values['parcial2_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p2 = n; break; } }
-              if (!Number.isNaN(p1) && !Number.isNaN(p2)) grade = Math.round((p1 + p2) / 2);
+              if (model === 'three_partials'){
+                for (let i = 3; i >= 1; i--){ const v = stored.values['parcial3_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p3 = n; break; } }
+              }
+              if (model === 'three_partials'){
+                if (!Number.isNaN(p1) && !Number.isNaN(p2) && !Number.isNaN(p3)) grade = Math.round((p1 + p2 + p3) / 3);
+              } else {
+                if (!Number.isNaN(p1) && !Number.isNaN(p2)) grade = Math.round((p1 + p2) / 2);
+              }
             }
           }catch(e){}
           if (!Number.isNaN(grade)){

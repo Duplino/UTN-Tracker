@@ -360,6 +360,16 @@
 		    <div class="modal-content">
 		      <div class="modal-header">
 		        <h5 class="modal-title" id="subjectModalLabel">Materia</h5>
+		        <div class="dropdown ms-auto me-2">
+		          <button class="btn btn-outline-secondary btn-sm" type="button" id="subject-approval-model-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Cambiar modelo de aprobación" title="Cambiar modelo de aprobación">
+		            <i class="bi bi-gear"></i>
+		          </button>
+		          <ul class="dropdown-menu dropdown-menu-end" id="subject-approval-model-menu">
+		            <li><a class="dropdown-item" href="#" data-model="standard">Estándar (2 parciales)</a></li>
+		            <li><a class="dropdown-item" href="#" data-model="with_lab">Con laboratorio</a></li>
+		            <li><a class="dropdown-item" href="#" data-model="three_partials">3 parciales</a></li>
+		          </ul>
+		        </div>
 		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
 		      </div>
 		      <div class="modal-body">
@@ -382,6 +392,22 @@
 							<input id="parcial2_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
 							<input id="parcial2_3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
 						</div>
+					</div>
+
+					<div class="mb-3 d-none" id="parcial3-wrap">
+						<label class="form-label">Tercer Parcial</label>
+						<div id="parcial3-group" class="input-group" role="group" aria-label="Tercer parcial">
+							<input id="parcial3_1" data-attempt="1" type="number" min="0" max="10" step="0.1" class="form-control" placeholder="Ingrese nota" />
+							<input id="parcial3_2" data-attempt="2" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
+							<input id="parcial3_3" data-attempt="3" type="number" min="0" max="10" step="0.1" class="form-control d-none" placeholder="Debe Recuperar" />
+						</div>
+					</div>
+
+					<div class="form-check mb-3 d-none" id="lab-approved-wrap">
+						<input class="form-check-input" type="checkbox" id="lab-approved">
+						<label class="form-check-label" for="lab-approved">
+							Laboratorio aprobado
+						</label>
 					</div>
 
 					<!-- Finales: four inputs on a single group row -->

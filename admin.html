@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UTN Tracker - Admin Migración</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body>
+    <main class="container py-4">
+      <h1 class="h4 mb-3">Migración users → users-dev</h1>
+
+      <div class="card">
+        <div class="card-body">
+          <div id="auth-state" class="mb-3 text-muted">Iniciá sesión para continuar.</div>
+          <div class="d-flex gap-2 flex-wrap mb-3">
+            <button id="btn-signin" type="button" class="btn btn-primary">Iniciar con Google</button>
+            <button id="btn-signout" type="button" class="btn btn-outline-secondary d-none">Cerrar sesión</button>
+          </div>
+          <button id="btn-migrate" type="button" class="btn btn-danger" disabled>Ejecutar migración</button>
+          <div id="migration-status" class="mt-3 small text-muted"></div>
+        </div>
+      </div>
+    </main>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+      import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+      import { collection, doc, getDocs, getFirestore, writeBatch } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+      const ADMIN_EMAIL = "fscaliseg@gmail.com";
+      const firebaseConfig = {
+        apiKey: "AIzaSyB4n2_ZY0tBjwMzoQqvjjUHlqD0Yu6Dr0A",
+        authDomain: "utntracker.firebaseapp.com",
+        projectId: "utntracker",
+        storageBucket: "utntracker.firebasestorage.app",
+        messagingSenderId: "791264678302",
+        appId: "1:791264678302:web:e637c2e3b499614683868f",
+        measurementId: "G-T4WYQC67SW"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+      const db = getFirestore(app);
+
+      const authStateEl = document.getElementById('auth-state');
+      const statusEl = document.getElementById('migration-status');
+      const btnSignin = document.getElementById('btn-signin');
+      const btnSignout = document.getElementById('btn-signout');
+      const btnMigrate = document.getElementById('btn-migrate');
+
+      function setStatus(msg) {
+        statusEl.textContent = msg || '';
+      }
+
+      function toNumOrNull(v) {
+        if (v === null || v === undefined || v === '') return null;
+        const n = Number.parseFloat(String(v).replace(',', '.'));
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function normalizeInstances(value) {
+        if (Array.isArray(value)) {
+          return [toNumOrNull(value[0]), toNumOrNull(value[1]), toNumOrNull(value[2])];
+        }
+        if (value && typeof value === 'object' && Array.isArray(value.instances)) {
+          return [toNumOrNull(value.instances[0]), toNumOrNull(value.instances[1]), toNumOrNull(value.instances[2])];
+        }
+        return [toNumOrNull(value), null, null];
+      }
+
+      function lastNonNull(arr) {
+        for (let i = arr.length - 1; i >= 0; i--) {
+          if (arr[i] !== null) return arr[i];
+        }
+        return null;
+      }
+
+      function extractSubjectEntries(userData) {
+        if (Array.isArray(userData?.subject_data)) return userData.subject_data;
+        const subjectData = userData?.subjectData;
+        if (!subjectData || typeof subjectData !== 'object') return [];
+
+        return Object.keys(subjectData).map((code) => {
+          const entry = subjectData[code] || {};
+          const values = entry.values && typeof entry.values === 'object' ? entry.values : {};
+          let maxPartial = 0;
+          Object.keys(values).forEach((k) => {
+            const m = k.match(/^parcial(\d+)_(\d+)$/);
+            if (m) {
+              const p = Number.parseInt(m[1], 10);
+              if (Number.isFinite(p) && p > maxPartial) maxPartial = p;
+            }
+          });
+          if (maxPartial < 2) maxPartial = 2;
+          const partials = [];
+          for (let p = 1; p <= maxPartial; p++) {
+            partials.push([
+              toNumOrNull(values[`parcial${p}_1`]),
+              toNumOrNull(values[`parcial${p}_2`]),
+              toNumOrNull(values[`parcial${p}_3`])
+            ]);
+          }
+
+          const finalAttempts = [
+            toNumOrNull(values.final1),
+            toNumOrNull(values.final2),
+            toNumOrNull(values.final3),
+            toNumOrNull(values.final4)
+          ].filter((n) => n !== null);
+          const firstFinalPass = finalAttempts.find((n) => n >= 6);
+          const finalGrade = firstFinalPass ?? (finalAttempts.length ? finalAttempts[finalAttempts.length - 1] : null);
+          const status = entry.overrideStatus || entry.status || '';
+
+          return {
+            subject_id: code,
+            partials,
+            final_grade: finalGrade,
+            final_attempts: finalAttempts,
+            regularized: status === 'Regularizada' || status === 'Aprobada' || status === 'Promocionada',
+            approved: status === 'Aprobada' || status === 'Promocionada' || firstFinalPass !== undefined,
+            lab_approved: entry.labApproved === true,
+            approval_model: entry.approvalModel || null,
+            timestamp: entry.savedAt || null
+          };
+        });
+      }
+
+      function detectModel(subject, normalizedPartials) {
+        if (subject?.approval_model === 'with_lab' || subject?.approval_model === 'three_partials' || subject?.approval_model === 'standard') {
+          return subject.approval_model;
+        }
+        if (subject?.lab_approved === true || subject?.has_lab === true || subject?.requires_lab === true) return 'with_lab';
+        if (normalizedPartials.length >= 3) return 'three_partials';
+        return 'standard';
+      }
+
+      function migrateSubject(subject, events, fallbackTimestamp) {
+        const subjectId = subject?.subject_id || subject?.code || '';
+        const originalPartials = Array.isArray(subject?.partials) ? subject.partials : [];
+        const normalizedPartials = originalPartials.map((p) => normalizeInstances(p));
+        const model = detectModel(subject, normalizedPartials);
+        const targetPartials = model === 'three_partials' ? 3 : 2;
+        const partials = [];
+        for (let i = 0; i < targetPartials; i++) {
+          partials.push(normalizedPartials[i] || [null, null, null]);
+        }
+
+        const first = partials.map((p) => p[0]);
+        const second = partials.map((p) => p[1]);
+        const effective = partials.map((p) => lastNonNull(p));
+        const labApproved = subject?.lab_approved === true;
+
+        let regularized = false;
+        let promoted = false;
+
+        if (model === 'three_partials') {
+          regularized = effective.length === 3 && effective.every((n) => n !== null && n >= 6);
+          promoted = regularized && effective.filter((n) => n !== null && n >= 8).length >= 2;
+        } else {
+          const p1 = effective[0];
+          const p2 = effective[1];
+          regularized = p1 !== null && p2 !== null && p1 >= 6 && p2 >= 6;
+          promoted = (
+            (first[0] !== null && first[1] !== null && first[0] >= 8 && first[1] >= 8) ||
+            (first[0] !== null && first[0] >= 8 && second[1] !== null && second[1] >= 8) ||
+            (first[1] !== null && first[1] >= 8 && second[0] !== null && second[0] >= 8)
+          );
+          if (model === 'with_lab') {
+            regularized = regularized && labApproved;
+            promoted = promoted && labApproved;
+          }
+        }
+
+        const finalAttempts = Array.isArray(subject?.final_attempts)
+          ? subject.final_attempts.map((n) => toNumOrNull(n)).filter((n) => n !== null)
+          : [];
+        const finalGrade = toNumOrNull(subject?.final_grade);
+        const finalAttemptsUsed = finalAttempts.length || (finalGrade !== null ? 1 : 0);
+        const finalPassed = !promoted && ((subject?.approved === true) || (finalGrade !== null && finalGrade >= 6));
+        const finalFailed = !promoted && !finalPassed && finalGrade !== null && finalGrade < 6;
+        const timestamp = subject?.timestamp || fallbackTimestamp;
+
+        if (subjectId) {
+          if (finalPassed) {
+            events.push({ type: "final_passed", subject_id: subjectId, timestamp });
+          } else if (finalFailed) {
+            events.push({ type: "final_failed", subject_id: subjectId, timestamp });
+          }
+        }
+
+        return {
+          subject_id: subjectId,
+          rule: model === 'with_lab'
+            ? { type: 'with_lab', partials_required: 2, max_instances_per_partial: 3, requires_lab: true }
+            : model === 'three_partials'
+              ? { type: 'three_partials', partials_required: 3, max_instances_per_partial: 3 }
+              : { type: 'standard', partials_required: 2, max_instances_per_partial: 3 },
+          evaluations: {
+            partials: partials.map((instances) => ({ instances })),
+            ...(model === 'with_lab' ? { lab_approved: labApproved } : {})
+          },
+          status: {
+            regularized,
+            promoted,
+            final_required: regularized && !promoted && !finalPassed,
+            final_attempts_used: finalAttemptsUsed
+          }
+        };
+      }
+
+      function migrateUserData(userData) {
+        const timestamp = new Date().toISOString();
+        const sourceSubjects = extractSubjectEntries(userData);
+        const academicEvents = [];
+        const subjects = sourceSubjects
+          .map((subject) => migrateSubject(subject || {}, academicEvents, timestamp))
+          .filter((subject) => subject.subject_id);
+        return { subjects, academic_events: academicEvents };
+      }
+
+      async function runMigration() {
+        const user = auth.currentUser;
+        if (!user || user.email !== ADMIN_EMAIL) return;
+
+        btnMigrate.disabled = true;
+        setStatus('Migrando...');
+        try {
+          const snapshot = await getDocs(collection(db, 'users'));
+          let batch = writeBatch(db);
+          let pending = 0;
+          let total = 0;
+
+          for (const userDoc of snapshot.docs) {
+            const migrated = migrateUserData(userDoc.data() || {});
+            batch.set(doc(db, 'users-dev', userDoc.id), migrated);
+            pending += 1;
+            total += 1;
+            if (pending >= 400) {
+              await batch.commit();
+              batch = writeBatch(db);
+              pending = 0;
+            }
+          }
+          if (pending > 0) await batch.commit();
+          setStatus(`Migración finalizada. Usuarios procesados: ${total}.`);
+        } catch (e) {
+          setStatus('Error durante la migración.');
+        } finally {
+          btnMigrate.disabled = false;
+        }
+      }
+
+      btnSignin.addEventListener('click', async () => {
+        try {
+          await signInWithPopup(auth, provider);
+        } catch (e) {
+          setStatus('No se pudo iniciar sesión.');
+        }
+      });
+
+      btnSignout.addEventListener('click', async () => {
+        try {
+          await signOut(auth);
+        } catch (e) {
+          setStatus('No se pudo cerrar sesión.');
+        }
+      });
+
+      btnMigrate.addEventListener('click', runMigration);
+
+      onAuthStateChanged(auth, (user) => {
+        const isAdmin = !!(user && user.email === ADMIN_EMAIL);
+        btnSignin.classList.toggle('d-none', !!user);
+        btnSignout.classList.toggle('d-none', !user);
+        btnMigrate.disabled = !isAdmin;
+        if (!user) {
+          authStateEl.textContent = 'Iniciá sesión para continuar.';
+          return;
+        }
+        if (isAdmin) {
+          authStateEl.textContent = `Autenticado como ${user.email}. Acceso habilitado.`;
+        } else {
+          authStateEl.textContent = `Autenticado como ${user.email}. Sin permisos para migrar.`;
+        }
+      });
+    </script>
+  </body>
+</html>
