@@ -287,7 +287,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function isFutureExamDate(dateStr){
     if (!dateStr) return false;
-    const d = new Date(`${dateStr}T23:59:59`);
+    const parts = String(dateStr).split('-').map((x) => parseInt(x, 10));
+    if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return false;
+    const d = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
     if (Number.isNaN(d.getTime())) return false;
     return d > new Date();
   }
@@ -549,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (stored){
             p1 = getLastPassingOrLatestGrade(getPartialAttempts(stored, 1));
             p2 = getLastPassingOrLatestGrade(getPartialAttempts(stored, 2));
-          }          
+          }
         }catch(e){/* ignore */}
         if (!Number.isNaN(p1) && !Number.isNaN(p2)){
           const avg = Math.round((p1 + p2) / 2);
@@ -3040,10 +3042,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     pending.forEach((row) => {
       const tr = document.createElement('tr');
+      const instanceLabel = row.isFinal
+        ? `Final intento ${row.attemptIndex + 1}`
+        : `Parcial ${row.partialIndex + 1}, intento ${row.attemptIndex + 1}`;
       tr.innerHTML = `
         <td>${escapeHtml(row.name)} <small class="text-muted d-block">${escapeHtml(row.code)}</small></td>
         <td>${escapeHtml(row.kind)}</td>
-        <td>${row.isFinal ? String(row.attemptIndex + 1) : `${row.partialIndex + 1}.${row.attemptIndex + 1}`}</td>
+        <td>${escapeHtml(instanceLabel)}</td>
         <td>${escapeHtml(row.date || '—')}</td>
         <td><input type="number" min="0" max="10" step="0.1" class="form-control form-control-sm pending-grade-input"></td>
         <td class="d-flex gap-1">
