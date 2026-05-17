@@ -1014,16 +1014,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Subject modal behavior
   let currentCard = null;
+  const APPROVAL_MODELS = ['standard', 'with_lab', 'three_partials'];
   const APPROVAL_MODEL_LABELS = {
     standard: 'Estándar',
     with_lab: 'Con laboratorio',
     three_partials: '3 parciales'
   };
 
+  function isValidApprovalModel(model){
+    return APPROVAL_MODELS.includes(model);
+  }
+
   function getStoredApprovalModel(code){
     const stored = loadSubjectData(code || '');
     if (!stored) return 'standard';
-    if (stored.approvalModel === 'standard' || stored.approvalModel === 'with_lab' || stored.approvalModel === 'three_partials') return stored.approvalModel;
+    if (isValidApprovalModel(stored.approvalModel)) return stored.approvalModel;
     try{
       const values = stored.values || {};
       const hasThirdPartial = ['parcial3_1','parcial3_2','parcial3_3'].some(k => values[k] !== null && values[k] !== undefined && values[k] !== '');
@@ -1035,12 +1040,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function getCurrentApprovalModel(){
     const btn = document.getElementById('subject-approval-model-btn');
     const m = btn && btn.dataset ? btn.dataset.model : '';
-    if (m === 'with_lab' || m === 'three_partials' || m === 'standard') return m;
+    if (isValidApprovalModel(m)) return m;
     return 'standard';
   }
 
   function applyApprovalModelUI(model){
-    const normalizedModel = (model === 'with_lab' || model === 'three_partials') ? model : 'standard';
+    const normalizedModel = isValidApprovalModel(model) ? model : 'standard';
     const btn = document.getElementById('subject-approval-model-btn');
     const partial3Wrap = document.getElementById('parcial3-wrap');
     const labWrap = document.getElementById('lab-approved-wrap');
@@ -1086,7 +1091,6 @@ document.addEventListener('DOMContentLoaded', () => {
         syncApprovalMenuState(nextModel);
         const stored = loadSubjectData(code) || { values: {} };
         stored.approvalModel = nextModel;
-        if (nextModel !== 'with_lab') stored.labApproved = false;
         if (!stored.values) stored.values = {};
         saveSubjectData(code, stored);
         updateSubjectStatus();

@@ -29,6 +29,7 @@
       import { collection, doc, getDocs, getFirestore, writeBatch } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
       const ADMIN_EMAIL = "fscaliseg@gmail.com";
+      const MAX_BATCH_SIZE = 400;
       const firebaseConfig = {
         apiKey: "AIzaSyB4n2_ZY0tBjwMzoQqvjjUHlqD0Yu6Dr0A",
         authDomain: "utntracker.firebaseapp.com",
@@ -237,7 +238,7 @@
             batch.set(doc(db, 'users-dev', userDoc.id), migrated);
             pending += 1;
             total += 1;
-            if (pending >= 400) {
+            if (pending >= MAX_BATCH_SIZE) {
               await batch.commit();
               batch = writeBatch(db);
               pending = 0;
@@ -246,7 +247,7 @@
           if (pending > 0) await batch.commit();
           setStatus(`Migración finalizada. Usuarios procesados: ${total}.`);
         } catch (e) {
-          setStatus('Error durante la migración.');
+          setStatus(`Error durante la migración: ${(e && e.message) ? e.message : 'desconocido'}.`);
         } finally {
           btnMigrate.disabled = false;
         }
