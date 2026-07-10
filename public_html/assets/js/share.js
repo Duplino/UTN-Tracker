@@ -1,15 +1,20 @@
-// Share page JavaScript - Read-only public profile view
-document.addEventListener('DOMContentLoaded', () => {
+// Share page JavaScript - Read-only public profile view. Consume GET /api/public/{id}
+// (mismo shape que usa index.js: enrollments ya vienen con `status` calculado server-side).
+import { api } from './apiClient.js';
+
+document.addEventListener('DOMContentLoaded', async () => {
   // Plan management: determine which plan to load
   const AVAILABLE_PLANS = {
     'k23': 'assets/data/k23.json',
     'k23medio': 'assets/data/k23medio.json'
   };
   const DEFAULT_PLAN = 'k23';
-  
-  // Get initial plan from window.sharePlan (set by share.html module) or use default
-  let currentPlan = (window.sharePlan && AVAILABLE_PLANS[window.sharePlan]) ? window.sharePlan : DEFAULT_PLAN;
-  
+  const PLAN_NAMES = {
+    'k23': 'Ingeniería en Sistemas de Información - K23',
+    'k23medio': 'Analista en Sistemas de Información - K23'
+  };
+
+  let currentPlan = DEFAULT_PLAN;
   let DATA_URL = AVAILABLE_PLANS[currentPlan];
   let planData = null;
   let electivasList = [];
@@ -25,9 +30,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressLabel = document.getElementById('progress-label');
   let displayedSubjects = [];
 
-  // User data from Firestore (set by the module script in share.html)
-  let remoteSubjectData = {};
-  let remoteElectives = {};
+  // Datos remotos (poblados por loadRemoteData() al inicio, ver más abajo)
+  let enrollmentsByCode = {};
+  let electivesList = [];
+
+  function showAlert(message){
+    const alertEl = document.getElementById('share-alert');
+    if (!alertEl) return;
+    alertEl.textContent = message;
+    alertEl.classList.remove('d-none');
+  }
 
   // Correlativas toggle
   const correlativasToggle = document.getElementById('toggle-correlativas');
@@ -49,24 +61,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- LocalStorage-like helpers but reading from remote data ---
   function loadSubjectData(code) {
     if (!code) return null;
-    return remoteSubjectData[code] || null;
+    return enrollmentsByCode[code] || null;
   }
 
-  // Parse number helper
   function parseNum(v) {
     if (v === null || v === undefined || v === '') return NaN;
     const n = parseFloat(String(v).replace(',', '.'));
     return Number.isFinite(n) ? n : NaN;
-  }
-
-  // Compute status text for display
-  function getStatusText(stored) {
-    if (!stored) return null;
-    const status = stored.overrideStatus || stored.status || null;
-    return status;
   }
 
   function countPassedSubjects(subjects) {
@@ -74,12 +77,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return subjects.filter(s => {
       const key = (s.code && s.code.trim()) ? s.code : (s.name || '');
       const stored = key ? loadSubjectData(key) : null;
-      const st = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const st = stored ? stored.status : null;
       return st === 'Aprobada' || st === 'Promocionada';
     }).length;
   }
 
-  // Get a user-friendly description for the status
   function getStatusDescription(status) {
     switch (status) {
       case 'Aprobada': return 'Aprobada';
@@ -88,54 +90,35 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'Desaprobada': return 'Desaprobada';
       case 'No regularizada': return 'Debe recuperar';
       case 'Faltan notas': return 'En curso';
-      case 'Faltan examenes': return 'En curso';
       default: return status || null;
     }
   }
 
-  // Check if a subject can be promoted (both parciales >=6 but at least one <8)
+  // Heurística de UI (no autoritativa) igual que en index.js.
   function canPromote(stored) {
-    if (!stored || !stored.values) return false;
-    // Get best parcial values
-    let p1 = NaN, p2 = NaN;
-    for (let i = 3; i >= 1; i--) {
-      const v = stored.values['parcial1_' + i];
-      const n = parseNum(v);
-      if (!Number.isNaN(n)) { p1 = n; break; }
+    if (!stored || !stored.schemeConfig || !stored.partials) return false;
+    const config = stored.schemeConfig;
+    const highNote = config?.promotion?.high_note ?? 8;
+    const n = config?.partials ?? 2;
+    const partials = stored.partials || {};
+    let closeCount = 0;
+    let hasOpenRecovery = false;
+    for (let p = 1; p <= n; p++) {
+      const attempts = partials[p] || {};
+      const a1 = attempts[1] ?? null;
+      const a2 = attempts[2] ?? null;
+      if (a1 !== null && a1 >= highNote) { closeCount++; continue; }
+      if (a1 !== null && a1 >= 6 && a2 === null) hasOpenRecovery = true;
     }
-    for (let i = 3; i >= 1; i--) {
-      const v = stored.values['parcial2_' + i];
-      const n = parseNum(v);
-      if (!Number.isNaN(n)) { p2 = n; break; }
-    }
-    if (Number.isNaN(p1) || Number.isNaN(p2)) return false;
-    //if (p1 < 6 || p2 < 6) return false; // not regularizada
-    // If both >=8, it's already promocionada
-    if (p1 >= 8 && p2 >= 8) return false;
-    // If exactly one >=8 and the other >=6 but <8, they could still promote with a recuperatory
-    if (p1 >= 8 && p2 < 8) {
-      const p2_2 = stored.values['parcial2_2'];
-      const n2_2 = parseNum(p2_2);
-      if (Number.isNaN(n2_2)) return true;
-      return false;
-    }
-    if (p2 >= 8 && p1 < 8) {
-      const p1_2 = stored.values['parcial1_2'];
-      const n1_2 = parseNum(p1_2);
-      if (Number.isNaN(n1_2)) return true;
-      return false;
-    }
-    return false;
+    if (closeCount >= n) return false;
+    return closeCount === n - 1 && hasOpenRecovery;
   }
 
-  // Apply card status style (visual appearance based on status)
   function applyCardStatusStyle(card, status) {
     if (!card) return;
-    // remove previous status classes
     ['card-status-aprobada', 'card-status-desaprobada', 'card-status-promocionada', 'card-status-regularizada'].forEach(c => card.classList.remove(c));
-    
-    if (status === 'Faltan notas' || status === 'Faltan examenes') status = null;
-    
+    if (status === 'Faltan notas') status = null;
+
     const mapping = {
       'Aprobada': 'card-status-aprobada',
       'Desaprobada': 'card-status-desaprobada',
@@ -145,7 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const cls = mapping[status];
     if (cls) card.classList.add(cls);
 
-    // Badge rendering
     try {
       let bc = card.querySelector('.card-badge-container');
       if (!bc) {
@@ -166,11 +148,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (status === 'Aprobada') {
         let grade = null;
         try {
-          if (stored && stored.values) {
-            for (let i = 1; i <= 4; i++) {
-              const v = stored.values['final' + i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n) && n >= 6) { grade = n; break; }
+          if (stored && Array.isArray(stored.finals)) {
+            const sorted = [...stored.finals].sort((a, b) => a.attemptNumber - b.attemptNumber);
+            for (const f of sorted) {
+              if (f && f.grade !== null && f.grade !== undefined && f.grade >= 6) { grade = f.grade; break; }
             }
           }
         } catch (e) {/* ignore */}
@@ -182,23 +163,20 @@ document.addEventListener('DOMContentLoaded', () => {
           bc.appendChild(span);
         }
       } else if (status === 'Promocionada') {
-        let p1 = NaN, p2 = NaN;
+        let sum = 0, count = 0;
         try {
-          if (stored && stored.values) {
-            for (let i = 3; i >= 1; i--) {
-              const v = stored.values['parcial1_' + i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n)) { p1 = n; break; }
-            }
-            for (let i = 3; i >= 1; i--) {
-              const v = stored.values['parcial2_' + i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n)) { p2 = n; break; }
+          if (stored && stored.partials && stored.schemeConfig) {
+            const n = stored.schemeConfig.partials ?? 2;
+            for (let p = 1; p <= n; p++) {
+              const attempts = stored.partials[p] || {};
+              let eff = null;
+              for (let a = 3; a >= 1; a--) { if (attempts[a] !== null && attempts[a] !== undefined) { eff = attempts[a]; break; } }
+              if (eff !== null) { sum += eff; count++; }
             }
           }
         } catch (e) {/* ignore */}
-        if (!Number.isNaN(p1) && !Number.isNaN(p2)) {
-          const avg = Math.round((p1 + p2) / 2);
+        if (count > 0) {
+          const avg = Math.round(sum / count);
           const span = document.createElement('span');
           span.className = 'badge bg-success';
           span.style.fontSize = '0.8rem';
@@ -208,11 +186,9 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (status === 'Regularizada') {
         // No badge for Regularizada
       } else {
-        // Not approved -> show weekHours badge (blue) with C/A indicator
         const span = document.createElement('span');
         span.className = 'badge bg-primary';
         span.style.fontSize = '0.8rem';
-        // Get duration from card dataset (cuatrimestral or anual)
         const duration = card.dataset.duration || 'anual';
         const durationIndicator = duration === 'cuatrimestral' ? 'C' : 'A';
         span.textContent = `${weekHours} hs - ${durationIndicator}`;
@@ -221,18 +197,17 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {/* ignore badge errors */}
   }
 
-  // Evaluate 'cursar' requirements for a given card
   function cursarRequirementsMetForCard(card) {
     if (!card) return true;
     const reqObj = card.dataset.requirements ? JSON.parse(card.dataset.requirements) : { cursar: [] };
     const cursar = reqObj.cursar || [];
     if (!cursar || cursar.length === 0) return true;
-    
+
     for (const r of cursar) {
       const id = (typeof r === 'string') ? r : (r.id || r.code);
       if (!id) return false;
       const stored = loadSubjectData(id);
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       if (!status) return false;
       const type = (typeof r === 'object' && r.type) ? r.type : 'aprobada';
       if (type === 'regularizada') {
@@ -246,16 +221,13 @@ document.addEventListener('DOMContentLoaded', () => {
     return true;
   }
 
-  // Update all cards' disabled/enabled state according to cursar requirements
   function updateAllCardCursarState() {
     try {
       if (!columnsContainer) return;
       const all = columnsContainer.querySelectorAll('.card-subject');
       all.forEach(c => {
         try {
-          // Skip electiva placeholder cards (they have no subject code and shouldn't be counted)
           if (c.classList.contains('card-electiva-placeholder')) return;
-          
           const meets = cursarRequirementsMetForCard(c);
           if (!meets) {
             c.classList.add('card-disabled');
@@ -264,15 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
             c.classList.remove('card-disabled');
             c.removeAttribute('aria-disabled');
           }
-          // available (dashed border) when requirements met but subject not started/saved
           try {
             const code = c.dataset && c.dataset.code ? c.dataset.code : null;
             const stored = code ? loadSubjectData(code) : null;
-            if (meets && !stored) {
-              c.classList.add('card-available');
-            } else {
-              c.classList.remove('card-available');
-            }
+            if (meets && !stored) c.classList.add('card-available');
+            else c.classList.remove('card-available');
           } catch (e) {/* ignore per-card */}
         } catch (e) {/* ignore per-card errors */}
       });
@@ -289,8 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     columns = Math.min(Math.max(visibleModules.length, 1), 8);
     columnsContainer.innerHTML = '';
-    
-    // Dynamically adjust the grid columns based on the number of visible modules
     columnsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
 
     visibleModules.forEach((module, visIdx) => {
@@ -307,17 +273,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       subjects.forEach(subj => col.appendChild(createCard(subj, module)));
 
-      // Insert electiva cards for placed electives in this column
       const electivasCount = Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0;
       for (let i = 0; i < electivasCount; i++) {
-        // Check if there's an elective placed in this column
         const placed = getPlacedElectiveForSlot(visIdx, i);
-        if (placed) {
-          col.appendChild(createElectivaCard(placed));
-        } else {
-          // Show empty placeholder (no interaction in public view)
-          col.appendChild(createEmptyElectivaPlaceholder());
-        }
+        if (placed) col.appendChild(createElectivaCard(placed));
+        else col.appendChild(createEmptyElectivaPlaceholder());
       }
 
       columnsContainer.appendChild(col);
@@ -328,31 +288,23 @@ document.addEventListener('DOMContentLoaded', () => {
       if (Array.isArray(m.subjects)) displayedSubjects.push(...m.subjects);
     });
     setupOverlayAndInteractions();
-    // Compute stats after cursar state is updated (so .card-available classes are present)
     computeStats(displayedSubjects);
   }
 
-  // Get placed elective for a specific slot
-  // NOTE: Only returns electives that exist in the current plan's electivasList
+  // NOTE: solo devuelve electivas que existan en electivasList del plan actual
   function getPlacedElectiveForSlot(colIndex, slotIndex) {
-    if (!remoteElectives || Object.keys(remoteElectives).length === 0) return null;
-    const electList = Array.isArray(electivasList) ? electivasList : [];
+    if (!electivesList.length) return null;
     const byCode = {};
     const byName = {};
-    electList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
+    electivasList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
 
     let slotCounter = 0;
-    for (const key of Object.keys(remoteElectives)) {
-      const entry = remoteElectives[key];
-      const entryColIndex = typeof entry.colIndex === 'number' ? entry.colIndex : parseInt(entry.colIndex, 10);
-      // Skip electives that don't exist in the current plan
-      const electiveMeta = byCode[key] || byName[key];
+    for (const entry of electivesList) {
+      if (entry.planCode !== currentPlan) continue;
+      const electiveMeta = byCode[entry.subjectCode] || byName[entry.subjectCode];
       if (!electiveMeta) continue;
-      
-      if (entryColIndex === colIndex) {
-        if (slotCounter === slotIndex) {
-          return electiveMeta;
-        }
+      if (entry.columnIndex === colIndex) {
+        if (slotCounter === slotIndex) return electiveMeta;
         slotCounter++;
       }
     }
@@ -369,9 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
     card.dataset.requirements = JSON.stringify(reqsObj);
     if (group && group.color) card.dataset.groupColor = group.color;
 
-    // Get status for this subject
     const stored = loadSubjectData(subject.code);
-    const status = getStatusText(stored);
+    const status = stored ? stored.status : null;
     const statusDesc = getStatusDescription(status);
     const promotable = (status === 'Regularizada' || status === 'No regularizada') && canPromote(stored);
     const statusLabel = statusDesc ? (promotable ? `${escapeHtml(statusDesc)} • Puede promocionar` : escapeHtml(statusDesc)) : '';
@@ -391,49 +342,14 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    // Apply visual status styling
     applyCardStatusStyle(card, status);
-
-    // Read-only: no click handler to open modal
     card.style.cursor = 'default';
-
     return card;
   }
 
   function createElectivaCard(subj) {
-    const card = document.createElement('div');
-    card.className = 'card card-subject card-electiva card-readonly';
-    if (subj.code) card.dataset.code = subj.code;
-    card.dataset.weekHours = typeof subj.weekHours === 'number' ? String(subj.weekHours) : '6';
-    card.dataset.duration = subj.duration || 'anual';
-    const reqsObj = subj.requirements || { cursar: [], aprobar: [] };
-    card.dataset.requirements = JSON.stringify(reqsObj);
-
-    // Get status for this elective
-    const stored = loadSubjectData(subj.code);
-    const status = getStatusText(stored);
-    const statusDesc = getStatusDescription(status);
-    const promotable = (status === 'Regularizada' || status === 'No regularizada') && canPromote(stored);
-    const statusLabel = statusDesc ? (promotable ? `${escapeHtml(statusDesc)} • Puede promocionar` : escapeHtml(statusDesc)) : '';
-
-    card.innerHTML = `
-      <div class="card-body p-1">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <h6 class="card-title mb-0">${escapeHtml(subj.name)}</h6>
-            <small class="text-muted d-block">${escapeHtml(subj.code)}</small>
-            ${statusLabel ? `<small class="text-muted status-label">${statusLabel}</small>` : ''}
-          </div>
-          <div class="text-end">
-            <div class="card-badge-container" aria-hidden="true"></div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    applyCardStatusStyle(card, status);
-    card.style.cursor = 'default';
-
+    const card = createCard(subj);
+    card.classList.add('card-electiva');
     return card;
   }
 
@@ -477,7 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
     overlaySvg.appendChild(defs);
     columnsContainer.appendChild(overlaySvg);
 
-    // build code map
     codeMap = {};
     const cards = columnsContainer.querySelectorAll('.card-subject');
     cards.forEach(card => {
@@ -487,18 +402,15 @@ document.addEventListener('DOMContentLoaded', () => {
       card.addEventListener('mouseleave', onCardLeave);
     });
 
-    // Apply saved styles / badges for each card
     Object.keys(codeMap).forEach(code => {
       try {
         const stored = loadSubjectData(code);
-        const effectiveStatus = stored ? (stored.overrideStatus ? stored.overrideStatus : (stored.status ? stored.status : null)) : null;
-        applyCardStatusStyle(codeMap[code], effectiveStatus);
+        applyCardStatusStyle(codeMap[code], stored ? stored.status : null);
       } catch (e) {/* ignore */}
     });
 
     updateAllCardCursarState();
 
-    // build dependents map
     dependentsMap = {};
     cards.forEach(card => {
       const rObj = card.dataset.requirements ? JSON.parse(card.dataset.requirements) : { cursar: [], aprobar: [] };
@@ -528,7 +440,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if ((requiresCursar && requiresCursar.length) || (requiresAprobar && requiresAprobar.length)) {
       drawArrowsFromRequirementsToCard(card, { cursar: requiresCursar, aprobar: requiresAprobar });
     }
-
     if (dependents && dependents.length) {
       drawArrowsToCard(card, dependents);
     }
@@ -590,12 +501,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const qx = fromX + dx * 0.5;
       const qy = fromY;
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      const d = `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`;
-      path.setAttribute('d', d);
+      path.setAttribute('d', `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`);
       path.setAttribute('class', 'arrow-line');
-      if (typeof r === 'object' && r.type === 'regularizada') {
-        path.setAttribute('stroke-dasharray', '6,4');
-      }
+      if (typeof r === 'object' && r.type === 'regularizada') path.setAttribute('stroke-dasharray', '6,4');
       path.setAttribute('stroke', '#000');
       path.setAttribute('marker-end', 'url(#arrowhead-black)');
       overlaySvg.appendChild(path);
@@ -612,8 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const qx = fromX + dx * 0.5;
       const qy = fromY;
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      const d = `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`;
-      path.setAttribute('d', d);
+      path.setAttribute('d', `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`);
       path.setAttribute('class', 'arrow-line');
       path.setAttribute('stroke', '#28a745');
       const t = (typeof r === 'object' && r.type) ? r.type : 'aprobada';
@@ -634,14 +541,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const toRect = depCard.getBoundingClientRect();
       const toX = (toRect.left + toRect.right) / 2 - containerRect.left;
       const toY = (toRect.top + toRect.bottom) / 2 - containerRect.top;
-
       const dx = toX - fromX;
       const qx = fromX + dx * 0.5;
       const qy = fromY;
-
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      const d = `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`;
-      path.setAttribute('d', d);
+      path.setAttribute('d', `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`);
       path.setAttribute('class', 'arrow-line');
       if (dep.relation === 'cursar') {
         path.setAttribute('stroke', '#000');
@@ -656,20 +560,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function electivesForCurrentPlan() {
+    return electivesList.filter(e => e.planCode === currentPlan);
+  }
+
   function computeStats(list) {
     const baseTotal = Array.isArray(list) ? list.length : 0;
     let approved = 0;
     let regularized = 0;
-    
+
     for (const subj of (list || [])) {
       const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
       const stored = key ? loadSubjectData(key) : null;
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       if (status === 'Aprobada' || status === 'Promocionada') approved++;
       else if (status === 'Regularizada') regularized++;
     }
 
-    // Add required electivas per visible module to the total
     let electivasRequired = 0;
     try {
       if (planData && Array.isArray(planData.modules)) {
@@ -681,80 +588,70 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (e) { electivasRequired = 0; }
 
-    // Count electivas that have saved statuses
     try {
-      if (remoteElectives) {
-        Object.keys(remoteElectives || {}).forEach(k => {
-          try {
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            if (status === 'Aprobada' || status === 'Promocionada') approved++;
-            else if (status === 'Regularizada') regularized++;
-          } catch (e) {/* ignore */}
-        });
-      }
+      electivesForCurrentPlan().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        const status = stored ? stored.status : null;
+        if (status === 'Aprobada' || status === 'Promocionada') approved++;
+        else if (status === 'Regularizada') regularized++;
+      });
     } catch (e) {/* ignore */}
 
     const total = baseTotal + electivasRequired;
 
-    // Sum weekly hours for subjects that are 'EN CURSO'
     let inCourseHours = 0;
     try {
+      const terminal = ['Aprobada', 'Promocionada', 'Regularizada', 'Desaprobada'];
       for (const subj of (list || [])) {
         const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
         const stored = key ? loadSubjectData(key) : null;
-        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-        const terminal = ['Aprobada', 'Promocionada', 'Regularizada', 'Desaprobada'];
+        const status = stored ? stored.status : null;
         if (stored && !terminal.includes(status)) {
           const wh = Number.isFinite(Number(subj.weekHours)) ? Number(subj.weekHours) : 6;
           inCourseHours += wh;
         }
       }
-      // Also include electivas
-      if (remoteElectives) {
-        const electList = Array.isArray(electivasList) ? electivasList : [];
-        const byCode = {};
-        const byName = {};
-        electList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
-        Object.keys(remoteElectives).forEach(k => {
-          try {
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            const terminal = ['Aprobada', 'Promocionada', 'Regularizada', 'Desaprobada'];
-            if (stored && !terminal.includes(status)) {
-              const meta = byCode[k] || byName[k] || null;
-              const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : 6;
-              inCourseHours += wh;
-            }
-          } catch (e) {/* ignore */}
-        });
-      }
+      const byCode = {};
+      const byName = {};
+      electivasList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
+      electivesForCurrentPlan().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        const status = stored ? stored.status : null;
+        if (stored && !terminal.includes(status)) {
+          const meta = byCode[entry.subjectCode] || byName[entry.subjectCode] || null;
+          const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : 6;
+          inCourseHours += wh;
+        }
+      });
     } catch (e) { inCourseHours = 0; }
 
     statsTotalPeso.textContent = inCourseHours > 0 ? (String(inCourseHours) + ' hs') : '—';
 
-    // Compute average grade for approved subjects
     let approvedGradeSum = 0;
     let approvedGradeCount = 0;
     try {
       for (const subj of (list || [])) {
         const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
         const stored = key ? loadSubjectData(key) : null;
-        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+        const status = stored ? stored.status : null;
         if (status === 'Aprobada' || status === 'Promocionada') {
           let grade = NaN;
           try {
-            if (status === 'Aprobada' && stored && stored.values) {
-              for (let i = 1; i <= 4; i++) {
-                const v = stored.values['final' + i];
-                const n = parseNum(v);
-                if (!Number.isNaN(n) && n >= 6) { grade = n; break; }
+            if (status === 'Aprobada' && stored && Array.isArray(stored.finals)) {
+              const sorted = [...stored.finals].sort((a, b) => a.attemptNumber - b.attemptNumber);
+              for (const f of sorted) {
+                if (f && f.grade !== null && f.grade !== undefined && f.grade >= 6) { grade = f.grade; break; }
               }
-            } else if (status === 'Promocionada' && stored && stored.values) {
-              let p1 = NaN, p2 = NaN;
-              for (let i = 3; i >= 1; i--) { const v = stored.values['parcial1_' + i]; const n = parseNum(v); if (!Number.isNaN(n)) { p1 = n; break; } }
-              for (let i = 3; i >= 1; i--) { const v = stored.values['parcial2_' + i]; const n = parseNum(v); if (!Number.isNaN(n)) { p2 = n; break; } }
-              if (!Number.isNaN(p1) && !Number.isNaN(p2)) grade = Math.round((p1 + p2) / 2);
+            } else if (status === 'Promocionada' && stored && stored.partials && stored.schemeConfig) {
+              let sum = 0, count = 0;
+              const n = stored.schemeConfig.partials ?? 2;
+              for (let p = 1; p <= n; p++) {
+                const attempts = stored.partials[p] || {};
+                let eff = null;
+                for (let a = 3; a >= 1; a--) { if (attempts[a] !== null && attempts[a] !== undefined) { eff = attempts[a]; break; } }
+                if (eff !== null) { sum += eff; count++; }
+              }
+              if (count > 0) grade = Math.round(sum / count);
             }
           } catch (e) {/* ignore */}
           if (!Number.isNaN(grade)) {
@@ -774,8 +671,6 @@ document.addEventListener('DOMContentLoaded', () => {
     statPlaceholder1.textContent = approved + ' / ' + total;
     statPlaceholder2.textContent = regularized;
 
-    // Count available subjects (cards with .card-available class = meet cursar requirements and not started)
-    // Exclude electiva placeholders from the count
     let disponibles = 0;
     try {
       if (columnsContainer) {
@@ -785,7 +680,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { disponibles = 0; }
     if (statDisponibles) statDisponibles.textContent = disponibles;
 
-    // Progress formula: (approved + regularized/2) / total
     let progress = 0;
     if (total > 0) {
       progress = ((approved + (regularized / 2)) / total) * 100;
@@ -804,33 +698,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Listen for data ready event from the module script
-  document.addEventListener('share:data-ready', (ev) => {
-    try {
-      const data = ev.detail || {};
-      remoteSubjectData = data.subjectData || {};
-      remoteElectives = data.electives || {};
-      
-      // Check if the plan from Firestore is different from the current one
-      const remotePlan = data.plan || DEFAULT_PLAN;
-      if (AVAILABLE_PLANS[remotePlan] && remotePlan !== currentPlan) {
-        // Update the plan and reload the data
-        currentPlan = remotePlan;
-        DATA_URL = AVAILABLE_PLANS[currentPlan];
-        loadPlanData();
-        return;
-      }
-      
-      // Re-render if planData is already loaded
-      if (planData) {
-        renderGroups(planData);
-      }
-    } catch (e) {
-      console.error('Error processing share data', e);
-    }
-  });
-
-  // Function to load plan data from the current DATA_URL
   function loadPlanData() {
     fetch(DATA_URL)
       .then(r => r.json())
@@ -839,11 +706,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const modules = Array.isArray(d.modules) ? d.modules : [];
         const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
         electivasList = electModule && Array.isArray(electModule.subjects) ? electModule.subjects : [];
-        // If remote data is already available, render with it
-        if (window.shareUserData) {
-          remoteSubjectData = window.shareUserData;
-          remoteElectives = window.shareElectives || {};
-        }
         try { renderGroups(d); } catch (e) { console.error('Error renderizando grupos', e); }
       })
       .catch(err => {
@@ -852,6 +714,33 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  // Load the main plan from DATA_URL and render
-  loadPlanData();
+  // --- Carga inicial: GET /api/public/{identifier} ---
+  const urlParams = new URLSearchParams(window.location.search);
+  const identifier = urlParams.get('uid');
+
+  if (!identifier) {
+    showAlert('No se especificó un perfil para mostrar.');
+    return;
+  }
+
+  try {
+    const data = await api.get(`/public/${encodeURIComponent(identifier)}`);
+    enrollmentsByCode = {};
+    (data.enrollments || []).forEach(e => { enrollmentsByCode[e.subjectCode] = e; });
+    electivesList = data.electives || [];
+
+    const remotePlan = (data.preferences && data.preferences.activePlanCode) || DEFAULT_PLAN;
+    currentPlan = AVAILABLE_PLANS[remotePlan] ? remotePlan : DEFAULT_PLAN;
+    DATA_URL = AVAILABLE_PLANS[currentPlan];
+
+    const programBadge = document.getElementById('share-program');
+    if (programBadge && PLAN_NAMES[currentPlan]) programBadge.textContent = PLAN_NAMES[currentPlan];
+
+    loadPlanData();
+  } catch (err) {
+    console.error('Error fetching public profile', err);
+    if (err && err.status === 403) showAlert('Este perfil no es público.');
+    else if (err && err.status === 404) showAlert('Este perfil no existe.');
+    else showAlert('Error al cargar el perfil.');
+  }
 });

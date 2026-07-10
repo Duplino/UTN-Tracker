@@ -1,30 +1,34 @@
-document.addEventListener('DOMContentLoaded', () => {
+import { api } from './apiClient.js';
+import { computeStatus } from './statusEngine.js';
+import { getEvaluationSchemes } from './evaluationSchemes.js';
+import { localGuestStore } from './localGuestStore.js';
+import { apiStore } from './apiStore.js';
+import { initAuth } from './auth.js';
+
+document.addEventListener('DOMContentLoaded', async () => {
   // Plan management: determine which plan to load
   const AVAILABLE_PLANS = {
     'k23': 'assets/data/k23.json',
     'k23medio': 'assets/data/k23medio.json'
   };
   const DEFAULT_PLAN = 'k23';
-  
+
   // Load saved plan from localStorage or use default
   function getSavedPlan() {
     const saved = localStorage.getItem('plan');
     return (saved && AVAILABLE_PLANS[saved]) ? saved : DEFAULT_PLAN;
   }
-  
+
   function savePlan(planKey) {
     localStorage.setItem('plan', planKey);
-    // Upload plan to Firestore if available (skip when applying remote changes)
-    try { 
-      if (!window.__firestoreApplyingRemote && window.firestoreUploadPlan) {
-        window.firestoreUploadPlan(planKey); 
-      }
-    } catch(e) { console.error('firestoreUploadPlan hook error', e); }
+    if (activeStore === apiStore) {
+      activeStore.updatePreferences({ activePlanCode: planKey }).catch(e => console.error('Error sincronizando plan', e));
+    }
   }
-  
+
   let currentPlan = getSavedPlan();
   let DATA_URL = AVAILABLE_PLANS[currentPlan];
-  
+
   // Electivas will be read from the main DATA_URL under the module with id 'electives'
   let planData = null;
   let electivasList = [];
@@ -36,18 +40,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressLabel = document.getElementById('progress-label');
   let displayedSubjects = [];
 
+  // --- Store activo (invitado local o API autenticada) + caches síncronos ---
+  // El resto de la app lee `enrollmentCache`/`electivesCache`/`schemesCache` de forma
+  // síncrona (igual que antes leía localStorage directo); estos caches se pueblan al
+  // bootear y se actualizan puntualmente después de cada escritura (ver putSubjectDataInCache).
+  let activeStore = localGuestStore;
+  let enrollmentCache = {};
+  let electivesCache = [];
+  let schemesCache = [];
+
+  async function refreshEnrollmentCache(){
+    const list = await activeStore.getEnrollments();
+    enrollmentCache = {};
+    list.forEach(e => { enrollmentCache[enrollmentCacheKey(e.planCode, e.subjectCode)] = e; });
+  }
+
+  async function refreshElectivesCache(){
+    electivesCache = await activeStore.getElectives();
+  }
+
+  async function switchStoreAndReload(nextStore){
+    activeStore = nextStore;
+    await Promise.all([refreshEnrollmentCache(), refreshElectivesCache()]);
+    try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-renderizando tras cambio de sesión', e); }
+  }
+
   // View mode management: grid or table
   let currentViewMode = 'grid'; // default to grid view
-  
+
   function getSavedViewMode() {
     const saved = localStorage.getItem('viewMode');
     return (saved === 'table' || saved === 'grid') ? saved : 'grid';
   }
-  
+
   function saveViewMode(mode) {
     localStorage.setItem('viewMode', mode);
   }
-  
+
   function applyViewMode(mode) {
     currentViewMode = mode;
     const container = document.querySelector('.container-fluid');
@@ -58,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
       container.classList.add('view-mode-grid');
       container.classList.remove('view-mode-table');
     }
-    
+
     // Update button states
     const btnGrid = document.getElementById('btn-view-grid');
     const btnTable = document.getElementById('btn-view-table');
@@ -72,45 +101,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
-  
+
   // Initialize view mode
   currentViewMode = getSavedViewMode();
   applyViewMode(currentViewMode);
-
-  // When Firestore listener notifies of remote changes, refresh the app state
-  document.addEventListener('firestore:remote-update', (ev) => {
-    try{
-      console.log('Firestore remote update received', ev && ev.detail);
-      
-      // Check if plan has changed in localStorage (set by Firestore sync) and reload if needed
-      // This only triggers a reload when the remote plan differs from the currently loaded plan
-      const savedPlan = getSavedPlan();
-      if (savedPlan !== currentPlan) {
-        currentPlan = savedPlan;
-        DATA_URL = AVAILABLE_PLANS[currentPlan];
-        // Update the dropdown to reflect the new plan
-        const programSelectEl = document.getElementById('programSelect');
-        if (programSelectEl) {
-          programSelectEl.value = currentPlan;
-        }
-        // Reload plan data
-        loadPlanData();
-        return;
-      }
-      
-      // Prefer in-place re-render from planData when available to avoid a full reload loop.
-      if (typeof renderGroups === 'function' && typeof planData !== 'undefined' && planData){
-        try{
-          window.__firestoreApplyingRemote = true;
-          renderGroups(planData);
-        }catch(e){ console.error('Error re-rendering after remote update', e); }
-        finally{ window.__firestoreApplyingRemote = false; }
-      } else {
-        // fallback: reload once
-        try{ location.reload(); }catch(e){}
-      }
-    }catch(e){ console.error(e); }
-  });
 
   // Correlativas toggle: read persisted preference and bind toggle UI
   const correlativasToggle = document.getElementById('settings-correlativas');
@@ -121,6 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function saveCorrelativasPref(val){
     localStorage.setItem('mostrarCorrelativas', val ? '1' : '0');
+    if (activeStore === apiStore) {
+      activeStore.updatePreferences({ showCorrelativas: !!val }).catch(e => console.error('Error sincronizando showCorrelativas', e));
+    }
   }
   // Initialize state (will be set again after DOM rendered elements exist)
   correlativasEnabled = loadCorrelativasPref();
@@ -161,6 +158,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function saveShowStatusPref(val){
     localStorage.setItem('mostrarEstado', val ? '1' : '0');
+    if (activeStore === apiStore) {
+      activeStore.updatePreferences({ showStatus: !!val }).catch(e => console.error('Error sincronizando showStatus', e));
+    }
   }
   showStatusEnabled = loadShowStatusPref();
   try{
@@ -254,33 +254,32 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (electivasBtn) electivasBtn.addEventListener('click', openElectivasModal);
 
-  // --- LocalStorage helpers for subject data ---
-  function getSubjectStorageKey(code){
-    if (!code) return null;
-    return `subjectData:${code}`;
+  // --- Enrollment cache: synchronous reads backed by the active store (local o API) ---
+  // `activeStore`/`enrollmentCache`/`electivesCache` se inicializan en el bootstrap de auth
+  // (ver más abajo, cerca del final del archivo) antes del primer renderGroups().
+
+  function enrollmentCacheKey(planCode, code){
+    return `${planCode}:${code}`;
   }
 
+  // Lectura síncrona desde el cache poblado al inicio (o tras cada escritura). El resto del
+  // archivo (render, arrows, stats) sigue leyendo con esta misma firma que tenía antes.
   function loadSubjectData(code){
-    const key = getSubjectStorageKey(code);
-    if (!key) return null;
-    try{
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    }catch(e){
-      console.warn('Error parseando subject data', e);
-      return null;
-    }
+    if (!code) return null;
+    return enrollmentCache[enrollmentCacheKey(currentPlan, code)] || null;
   }
 
-  // Check if subject has actual progress (grades or status), not just recursedCount
+  function putSubjectDataInCache(planCode, code, hydrated){
+    if (!code) return;
+    const key = enrollmentCacheKey(planCode, code);
+    if (hydrated) enrollmentCache[key] = hydrated;
+    else delete enrollmentCache[key];
+  }
+
+  // Una materia "tiene progreso" simplemente si ya existe una inscripción (creada al
+  // apretar "Empezar"), sin importar si todavía no cargó ninguna nota.
   function hasSubjectProgress(code){
-    const stored = loadSubjectData(code);
-    if (!stored) return false;
-    // Check if there's a status or any values (grades)
-    if (stored.status || stored.overrideStatus) return true;
-    if (stored.values && Object.keys(stored.values).some(k => stored.values[k] !== null && stored.values[k] !== undefined && stored.values[k] !== '')) return true;
-    return false;
+    return !!loadSubjectData(code);
   }
 
   function countPassedSubjects(subjects){
@@ -288,43 +287,25 @@ document.addEventListener('DOMContentLoaded', () => {
     return subjects.filter(s => {
       const key = (s.code && s.code.trim()) ? s.code : (s.name || '');
       const stored = key ? loadSubjectData(key) : null;
-      const st = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const st = stored ? stored.status : null;
       return st === 'Aprobada' || st === 'Promocionada';
     }).length;
   }
 
-  function countPassedElectivasForColumn(colIndex){
-    try{
-      const raw = localStorage.getItem('electives');
-      if (!raw) return 0;
-      const obj = JSON.parse(raw);
-      let count = 0;
-      Object.keys(obj || {}).forEach(k => {
-        if (obj[k] && obj[k].colIndex === colIndex){
-          const stored = loadSubjectData(k);
-          const st = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-          if (st === 'Aprobada' || st === 'Promocionada') count++;
-        }
-      });
-      return count;
-    }catch(e){ return 0; }
+  function getElectivesForCurrentPlan(){
+    return (electivesCache || []).filter(e => e.planCode === currentPlan);
   }
 
-  function saveSubjectData(code, payload){
-    const key = getSubjectStorageKey(code);
-    if (!key) return;
-    try{
-      // Preserve recursedCount if it exists in current storage and not in payload
-      const existingData = loadSubjectData(code);
-      if (existingData && typeof existingData.recursedCount === 'number' && !('recursedCount' in payload)) {
-        payload.recursedCount = existingData.recursedCount;
+  function countPassedElectivasForColumn(colIndex){
+    let count = 0;
+    getElectivesForCurrentPlan().forEach(e => {
+      if (e.columnIndex === colIndex){
+        const stored = loadSubjectData(e.subjectCode);
+        const st = stored ? stored.status : null;
+        if (st === 'Aprobada' || st === 'Promocionada') count++;
       }
-      localStorage.setItem(key, JSON.stringify(payload));
-      // upload to Firestore if available (skip when applying remote changes)
-      try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadSubject) window.firestoreUploadSubject(code, payload); }catch(e){ console.error('uploadSubject hook error', e); }
-    }catch(e){
-      console.error('Error guardando subject data', e);
-    }
+    });
+    return count;
   }
 
   // Convert a number to Roman numeral (for recursed count display)
@@ -363,61 +344,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Check if a subject can be promoted (both parciales >=6 but at least one <8)
+  // Heurística de UI (no autoritativa: el status real lo calcula computeStatus()) para
+  // mostrar "Puede promocionar" cuando falta un solo parcial por debajo del umbral alto
+  // y todavía queda un recuperatorio disponible para intentar alcanzarlo.
   function canPromote(stored) {
-    if (!stored || !stored.values) return false;
-    // Get best parcial values
-    let p1 = NaN, p2 = NaN;
-    for (let i = 3; i >= 1; i--) {
-      const v = stored.values['parcial1_' + i];
-      const n = parseNum(v);
-      if (!Number.isNaN(n)) { p1 = n; break; }
+    if (!stored || !stored.schemeConfig || !stored.partials) return false;
+    const config = stored.schemeConfig;
+    const highNote = config?.promotion?.high_note ?? 8;
+    const n = config?.partials ?? 2;
+    const partials = stored.partials || {};
+    let closeCount = 0;
+    let hasOpenRecovery = false;
+    for (let p = 1; p <= n; p++) {
+      const attempts = partials[p] || {};
+      const a1 = attempts[1] ?? null;
+      const a2 = attempts[2] ?? null;
+      if (a1 !== null && a1 >= highNote) { closeCount++; continue; }
+      if (a1 !== null && a1 >= 6 && a2 === null) hasOpenRecovery = true;
     }
-    for (let i = 3; i >= 1; i--) {
-      const v = stored.values['parcial2_' + i];
-      const n = parseNum(v);
-      if (!Number.isNaN(n)) { p2 = n; break; }
-    }
-    // Can promote if: both >=6, AND at least one >= 8 already OR exactly one <8 with recuperatory chance
-    // Simplified: if regularizada (both >=6) and both >= 8 already -> would be promocionada, not this case
-    // If regularizada and at least one >=8 and other <8 -> can try to recover to >=8
-    if (Number.isNaN(p1) || Number.isNaN(p2)) return false;
-    //if (p1 < 6 || p2 < 6) return false; // not regularizada
-    // If both >=8, it's already promocionada
-    if (p1 >= 8 && p2 >= 8) return false;
-    // If exactly one >=8 and the other >=6 but <8, they could still promote with a recuperatory
-    // Check if there's still a recuperatory attempt available
-    // According to promotion logic: only ONE recuperatory is allowed across both parcials to try to reach >=8
-    // So if one is <8 and hasn't used its recuperatory for promotion yet, can promote
-    if (p1 >= 8 && p2 < 8) {
-      // Check if p2 attempt 2 has been used
-      const p2_2 = stored.values['parcial2_2'];
-      const n2_2 = parseNum(p2_2);
-      // If attempt 2 not used yet, can still try to promote
-      if (Number.isNaN(n2_2)) return true;
-      return false;
-    }
-    if (p2 >= 8 && p1 < 8) {
-      const p1_2 = stored.values['parcial1_2'];
-      const n1_2 = parseNum(p1_2);
-      if (Number.isNaN(n1_2)) return true;
-      return false;
-    }
-    return false;
+    if (closeCount >= n) return false;
+    return closeCount === n - 1 && hasOpenRecovery;
   }
 
   // Calculate remaining final attempts for a regularized subject (up to 4 finals total)
   function getRemainingFinalAttempts(stored) {
-    if (!stored || !stored.values) return 4; // No attempts used yet
-    // Count how many finals have been attempted (have a value)
-    let attemptsUsed = 0;
-    for (let i = 1; i <= 4; i++) {
-      const finalKey = 'final' + i;
-      const finalValue = stored.values[finalKey];
-      if (finalValue !== undefined && finalValue !== null && finalValue !== '') {
-        attemptsUsed++;
-      }
-    }
-    return 4 - attemptsUsed;
+    if (!stored) return 4;
+    const used = Array.isArray(stored.finals)
+      ? stored.finals.filter(f => f && f.grade !== null && f.grade !== undefined).length
+      : 0;
+    return Math.max(0, 4 - used);
   }
 
   // Apply a very light status background class to a card (except 'Faltan notas')
@@ -461,12 +416,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (status === 'Aprobada'){
         let grade = null;
         try{
-          if (stored && stored.values){
-            // search final1..final4 for the first numeric >= 6 (this is where the subject was approved)
-            for (let i = 1; i <= 4; i++){
-              const v = stored.values['final'+i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
+          if (stored && Array.isArray(stored.finals)){
+            const sorted = [...stored.finals].sort((a,b) => a.attemptNumber - b.attemptNumber);
+            for (const f of sorted){
+              if (f && f.grade !== null && f.grade !== undefined && f.grade >= 6){ grade = f.grade; break; }
             }
           }
         }catch(e){/* ignore */}
@@ -474,30 +427,27 @@ document.addEventListener('DOMContentLoaded', () => {
           const span = document.createElement('span');
           span.className = 'badge bg-success';
           span.style.fontSize = '0.8rem';
-          // show as integer when whole, otherwise keep decimal (user requested rounding only for promocionadas)
-          span.textContent = Number.isInteger(grade) ? String(grade) : String(grade);
+          span.textContent = String(grade);
           bc.appendChild(span);
         }
       } else if (status === 'Promocionada'){
-        // Promocionada => average of both parciales (use the last attempt value for each parcial), rounded
-        let p1 = NaN, p2 = NaN;
+        // Promocionada => promedio del último intento cargado de cada parcial, redondeado
+        let sum = 0, count = 0;
         try{
-          if (stored && stored.values){
-            // find last non-empty attempt for parcial1 (parcial1_3..parcial1_1)
-            for (let i = 3; i >= 1; i--){
-              const v = stored.values['parcial1_'+i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n)){ p1 = n; break; }
-            }
-            for (let i = 3; i >= 1; i--){
-              const v = stored.values['parcial2_'+i];
-              const n = parseNum(v);
-              if (!Number.isNaN(n)){ p2 = n; break; }
+          if (stored && stored.partials && stored.schemeConfig){
+            const n = stored.schemeConfig.partials ?? 2;
+            for (let p = 1; p <= n; p++){
+              const attempts = stored.partials[p] || {};
+              let eff = null;
+              for (let a = 3; a >= 1; a--){
+                if (attempts[a] !== null && attempts[a] !== undefined){ eff = attempts[a]; break; }
+              }
+              if (eff !== null){ sum += eff; count++; }
             }
           }
         }catch(e){/* ignore */}
-        if (!Number.isNaN(p1) && !Number.isNaN(p2)){
-          const avg = Math.round((p1 + p2) / 2);
+        if (count > 0){
+          const avg = Math.round(sum / count);
           const span = document.createElement('span');
           span.className = 'badge bg-success';
           span.style.fontSize = '0.8rem';
@@ -521,120 +471,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }catch(e){/* ignore badge errors */}
   }
 
-  // Create or remove a "Recursar" button inside the modal footer depending on status.
-  function toggleRecursarButton(code){
-    const modalFooter = document.querySelector('#subjectModal .modal-footer');
-    if (!modalFooter) return;
-    // remove existing if any
-    const existing = modalFooter.querySelector('#subject-recursar');
-    if (existing) existing.remove();
-    // show button only when there is saved data for this subject
-    const stored = loadSubjectData(code || '');
-    if (!stored) return;
-
-    // create button (text varies: 'Recursar' when Desaprobada, otherwise 'Dar de baja')
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.id = 'subject-recursar';
-    btn.className = 'btn btn-danger me-auto';
-    // decide label based on computed banner status (if present) else stored/override status
-    const bannerEl = document.getElementById('subject-status-text');
-    const bannerStatus = bannerEl ? bannerEl.textContent.trim() : null;
-    const storedStatus = stored && (stored.overrideStatus || stored.status) ? (stored.overrideStatus || stored.status) : null;
-    const label = (bannerStatus === 'Desaprobada' || storedStatus === 'Desaprobada') ? 'Recursar' : 'Dar de baja';
-    btn.textContent = label;
-    // handler: clear stored data for this subject and reset inputs
-    btn.addEventListener('click', () => {
-      // Determine if this is a recurse (failed subject) or just dropping
-      const isRecursing = (bannerStatus === 'Desaprobada' || storedStatus === 'Desaprobada');
-      const prevRecursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
-      const newRecursedCount = isRecursing ? (prevRecursedCount + 1) : prevRecursedCount;
-      const key = getSubjectStorageKey(code);
-      
-      // Animate unlocks: capture available-before, remove data, then capture after and animate
-      let prevAvailable = [];
-      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
-      
-      // Clear subject data - always delete from Firebase first to clear all grades/status
-      // Then re-upload just the recursedCount if needed
-      if (key) {
-        // First, delete from Firebase to clear all existing data (grades, status, etc.)
-        try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(code); }catch(e){ console.error('firestoreDeleteSubject hook error', e); }
-        
-        if (newRecursedCount > 0) {
-          // Save just the recursedCount locally and upload to Firebase
-          const minimalData = { recursedCount: newRecursedCount };
-          localStorage.setItem(key, JSON.stringify(minimalData));
-          // Upload to Firestore after a short delay to ensure delete completes first
-          setTimeout(() => {
-            try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadSubject) window.firestoreUploadSubject(code, minimalData); }catch(e){ console.error('firestoreUploadSubject hook error', e); }
-          }, 100);
-        } else {
-          localStorage.removeItem(key);
-          // Already deleted from Firestore above
-        }
-      }
-      
-      // clear inputs
-      ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-      });
-      // reset partial placeholders and visibility to defaults
-      const p1_2 = document.getElementById('parcial1_2');
-      const p1_3 = document.getElementById('parcial1_3');
-      const p2_2 = document.getElementById('parcial2_2');
-      const p2_3 = document.getElementById('parcial2_3');
-      if (p1_2) { p1_2.placeholder = 'Debe Recuperar'; p1_2.classList.add('d-none'); }
-      if (p1_3) { p1_3.placeholder = 'Debe Recuperar'; p1_3.classList.add('d-none'); }
-      if (p2_2) { p2_2.placeholder = 'Debe Recuperar'; p2_2.classList.add('d-none'); }
-      if (p2_3) { p2_3.placeholder = 'Debe Recuperar'; p2_3.classList.add('d-none'); }
-      // ensure only first parcial attempt visible initially
-      showPartialAttemptsUpTo(1,1);
-      showPartialAttemptsUpTo(2,1);
-      // hide finals
-      showFinalsUpTo(0);
-      // clear status banner
-      const statusContainer = document.getElementById('subject-status');
-      if (statusContainer) statusContainer.innerHTML = '';
-  // remove card styling and re-evaluate cursar state
-  if (currentCard) applyCardStatusStyle(currentCard, null);
-  updateAllCardCursarState();
-  try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
-  // Re-render card to show updated recursed numeral
-  try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-rendering after recursar', e); }
-      // remove the button itself
-      btn.remove();
-      // close modal after dar de baja
-      try{
-        const modalEl = document.getElementById('subjectModal');
-        if (modalEl){
-          const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-          inst.hide();
-        }
-      }catch(err){/* ignore */}
-      // re-bind inputs listeners may already be bound; ensure status updates reflect cleared values
-      updateSubjectStatus();
-    });
-
-    // insert at the start of footer (left side)
-    modalFooter.insertBefore(btn, modalFooter.firstChild);
-  }
-
-  // The override control is now static in HTML (see index.html). Event binding and
-  // initialization happens when opening the modal (onCardClick) so we remove the
-  // dynamic renderer previously used.
-
-  function clearOverrideFor(code){
-    if (!code) return;
-    const stored = loadSubjectData(code) || null;
-    if (!stored) return;
-    if (stored.overrideStatus){
-      delete stored.overrideStatus;
-      saveSubjectData(code, stored);
-    }
-    // The dropdown is now inside the banner, no separate select to update
-  }
+  // "Recursar"/"Dar de baja" ahora se maneja desde el panel de configuración de la materia
+  // (botón de engranaje en el modal, ver bindSubjectSettingsPanel() más abajo), que llama a
+  // activeStore.recursar()/dropEnrollment() en vez de manipular localStorage/Firestore acá.
 
   // Evaluate 'cursar' requirements for a given card. Returns true if all requirements met.
   function cursarRequirementsMetForCard(card){
@@ -649,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!id) return false;
       const stored = loadSubjectData(id);
       // if user override exists, consider it
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       // If no status, requirement not met
       if (!status) return false;
       // Determine acceptable statuses
@@ -781,25 +620,18 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.appendChild(row);
       });
 
-      // Add electivas from storage if any belong to this module
+      // Add electivas from cache if any belong to this module
       try {
-        const electivesStr = localStorage.getItem('electives');
-        if (electivesStr) {
-          const electivesMap = JSON.parse(electivesStr);
-          
-          Object.keys(electivesMap).forEach(key => {
-            const electiveData = electivesMap[key];
-            if (electiveData && electiveData.colIndex === moduleIndex) {
-              // Find the electiva in electivasList
-              const electiva = electivasList.find(e => e.code === key || e.name === key);
-              if (electiva) {
-                const row = createTableRow(electiva, module);
-                tbody.appendChild(row);
-              }
+        getElectivesForCurrentPlan().forEach(entry => {
+          if (entry.columnIndex === moduleIndex) {
+            const electiva = electivasList.find(e => e.code === entry.subjectCode || e.name === entry.subjectCode);
+            if (electiva) {
+              const row = createTableRow(electiva, module);
+              tbody.appendChild(row);
             }
-          });
-        }
-      } catch(e) { console.error('Failed to load electivas from localStorage for table view:', e); }
+          }
+        });
+      } catch(e) { console.error('Failed to load electivas for table view:', e); }
 
       table.appendChild(tbody);
       groupDiv.appendChild(table);
@@ -814,7 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Get stored data for this subject
     const stored = loadSubjectData(subject.code);
-    const status = stored ? (stored.overrideStatus || stored.status || null) : null;
+    const status = stored ? stored.status : null;
     const statusDesc = getStatusDescription(status);
     
     // Apply status background class
@@ -874,7 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const reqId = (typeof req === 'string') ? req : (req.id || req.code);
         if (!reqId) continue;
         const reqStored = loadSubjectData(reqId);
-        const reqStatus = reqStored ? (reqStored.overrideStatus || reqStored.status || null) : null;
+        const reqStatus = reqStored ? reqStored.status : null;
         const reqType = (typeof req === 'object' && req.type) ? req.type : 'aprobada';
         
         let reqMet = false;
@@ -933,7 +765,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Get status for this subject if showStatusEnabled
     const stored = loadSubjectData(subject.code);
-    const status = stored ? (stored.overrideStatus || stored.status || null) : null;
+    const status = stored ? stored.status : null;
     const statusDesc = getStatusDescription(status);
     const promotable = (status === 'Regularizada' || status === 'No regularizada') && canPromote(stored);
     let statusLabel = '';
@@ -1004,7 +836,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Subject modal behavior
   let currentCard = null;
-  function onCardClick(e){
+  let currentEnrollment = null; // enrollment hidratado de la materia con el modal abierto (o null si no está inscripta)
+  async function onCardClick(e){
     // open modal and populate minimal info
     currentCard = e.currentTarget;
     // If card is disabled (doesn't meet cursar requirements) highlight missing requirements instead of opening modal
@@ -1025,265 +858,175 @@ document.addEventListener('DOMContentLoaded', () => {
       name = clone.textContent.trim() || code;
     }
     titleEl.textContent = `${name} ${code ? '(' + code + ')' : ''}`;
-    
-    // Always display recursedCount badge in modal header (starting from "Cursada I"), make it clickable to edit
+
+    // Display recursedCount badge in modal header ("Cursada I", "Cursada II", ...). Para
+    // editar el número real hay que usar "Recursar" desde el panel de configuración.
     const existingRecursedBadge = document.getElementById('subject-recursed-badge');
     if (existingRecursedBadge) existingRecursedBadge.remove();
-    const storedForBadge = loadSubjectData(code);
-    const currentRecursedCount = (storedForBadge && typeof storedForBadge.recursedCount === 'number') ? storedForBadge.recursedCount : 0;
+    currentEnrollment = loadSubjectData(code);
+    const currentRecursedCount = (currentEnrollment && typeof currentEnrollment.recursedCount === 'number') ? currentEnrollment.recursedCount : 0;
     const cursadaNumber = currentRecursedCount + 1;
     const cursadaNumeral = toRomanNumeral(cursadaNumber);
-    
     const badge = document.createElement('span');
     badge.id = 'subject-recursed-badge';
     badge.className = 'badge bg-secondary ms-2';
     badge.style.fontSize = '0.75rem';
     badge.style.fontWeight = 'normal';
     badge.style.verticalAlign = 'middle';
-    badge.style.cursor = 'pointer';
     badge.textContent = `Cursada ${cursadaNumeral}`;
-    badge.title = currentRecursedCount > 0 
-      ? `Has recursado esta materia ${currentRecursedCount} vez${currentRecursedCount !== 1 ? 'es' : ''} - Click para editar`
-      : 'Click para editar el número de cursada';
-    
-    // Add click handler to edit cursada number
-    badge.addEventListener('click', () => {
-      const currentStored = loadSubjectData(code) || {};
-      const currentCount = (typeof currentStored.recursedCount === 'number') ? currentStored.recursedCount : 0;
-      const currentCursada = currentCount + 1;
-      const newCursadaStr = prompt(`Ingresá el número de cursada (actualmente: ${currentCursada}):`, String(currentCursada));
-      if (newCursadaStr === null) return; // User cancelled
-      const newCursada = parseInt(newCursadaStr, 10);
-      if (Number.isNaN(newCursada) || newCursada < 1) {
-        alert('Por favor ingresá un número válido mayor o igual a 1.');
-        return;
-      }
-      const newRecursedCount = newCursada - 1; // Convert cursada number to recursedCount
-      // Update the stored data
-      currentStored.recursedCount = newRecursedCount;
-      saveSubjectData(code, currentStored);
-      // Update the badge text
-      badge.textContent = `Cursada ${toRomanNumeral(newCursada)}`;
-      badge.title = newRecursedCount > 0 
-        ? `Has recursado esta materia ${newRecursedCount} vez${newRecursedCount !== 1 ? 'es' : ''} - Click para editar`
-        : 'Click para editar el número de cursada';
-      // Re-render the board to reflect the change
-      try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-rendering after cursada edit', e); }
-    });
-    
+    badge.title = currentRecursedCount > 0
+      ? `Has recursado esta materia ${currentRecursedCount} vez${currentRecursedCount !== 1 ? 'es' : ''}`
+      : '';
     titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
 
-    // clear inputs for now (new layout: parciales with 3 fields each)
-    ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-    // reset partial placeholders and visibility to defaults
-    const p1_2 = document.getElementById('parcial1_2');
-    const p1_3 = document.getElementById('parcial1_3');
-    const p2_2 = document.getElementById('parcial2_2');
-    const p2_3 = document.getElementById('parcial2_3');
-    if (p1_2) { p1_2.placeholder = 'Debe Recuperar'; p1_2.classList.add('d-none'); }
-    if (p1_3) { p1_3.placeholder = 'Debe Recuperar'; p1_3.classList.add('d-none'); }
-    if (p2_2) { p2_2.placeholder = 'Debe Recuperar'; p2_2.classList.add('d-none'); }
-    if (p2_3) { p2_3.placeholder = 'Debe Recuperar'; p2_3.classList.add('d-none'); }
-    // ensure only first parcial attempt visible initially
-    const p1group = document.getElementById('parcial1-group'); if (p1group) p1group.classList.remove('d-none');
-    const p2group = document.getElementById('parcial2-group'); if (p2group) p2group.classList.remove('d-none');
-
     const modalEl = document.getElementById('subjectModal');
-    if (modalEl){
-      // ensure footer is visible by default when opening modal
-      const mf = modalEl.querySelector('.modal-footer'); if (mf) mf.style.display = '';
-      const bsModal = new bootstrap.Modal(modalEl);
-      bsModal.show();
-      // wire live status updates: listen to partials and finals and recalc
-      const partialIds = ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3'];
-      const finalIds = ['final1','final2','final3','final4'];
-      function bindLiveInputs(){
-        partialIds.concat(finalIds).forEach(id => {
-          const inp = document.getElementById(id);
-          if (!inp) return;
-          inp.removeEventListener('input', updateSubjectStatus);
-          inp.addEventListener('input', () => {
-            // Clearing any user override when notes are modified so the status is recomputed
-            clearOverrideFor(code);
-            updateSubjectStatus();
-            toggleRecursarButton(code);
-          });
-        });
-      }
-      // If we have saved data for this subject, populate fields
-      const stored = loadSubjectData(code || name);
-      if (stored && stored.values){
-        Object.keys(stored.values).forEach(id => {
-          const el = document.getElementById(id);
-          if (el && stored.values[id] !== null && stored.values[id] !== undefined){
-            el.value = stored.values[id];
-            // Ensure visibility for attempts/finals that were stored
-            if (id.startsWith('parcial1_')) showPartialAttemptsUpTo(1, Math.max(1, parseInt(id.split('_')[1] || '1')));
-            if (id.startsWith('parcial2_')) showPartialAttemptsUpTo(2, Math.max(1, parseInt(id.split('_')[1] || '1')));
-            if (id.startsWith('final')){
-              // determine how many finals should be visible based on highest final index with value
-              const idx = parseInt(id.replace('final','') || '1');
-              showFinalsUpTo(idx);
-            }
-          }
-        });
-      }
-      // ensure finals container initially hidden until status logic decides
-      const finalsContainer = document.getElementById('finals-container');
-      if (finalsContainer) finalsContainer.classList.add('d-none');
-      // clear any previous status
-      const statusContainer = document.getElementById('subject-status');
-      if (statusContainer) statusContainer.innerHTML = '';
-      // render 'Empezar' button when subject not present in localStorage and is available to cursar
-      function renderStartButton(code){
-        // remove any previous wrapper
-        const prev = document.getElementById('subject-start-wrap');
-        if (prev) prev.remove();
-        const effectiveCode = code || (currentCard && currentCard.dataset && currentCard.dataset.code) || '';
-        if (!effectiveCode) return;
-        // only show when subject has no progress (not started) and when subject can be cursar
-        if (hasSubjectProgress(effectiveCode)) return;
-        if (!cursarRequirementsMetForCard(currentCard)) return;
+    if (!modalEl) return;
 
-        // Hide main form and status area so the big button occupies the modal
-        const formEl = document.getElementById('subject-form');
-        const statusEl = document.getElementById('subject-status');
-        const modalFooter = document.querySelector('#subjectModal .modal-footer');
-        if (formEl) formEl.classList.add('d-none');
-        if (statusEl) statusEl.classList.add('d-none');
-  if (modalFooter) modalFooter.style.display = 'none';
+    const formEl = document.getElementById('subject-form');
+    const statusEl = document.getElementById('subject-status');
+    const modalFooter = modalEl.querySelector('.modal-footer');
+    const settingsPanel = document.getElementById('subject-settings-panel');
+    const settingsToggleBtn = document.getElementById('subject-settings-toggle');
+    const aprobarWarn = document.getElementById('subject-aprobar-warning');
+    if (formEl) formEl.classList.remove('d-none');
+    if (statusEl) statusEl.classList.remove('d-none');
+    if (modalFooter) modalFooter.style.display = '';
+    if (settingsPanel) settingsPanel.classList.add('d-none');
+    if (settingsToggleBtn) settingsToggleBtn.classList.remove('d-none');
+    if (aprobarWarn) { aprobarWarn.classList.add('d-none'); aprobarWarn.textContent = ''; }
+    const prevStartWrap = document.getElementById('subject-start-wrap');
+    if (prevStartWrap) prevStartWrap.remove();
 
-        const wrap = document.createElement('div');
-        wrap.id = 'subject-start-wrap';
-        wrap.className = 'd-flex flex-column justify-content-center align-items-center';
-        wrap.style.minHeight = '180px';
-        wrap.style.gap = '12px';
+    const bsModal = new bootstrap.Modal(modalEl);
+    bsModal.show();
 
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.id = 'subject-start';
-        btn.className = 'btn btn-success btn-lg';
-        btn.style.padding = '0.75rem 2rem';
-        btn.textContent = 'Empezar';
-
-        btn.addEventListener('click', () => {
-          // animate unlocks: capture available-before, save minimal stored object, then animate any newly unlocked
-          let prevAvailable = [];
-          try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
-          // create minimal stored object
-          const obj = { values: {}, status: 'Faltan examenes', savedAt: (new Date()).toISOString() };
-          saveSubjectData(effectiveCode, obj);
-
-          // If this modal was opened for an electiva selection and we have a pending insert target,
-          // create a real dashboard card in that column and remove the placeholder.
-          try{
-            if (currentCard && currentCard._electivaMeta && currentCard._insertTarget){
-              const meta = currentCard._electivaMeta;
-              const target = currentCard._insertTarget;
-              // avoid duplicates: if code already present, just remove placeholder
-              if (!meta.code || !codeMap[meta.code]){
-                const newCard = createCard(meta);
-                const colEl = columnsContainer.querySelector(`.column-col[data-index="${target.colIndex}"]`);
-                if (colEl){
-                  if (target.placeholderEl && target.placeholderEl.parentNode === colEl){
-                    colEl.insertBefore(newCard, target.placeholderEl);
-                    target.placeholderEl.remove();
-                  } else {
-                    colEl.appendChild(newCard);
-                  }
-                  // Rebuild overlay/maps so the new card is included
-                  setupOverlayAndInteractions();
-                  try{ computeStats(displayedSubjects); }catch(e){}
-                  // set currentCard to the newly created real card so subsequent UI updates apply to it
-                  currentCard = codeMap[meta.code] || newCard;
-                }
-              } else {
-                // already exists: remove placeholder if present
-                try{ if (target && target.placeholderEl && target.placeholderEl.parentNode) target.placeholderEl.remove(); }catch(e){}
-              }
-              // clear pending insert
-              electivaInsertTarget = null;
-              if (currentCard && currentCard._insertTarget) delete currentCard._insertTarget;
-            }
-          }catch(e){ console.error('Error inserting electiva into column', e); }
-
-          // restore modal content
-          if (formEl) formEl.classList.remove('d-none');
-          if (statusEl) { statusEl.classList.remove('d-none'); setStatusBanner(obj.status); }
-          if (modalFooter) modalFooter.style.display = '';
-          // update visuals
-          applyCardStatusStyle(currentCard, null);
-          updateAllCardCursarState();
-          try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
-          try{ computeStats(displayedSubjects); }catch(e){}
-          // remove the big start wrapper
-          wrap.remove();
-        });
-
-        wrap.appendChild(btn);
-        // place the wrapper into the modal body (replace content area)
-        const modalBody = modalEl.querySelector('.modal-body');
-        if (modalBody) modalBody.appendChild(wrap);
-      }
-      // bind and run initial status calculation
-      bindLiveInputs();
-      updateSubjectStatus();
-      // Check if there's an override stored, and if so, display that status
-      try{
-        const effectiveCode = code || (currentCard && currentCard.dataset && currentCard.dataset.code) || '';
-        const storedOverride = loadSubjectData(effectiveCode) || {};
-        if (storedOverride.overrideStatus){
-          // Display override status in the banner instead of computed
-          setStatusBanner(storedOverride.overrideStatus);
-        }
-      }catch(e){ console.error('Error checking stored override', e); }
-      // ensure recursar button reflects current status
-      toggleRecursarButton(code);
-      // The override dropdown is now inside the banner, handled by setStatusBanner
-      // render start button for current subject AFTER banner/override are rendered
-      try{ renderStartButton(code); }catch(e){}
-      // wire save to close the modal and log values (placeholder behavior)
-      const saveBtn = document.getElementById('subject-save');
-      if (saveBtn){
-        const handler = () => {
-          // capture available-before to animate newly unlocked after save
-          let prevAvailable = [];
-          try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
-          const values = {};
-          ['parcial1_1','parcial1_2','parcial1_3','parcial2_1','parcial2_2','parcial2_3','final1','final2','final3','final4'].forEach(id => {
-            const i = document.getElementById(id);
-            values[id] = i ? i.value : null;
-          });
-          // ensure status reflects latest inputs
-          updateSubjectStatus();
-          const statusTextEl = document.getElementById('subject-status-text');
-          const statusText = statusTextEl ? statusTextEl.textContent.trim() : '';
-          // persist to localStorage
-          const storedObj = { values, status: statusText, savedAt: (new Date()).toISOString() };
-          // Do NOT preserve existing override: saving the modal should clear any manual override
-          // so the computed status (from the entered notes) becomes the source of truth.
-          saveSubjectData(code || name, storedObj);
-          // The override dropdown is now inside the banner, no separate control to reset
-          console.log('Guardado subject:', code || name, { values, status: statusText });
-          // update card style in dashboard
-          applyCardStatusStyle(currentCard, statusText);
-          // after saving, re-evaluate cursar state for all cards (some may unlock)
-          updateAllCardCursarState();
-          try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
-          // recompute stats after saving
-          try{ computeStats(displayedSubjects); }catch(e){/* ignore */}
-          bsModal.hide();
-          saveBtn.removeEventListener('click', handler);
-        };
-        // remove any previous handlers by cloning
-        const newSave = saveBtn.cloneNode(true);
-        saveBtn.parentNode.replaceChild(newSave, saveBtn);
-        newSave.addEventListener('click', handler);
-      }
+    if (!currentEnrollment){
+      await renderStartFlow(code);
+      return;
     }
+    await renderEnrolledSubject(code);
+  }
+
+  // Flujo para una materia todavía no inscripta: elegir esquema (si hay más de uno
+  // disponible) y crear la inscripción al apretar "Empezar".
+  async function renderStartFlow(code){
+    const modalEl = document.getElementById('subjectModal');
+    const formEl = document.getElementById('subject-form');
+    const statusEl = document.getElementById('subject-status');
+    const modalFooter = modalEl.querySelector('.modal-footer');
+    const settingsToggleBtn = document.getElementById('subject-settings-toggle');
+    if (formEl) formEl.classList.add('d-none');
+    if (statusEl) statusEl.classList.add('d-none');
+    if (modalFooter) modalFooter.style.display = 'none';
+    if (settingsToggleBtn) settingsToggleBtn.classList.add('d-none');
+
+    const schemes = schemesCache.length ? schemesCache : await getEvaluationSchemes();
+    const wrap = document.createElement('div');
+    wrap.id = 'subject-start-wrap';
+    wrap.className = 'd-flex flex-column justify-content-center align-items-center';
+    wrap.style.minHeight = '180px';
+    wrap.style.gap = '12px';
+
+    if (schemes.length > 1){
+      const pickerWrap = document.createElement('div');
+      pickerWrap.className = 'mb-2';
+      pickerWrap.style.minWidth = '240px';
+      pickerWrap.innerHTML = `
+        <label class="form-label small" for="subject-start-scheme">Esquema de evaluación</label>
+        <select id="subject-start-scheme" class="form-select form-select-sm">
+          ${schemes.map(s => `<option value="${escapeHtml(s.code)}">${escapeHtml(s.name)}</option>`).join('')}
+        </select>`;
+      wrap.appendChild(pickerWrap);
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'subject-start';
+    btn.className = 'btn btn-success btn-lg';
+    btn.style.padding = '0.75rem 2rem';
+    btn.textContent = 'Empezar';
+    wrap.appendChild(btn);
+
+    btn.addEventListener('click', async () => {
+      let prevAvailable = [];
+      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+      const select = document.getElementById('subject-start-scheme');
+      const defaultScheme = schemes.find(s => s.code === '2-partials') || schemes[0];
+      const schemeCode = select ? select.value : (defaultScheme ? defaultScheme.code : null);
+      if (!schemeCode){ alert('No hay esquemas de evaluación configurados.'); return; }
+      btn.disabled = true;
+      let hydrated;
+      try{
+        hydrated = await activeStore.createEnrollment(currentPlan, code, schemeCode);
+      }catch(err){
+        console.error('Error creando inscripción', err);
+        alert('No se pudo anotar a la materia: ' + (err && err.message ? err.message : err));
+        btn.disabled = false;
+        return;
+      }
+      putSubjectDataInCache(currentPlan, code, hydrated);
+      currentEnrollment = hydrated;
+
+      // Si el modal se abrió para colocar una electiva pendiente, insertarla en el tablero
+      try{
+        if (currentCard && currentCard._electivaMeta && currentCard._insertTarget){
+          const meta = currentCard._electivaMeta;
+          const target = currentCard._insertTarget;
+          if (!meta.code || !codeMap[meta.code]){
+            const newCard = createCard(meta);
+            const colEl = columnsContainer.querySelector(`.column-col[data-index="${target.colIndex}"]`);
+            if (colEl){
+              if (target.placeholderEl && target.placeholderEl.parentNode === colEl){
+                colEl.insertBefore(newCard, target.placeholderEl);
+                target.placeholderEl.remove();
+              } else {
+                colEl.appendChild(newCard);
+              }
+              setupOverlayAndInteractions();
+              try{ computeStats(displayedSubjects); }catch(e){}
+              currentCard = codeMap[meta.code] || newCard;
+            }
+          } else {
+            try{ if (target && target.placeholderEl && target.placeholderEl.parentNode) target.placeholderEl.remove(); }catch(e){}
+          }
+          electivaInsertTarget = null;
+          if (currentCard && currentCard._insertTarget) delete currentCard._insertTarget;
+        }
+      }catch(e){ console.error('Error inserting electiva into column', e); }
+
+      wrap.remove();
+      if (formEl) formEl.classList.remove('d-none');
+      if (statusEl) statusEl.classList.remove('d-none');
+      if (modalFooter) modalFooter.style.display = '';
+      if (settingsToggleBtn) settingsToggleBtn.classList.remove('d-none');
+      applyCardStatusStyle(currentCard, hydrated.status);
+      updateAllCardCursarState();
+      try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
+      try{ computeStats(displayedSubjects); }catch(e){}
+      await renderEnrolledSubject(code);
+    });
+
+    const modalBody = modalEl.querySelector('.modal-body');
+    if (modalBody) modalBody.appendChild(wrap);
+  }
+
+  // Flujo para una materia ya inscripta: genera el formulario dinámico según su
+  // schemeConfig, lo puebla con los datos guardados y calcula el status en vivo.
+  async function renderEnrolledSubject(code){
+    const stored = currentEnrollment || loadSubjectData(code);
+    if (!stored) return;
+    const schemeConfig = stored.schemeConfig || {};
+
+    renderDynamicFields(schemeConfig);
+    populateDynamicFields(schemeConfig, stored);
+    bindLiveInputs(schemeConfig);
+    bindSubjectSettingsPanel(code, stored);
+
+    const liveStatus = updateSubjectStatusLive(schemeConfig);
+    setStatusBanner(stored.statusOverride || liveStatus);
+
+    wireSaveButton(code, schemeConfig);
+    updateAprobarWarning();
   }
 
   // When a disabled card is clicked, highlight the missing 'cursar' requirements
@@ -1301,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!target) return;
       // determine if this single requirement is met according to its type
       const stored = loadSubjectData(id);
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       const type = (typeof r === 'object' && r.type) ? r.type : 'aprobada';
       let met = false;
       if (type === 'regularizada'){
@@ -1325,17 +1068,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Aviso (no bloqueante) de que faltan cumplir requisitos "para aprobar" (rendir el final)
+  // de otra materia, según requirements.aprobar del plan JSON.
+  function updateAprobarWarning(){
+    const warnEl = document.getElementById('subject-aprobar-warning');
+    if (!warnEl || !currentCard) return;
+    const reqObj = currentCard.dataset.requirements ? JSON.parse(currentCard.dataset.requirements) : { cursar: [], aprobar: [] };
+    const aprobar = reqObj.aprobar || [];
+    if (!aprobar.length){ warnEl.classList.add('d-none'); warnEl.textContent = ''; return; }
+    const missing = [];
+    aprobar.forEach(r => {
+      const id = (typeof r === 'string') ? r : (r.id || r.code);
+      if (!id) return;
+      const reqStored = loadSubjectData(id);
+      const status = reqStored ? reqStored.status : null;
+      const type = (typeof r === 'object' && r.type) ? r.type : 'aprobada';
+      const met = type === 'regularizada'
+        ? ['Regularizada','Aprobada','Promocionada'].includes(status)
+        : ['Aprobada','Promocionada'].includes(status);
+      if (!met) missing.push(id);
+    });
+    if (missing.length){
+      warnEl.textContent = `Para rendir el final necesitás tener regularizada/aprobada: ${missing.join(', ')}.`;
+      warnEl.classList.remove('d-none');
+    } else {
+      warnEl.classList.add('d-none');
+      warnEl.textContent = '';
+    }
+  }
+
   // Helpers for status calculation and UI updates
   function parseNum(v){
     if (v === null || v === undefined || v === '') return NaN;
     const n = parseFloat(String(v).replace(',', '.'));
     return Number.isFinite(n) ? n : NaN;
-  }
-
-  function avgOf(arr){
-    const nums = arr.map(parseNum).filter(n => Number.isFinite(n));
-    if (nums.length === 0) return NaN;
-    return nums.reduce((a,b)=>a+b,0)/nums.length;
   }
 
   function setStatusBanner(status){
@@ -1393,36 +1159,29 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Handle override selection from the dropdown
-  function handleOverrideSelection(overrideValue){
+  async function handleOverrideSelection(overrideValue){
     const effectiveCode = currentCard && currentCard.dataset && currentCard.dataset.code ? currentCard.dataset.code : '';
     if (!effectiveCode) return;
 
-    // capture available subjects before changing override
     let prev = [];
     try{ prev = getAvailableSubjectCodes(); }catch(e){}
 
-    let subjectData = loadSubjectData(effectiveCode) || {};
-    if (overrideValue === 'computed'){
-      // Clear override and use computed status
-      if (subjectData.overrideStatus) delete subjectData.overrideStatus;
-    } else {
-      // Set override status
-      subjectData.overrideStatus = overrideValue;
+    const status = overrideValue === 'computed' ? null : overrideValue;
+    let hydrated;
+    try{
+      hydrated = await activeStore.setOverride(currentPlan, effectiveCode, status);
+    }catch(err){
+      console.error('Error aplicando override', err);
+      alert('No se pudo actualizar el estado: ' + (err && err.message ? err.message : err));
+      return;
     }
-    if (!subjectData.values) subjectData.values = {};
-    saveSubjectData(effectiveCode, subjectData);
+    putSubjectDataInCache(currentPlan, effectiveCode, hydrated);
+    currentEnrollment = hydrated;
 
-    // Determine what status to display
-    const applyStatus = (overrideValue === 'computed') 
-      ? (subjectData.status || '') 
-      : overrideValue;
-    
-    setStatusBanner(applyStatus);
-    applyCardStatusStyle(currentCard, (overrideValue === 'computed') ? (subjectData.status || null) : overrideValue);
+    setStatusBanner(hydrated.status);
+    applyCardStatusStyle(currentCard, hydrated.status);
     try{ computeStats(displayedSubjects); }catch(e){}
-    // re-evaluate cursar state and animate newly unlocked subjects
     try{ updateAllCardCursarState(); const now = getAvailableSubjectCodes(); animateNewlyUnlocked(prev, now); }catch(e){}
-    // Close modal after override selection
     try{
       const modalEl = document.getElementById('subjectModal');
       if (modalEl){
@@ -1432,193 +1191,343 @@ document.addEventListener('DOMContentLoaded', () => {
     }catch(err){ console.error('Error closing modal after override selection', err); }
   }
 
-  function showFinalsUpTo(n){
-    const finals = [1,2,3,4].map(i => document.getElementById('final'+i)).filter(Boolean);
-    finals.forEach((el, idx) => {
-      if (idx < n) el.classList.remove('d-none'); else el.classList.add('d-none');
+  // --- Generación y lectura del formulario dinámico (parciales/finales/checklist) ---
+  // La cantidad de parciales, TPs y laboratorios sale del `schemeConfig` de la inscripción
+  // activa (ver evaluation_schemes.config en el backend); los intentos por parcial siguen
+  // siendo 3 (constante de la app, igual que antes).
+
+  function renderDynamicFields(schemeConfig){
+    const container = document.getElementById('subject-dynamic-fields');
+    if (!container) return;
+    container.innerHTML = '';
+    const partials = schemeConfig?.partials ?? 2;
+    const tp = schemeConfig?.tp ?? 0;
+    const labs = schemeConfig?.labs ?? 0;
+
+    for (let p = 1; p <= partials; p++){
+      const group = document.createElement('div');
+      group.className = 'mb-2';
+      group.id = `partial-group-${p}`;
+      group.innerHTML = `
+        <label class="form-label small">Parcial ${p}</label>
+        <div class="d-flex gap-1">
+          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm" id="p_${p}_1" placeholder="Nota">
+          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_2" placeholder="Debe Recuperar">
+          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_3" placeholder="Debe Recuperar">
+        </div>`;
+      container.appendChild(group);
+    }
+
+    if (tp > 0){
+      const group = document.createElement('div');
+      group.className = 'mb-2';
+      let inner = '<label class="form-label small">Trabajos prácticos</label><div class="d-flex flex-column gap-1">';
+      for (let i = 1; i <= tp; i++){
+        inner += `<div class="form-check"><input class="form-check-input" type="checkbox" id="chk_tp_${i}"><label class="form-check-label" for="chk_tp_${i}">TP ${i}</label></div>`;
+      }
+      group.innerHTML = inner + '</div>';
+      container.appendChild(group);
+    }
+
+    if (labs > 0){
+      const group = document.createElement('div');
+      group.className = 'mb-2';
+      let inner = '<label class="form-label small">Laboratorios</label><div class="d-flex flex-column gap-1">';
+      for (let i = 1; i <= labs; i++){
+        inner += `<div class="form-check"><input class="form-check-input" type="checkbox" id="chk_lab_${i}"><label class="form-check-label" for="chk_lab_${i}">Laboratorio ${i}</label></div>`;
+      }
+      group.innerHTML = inner + '</div>';
+      container.appendChild(group);
+    }
+
+    const finalsWrap = document.createElement('div');
+    finalsWrap.id = 'finals-container';
+    finalsWrap.className = 'mb-2 d-none';
+    finalsWrap.innerHTML = '<label class="form-label small">Final</label>';
+    const finalsBody = document.createElement('div');
+    finalsBody.className = 'd-flex flex-column gap-1';
+    for (let i = 1; i <= 4; i++){
+      const row = document.createElement('div');
+      row.className = 'd-flex gap-1 final-row d-none';
+      row.id = `final-row-${i}`;
+      row.innerHTML = `
+        <input type="number" min="1" max="10" step="1" class="form-control form-control-sm" id="final_${i}" placeholder="Nota final ${i}">
+        <input type="date" class="form-control form-control-sm" id="final_${i}_date" title="Fecha del final">`;
+      finalsBody.appendChild(row);
+    }
+    finalsWrap.appendChild(finalsBody);
+    container.appendChild(finalsWrap);
+  }
+
+  function populateDynamicFields(schemeConfig, stored){
+    const n = schemeConfig?.partials ?? 2;
+    for (let p = 1; p <= n; p++){
+      const attempts = (stored.partials && stored.partials[p]) || {};
+      let maxA = 1;
+      for (let a = 1; a <= 3; a++){
+        const el = document.getElementById(`p_${p}_${a}`);
+        const v = attempts[a];
+        if (el && v !== null && v !== undefined){ el.value = v; maxA = Math.max(maxA, a); }
+      }
+      showPartialAttemptsUpTo(p, maxA);
+    }
+    let maxFinal = 0;
+    (stored.finals || []).forEach(f => {
+      if (!f) return;
+      const gEl = document.getElementById(`final_${f.attemptNumber}`);
+      const dEl = document.getElementById(`final_${f.attemptNumber}_date`);
+      if (gEl && f.grade !== null && f.grade !== undefined){ gEl.value = f.grade; maxFinal = Math.max(maxFinal, f.attemptNumber); }
+      if (dEl && f.examDate) dEl.value = f.examDate;
     });
-    const finalsContainer = document.getElementById('finals-container');
-    if (finalsContainer){
-      const finalsLabel = finalsContainer.previousElementSibling && finalsContainer.previousElementSibling.tagName === 'LABEL' ? finalsContainer.previousElementSibling : null;
-      if (n > 0){
-        finalsContainer.classList.remove('d-none');
-        if (finalsLabel) finalsLabel.classList.remove('d-none');
-      } else {
-        finalsContainer.classList.add('d-none');
-        if (finalsLabel) finalsLabel.classList.add('d-none');
+    showFinalsUpTo(maxFinal);
+    const checklist = stored.checklist || {};
+    ['tp', 'lab'].forEach(type => {
+      const items = checklist[type] || {};
+      Object.keys(items).forEach(num => {
+        const el = document.getElementById(`chk_${type}_${num}`);
+        if (el) el.checked = !!items[num];
+      });
+    });
+  }
+
+  function readDynamicPartials(schemeConfig){
+    const partials = {};
+    const n = schemeConfig?.partials ?? 2;
+    for (let p = 1; p <= n; p++){
+      partials[p] = {};
+      for (let a = 1; a <= 3; a++){
+        const el = document.getElementById(`p_${p}_${a}`);
+        const v = el ? parseNum(el.value) : NaN;
+        partials[p][a] = Number.isNaN(v) ? null : v;
       }
     }
+    return partials;
+  }
+
+  function readDynamicFinals(){
+    const finals = {};
+    for (let i = 1; i <= 4; i++){
+      const gradeEl = document.getElementById(`final_${i}`);
+      const dateEl = document.getElementById(`final_${i}_date`);
+      const grade = gradeEl ? parseNum(gradeEl.value) : NaN;
+      const date = dateEl && dateEl.value ? dateEl.value : null;
+      if (!Number.isNaN(grade) || date){
+        finals[i] = { grade: Number.isNaN(grade) ? null : grade, examDate: date };
+      }
+    }
+    return finals;
+  }
+
+  function readDynamicChecklist(schemeConfig){
+    const checklist = {};
+    const tp = schemeConfig?.tp ?? 0;
+    const labs = schemeConfig?.labs ?? 0;
+    if (tp > 0){
+      checklist.tp = {};
+      for (let i = 1; i <= tp; i++){
+        const el = document.getElementById(`chk_tp_${i}`);
+        checklist.tp[i] = !!(el && el.checked);
+      }
+    }
+    if (labs > 0){
+      checklist.lab = {};
+      for (let i = 1; i <= labs; i++){
+        const el = document.getElementById(`chk_lab_${i}`);
+        checklist.lab[i] = !!(el && el.checked);
+      }
+    }
+    return checklist;
+  }
+
+  function showFinalsUpTo(n){
+    for (let i = 1; i <= 4; i++){
+      const row = document.getElementById(`final-row-${i}`);
+      if (row){ if (i <= n) row.classList.remove('d-none'); else row.classList.add('d-none'); }
+    }
+    const wrap = document.getElementById('finals-container');
+    if (wrap){ if (n > 0) wrap.classList.remove('d-none'); else wrap.classList.add('d-none'); }
   }
 
   function showPartialAttemptsUpTo(partialIndex, n){
-    // partialIndex: 1 or 2, n: number of attempts to show (1..3)
-    const ids = [1,2,3].map(i => document.getElementById(`parcial${partialIndex}_${i}`)).filter(Boolean);
+    const ids = [1,2,3].map(i => document.getElementById(`p_${partialIndex}_${i}`)).filter(Boolean);
     ids.forEach((el, idx) => {
       if (idx < n) el.classList.remove('d-none'); else el.classList.add('d-none');
     });
-    const group = document.getElementById(`parcial${partialIndex}-group`);
-    if (group){
-      // keep group visible if at least one attempt visible
-      if (n > 0) group.classList.remove('d-none'); else group.classList.add('d-none');
-    }
   }
 
-  function updateSubjectStatus(){
-    // read partial attempts (attempts are ordered: 1=first try, 2=recup1, 3=recup2)
-    const p1 = [document.getElementById('parcial1_1'),document.getElementById('parcial1_2'),document.getElementById('parcial1_3')];
-    const p2 = [document.getElementById('parcial2_1'),document.getElementById('parcial2_2'),document.getElementById('parcial2_3')];
-    const p1_vals = p1.map(i => i ? i.value : '');
-    const p2_vals = p2.map(i => i ? i.value : '');
-    const p1_first = parseNum(p1_vals[0]);
-    const p2_first = parseNum(p2_vals[0]);
+  // Reveal progresivo de recuperatorios/finales (igual espíritu que antes, generalizado a N
+  // parciales) + cálculo del status en vivo vía statusEngine.js (mismo algoritmo que el backend).
+  function updateSubjectStatusLive(schemeConfig){
+    const n = schemeConfig?.partials ?? 2;
+    const highNote = schemeConfig?.promotion?.high_note ?? 8;
+    for (let p = 1; p <= n; p++) showPartialAttemptsUpTo(p, 1);
 
-    // compute averages across provided attempts for regularizada check
-    const p1_avg = avgOf(p1_vals);
-    const p2_avg = avgOf(p2_vals);
-
-    // finals values
-    const finals = [document.getElementById('final1'),document.getElementById('final2'),document.getElementById('final3'),document.getElementById('final4')];
-    const finalsVals = finals.map(f => f ? parseNum(f.value) : NaN);
-
-    // Reset: hide all partial recuperatories; we will reveal those needed
-    showPartialAttemptsUpTo(1,1);
-    showPartialAttemptsUpTo(2,1);
-
-    // Helper to detect filled attempts count per parcial
-    function lastAttemptValue(attemptEls){
-      for (let i = attemptEls.length - 1; i >= 0; i--){
-        const v = attemptEls[i] ? parseNum(attemptEls[i].value) : NaN;
-        if (!Number.isNaN(v)) return {value: v, index: i+1};
+    const partials = readDynamicPartials(schemeConfig);
+    for (let p = 1; p <= n; p++){
+      const a1 = partials[p][1];
+      const a2 = partials[p][2];
+      if (a1 !== null && a1 < 6){
+        showPartialAttemptsUpTo(p, 2);
+        if (a2 !== null && a2 < 6) showPartialAttemptsUpTo(p, 3);
+      } else if (a1 !== null && a1 < highNote){
+        // regularizado pero por debajo del umbral de promoción: dejar intentar un recuperatorio
+        showPartialAttemptsUpTo(p, 2);
       }
-      return {value: NaN, index: 0};
     }
 
-    // Promotion logic with at most ONE recuperatory allowed across both partials
-    // Case 1: both first tries >=8 => promocionada
-    if (!Number.isNaN(p1_first) && !Number.isNaN(p2_first) && p1_first >= 8 && p2_first >= 8){
-      showFinalsUpTo(0);
-      setStatusBanner('Promocionada');
-      return;
-    }
+    const finalsRaw = readDynamicFinals();
+    const finalsArr = Object.keys(finalsRaw).map(k => ({ attemptNumber: Number(k), ...finalsRaw[k] }));
+    const checklist = readDynamicChecklist(schemeConfig);
 
-    // Detect presence of notas per parcial. If some notas are missing we still want to
-    // run the recovery / "Debe Recuperar" calculation for the parcial(s) that have values.
-    // We will mark a 'faltanNotas' flag and avoid early returning so the UI shows recuperatories
-    // while keeping finals hidden and the banner as 'Faltan notas' when appropriate.
-    const p1_hasNote = p1_vals.map(v=>parseNum(v)).some(n=>!Number.isNaN(n));
-    const p2_hasNote = p2_vals.map(v=>parseNum(v)).some(n=>!Number.isNaN(n));
-    const faltanNotas = (!p1_hasNote || !p2_hasNote);
-    if (faltanNotas){
-      // keep finals hidden while notes are incomplete, but continue computing recuperatories
-      showFinalsUpTo(0);
-      // don't return here; continue to run recovery/placeholder logic below
-    }
+    const status = computeStatus(schemeConfig, partials, finalsArr, checklist, null);
 
-    // Case 2: one first >=8 and the other <8 -> allow ONE recuperatory on the lower one to try to reach >=8
-    let promotionCandidate = null; // {partialIndex:1|2}
-    if (!Number.isNaN(p1_first) && !Number.isNaN(p2_first)){
-      if (p1_first >= 8 && p2_first < 8) promotionCandidate = 2;
-      else if (p2_first >= 8 && p1_first < 8) promotionCandidate = 1;
-    }
-
-    if (promotionCandidate){
-      // show recuperatory attempt 2 for the candidate with placeholder 'Puede promocionar'
-      const candidateEls = promotionCandidate === 1 ? p1 : p2;
-      const otherFirst = promotionCandidate === 1 ? p2_first : p1_first;
-      // reveal attempt2 for the candidate
-      showPartialAttemptsUpTo(promotionCandidate, 2);
-      const attempt2 = candidateEls[1];
-      if (attempt2){
-        attempt2.placeholder = 'Puede promocionar';
-        attempt2.classList.remove('d-none');
-      }
-      // check if attempt2 filled and >=8 -> promocionada
-      const attempt2val = attempt2 ? parseNum(attempt2.value) : NaN;
-      if (!Number.isNaN(attempt2val) && attempt2val >= 8){
-        // promotion achieved via single recuperatory
-        showFinalsUpTo(0);
-        setStatusBanner('Promocionada');
-        return;
-      }
-      // If attempt2 filled but <8, promotion lost for this subject; fall through to recovery/regularized logic below
-    }
-
-    // Recovery logic for partials: if a parcial's (latest visible) attempt < 6, reveal next recuperatory(s)
-    // For each parcial, reveal next attempt when needed and set proper placeholders
-    [ {els: p1, idx:1}, {els: p2, idx:2} ].forEach(part => {
-      const firstVal = parseNum(part.els[0] ? part.els[0].value : '');
-      // If first attempt <6 or if second attempt already filled and <6, reveal next
-      if (!Number.isNaN(firstVal) && firstVal < 6){
-        // reveal attempt2
-        showPartialAttemptsUpTo(part.idx, 2);
-        const a2 = part.els[1];
-        if (a2){
-          // If this parcial was the promotion candidate, show 'Puede promocionar', otherwise 'Debe Recuperar'
-          if (promotionCandidate === part.idx) a2.placeholder = 'Puede promocionar'; else a2.placeholder = 'Debe Recuperar';
-          a2.classList.remove('d-none');
-        }
-        const a2val = a2 ? parseNum(a2.value) : NaN;
-        if (!Number.isNaN(a2val) && a2val < 6){
-          // reveal third recuperatory
-          showPartialAttemptsUpTo(part.idx, 3);
-          const a3 = part.els[2];
-          if (a3) a3.classList.remove('d-none');
-        }
-      }
-    });
-
-    // After recovery attempts visibility, compute effective last-attempt values for regularizada
-    const p1_last_info = lastAttemptValue(p1);
-    const p2_last_info = lastAttemptValue(p2);
-    const p1_last = p1_last_info.value;
-    const p2_last = p2_last_info.value;
-    if (!Number.isNaN(p1_last) && !Number.isNaN(p2_last) && p1_last >= 6 && p2_last >= 6){
-      // Regularizada path: show finals progressively as before
+    if (status === 'Regularizada' || status === 'Aprobada'){
       let attemptsToShow = 1;
-      for (let i=0;i<finalsVals.length;i++){
-        const v = finalsVals[i];
-        if (Number.isNaN(v)) break;
-        if (v < 6) attemptsToShow = i+2; else { showFinalsUpTo(i+1); setStatusBanner('Aprobada'); return; }
+      for (let i = 1; i <= 4; i++){
+        const f = finalsRaw[i];
+        if (!f || f.grade === null || f.grade === undefined) break;
+        if (f.grade < 6) attemptsToShow = i + 1; else { attemptsToShow = i; break; }
       }
-      if (attemptsToShow > finals.length) attemptsToShow = finals.length;
-      showFinalsUpTo(attemptsToShow);
-      setStatusBanner('Regularizada');
-      return;
-    }
-
-    // If any parcial has exhausted all attempts (index === 3) and the last value is <6, the subject is Desaprobada
-    if ((p1_last_info.index === 3 && !Number.isNaN(p1_last_info.value) && p1_last_info.value < 6) ||
-        (p2_last_info.index === 3 && !Number.isNaN(p2_last_info.value) && p2_last_info.value < 6)){
-      showFinalsUpTo(0);
-      // If notes are missing, prefer showing 'Faltan notas' instead of marking Desaprobada
-      if (faltanNotas){
-        setStatusBanner('Faltan notas');
-      } else {
-        setStatusBanner('Desaprobada');
-      }
-      return;
-    }
-
-    // Fallback: not regularizada, not promocionada -> either 'No regularizada' if there are remaining attempts, or 'Desaprobada' when all attempts exhausted
-    // Check if any partial or final attempt slots are still available (empty)
-    const partialAttemptEls = p1.concat(p2).filter(Boolean);
-    const partialRemaining = partialAttemptEls.some(el => {
-      const v = el.value; return v === null || v === undefined || v === '';
-    });
-    const finalEls = finals.filter(Boolean);
-    const finalRemaining = finalEls.some(el => {
-      const v = el.value; return v === null || v === undefined || v === '';
-    });
-    showFinalsUpTo(0);
-    // If some notas are missing, show that message instead of inferring No regularizada / Desaprobada
-    if (faltanNotas){
-      setStatusBanner('Faltan notas');
-      return;
-    }
-    if (partialRemaining || finalRemaining){
-      setStatusBanner('No regularizada');
+      showFinalsUpTo(Math.min(attemptsToShow, 4));
     } else {
-      setStatusBanner('Desaprobada');
+      showFinalsUpTo(0);
+    }
+
+    setStatusBanner(status);
+    return status;
+  }
+
+  function bindLiveInputs(schemeConfig){
+    const n = schemeConfig?.partials ?? 2;
+    const ids = [];
+    for (let p = 1; p <= n; p++) for (let a = 1; a <= 3; a++) ids.push(`p_${p}_${a}`);
+    for (let i = 1; i <= 4; i++){ ids.push(`final_${i}`); ids.push(`final_${i}_date`); }
+    const tp = schemeConfig?.tp ?? 0;
+    const labs = schemeConfig?.labs ?? 0;
+    for (let i = 1; i <= tp; i++) ids.push(`chk_tp_${i}`);
+    for (let i = 1; i <= labs; i++) ids.push(`chk_lab_${i}`);
+
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const evt = el.type === 'checkbox' ? 'change' : 'input';
+      el.addEventListener(evt, () => updateSubjectStatusLive(schemeConfig));
+    });
+  }
+
+  function wireSaveButton(code, schemeConfig){
+    const saveBtn = document.getElementById('subject-save');
+    if (!saveBtn) return;
+    const newSave = saveBtn.cloneNode(true);
+    saveBtn.parentNode.replaceChild(newSave, saveBtn);
+    newSave.addEventListener('click', async () => {
+      let prevAvailable = [];
+      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+      const partials = readDynamicPartials(schemeConfig);
+      const finals = readDynamicFinals();
+      const checklist = readDynamicChecklist(schemeConfig);
+      newSave.disabled = true;
+      try{
+        const hydrated = await activeStore.saveResults(currentPlan, code, { partials, finals, checklist, clearOverride: true });
+        putSubjectDataInCache(currentPlan, code, hydrated);
+        currentEnrollment = hydrated;
+        applyCardStatusStyle(currentCard, hydrated.status);
+        updateAllCardCursarState();
+        try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
+        try{ computeStats(displayedSubjects); }catch(e){}
+        try{ if (planData) renderGroups(planData); }catch(e){}
+        const modalEl = document.getElementById('subjectModal');
+        if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
+      }catch(err){
+        console.error('Error guardando notas', err);
+        alert('No se pudieron guardar las notas: ' + (err && err.message ? err.message : err));
+      }finally{
+        newSave.disabled = false;
+      }
+    });
+  }
+
+  // Panel de configuración de la materia (⚙): cambiar esquema/año, o recursar.
+  function bindSubjectSettingsPanel(code, stored){
+    const toggleBtn = document.getElementById('subject-settings-toggle');
+    const panel = document.getElementById('subject-settings-panel');
+    const schemeSelect = document.getElementById('subject-scheme-select');
+    const yearInput = document.getElementById('subject-year-input');
+    const applyBtn = document.getElementById('subject-settings-apply');
+    const recursarBtn = document.getElementById('subject-recursar-action');
+    if (!toggleBtn || !panel) return;
+
+    panel.classList.add('d-none');
+    const newToggle = toggleBtn.cloneNode(true);
+    toggleBtn.parentNode.replaceChild(newToggle, toggleBtn);
+    newToggle.addEventListener('click', () => panel.classList.toggle('d-none'));
+
+    const schemes = schemesCache.length ? schemesCache : [];
+    if (schemeSelect){
+      schemeSelect.innerHTML = schemes.map(s => `<option value="${escapeHtml(s.code)}">${escapeHtml(s.name)}</option>`).join('');
+      schemeSelect.value = stored.schemeCode || '';
+    }
+    if (yearInput) yearInput.value = stored.enrollmentYear || new Date().getFullYear();
+
+    if (applyBtn){
+      const newApply = applyBtn.cloneNode(true);
+      applyBtn.parentNode.replaceChild(newApply, applyBtn);
+      newApply.addEventListener('click', async () => {
+        const newSchemeCode = schemeSelect ? schemeSelect.value : stored.schemeCode;
+        const newYear = yearInput ? parseInt(yearInput.value, 10) : stored.enrollmentYear;
+        const schemeChanged = newSchemeCode && newSchemeCode !== stored.schemeCode;
+        if (schemeChanged){
+          const proceed = window.confirm('Cambiar el esquema de evaluación puede borrar las notas ya cargadas para esta materia. ¿Continuar?');
+          if (!proceed) return;
+        }
+        newApply.disabled = true;
+        try{
+          const hydrated = await activeStore.updateEnrollmentSettings(currentPlan, code, {
+            schemeCode: schemeChanged ? newSchemeCode : undefined,
+            enrollmentYear: Number.isFinite(newYear) ? newYear : undefined,
+          });
+          putSubjectDataInCache(currentPlan, code, hydrated);
+          currentEnrollment = hydrated;
+          panel.classList.add('d-none');
+          applyCardStatusStyle(currentCard, hydrated.status);
+          try{ computeStats(displayedSubjects); }catch(e){}
+          await renderEnrolledSubject(code);
+        }catch(err){
+          console.error('Error actualizando configuración de la materia', err);
+          alert('No se pudo actualizar la configuración: ' + (err && err.message ? err.message : err));
+        }finally{
+          newApply.disabled = false;
+        }
+      });
+    }
+
+    if (recursarBtn){
+      const newRecursar = recursarBtn.cloneNode(true);
+      recursarBtn.parentNode.replaceChild(newRecursar, recursarBtn);
+      newRecursar.addEventListener('click', async () => {
+        const proceed = window.confirm('¿Marcar esta materia como recursada? Se van a borrar las notas cargadas y se va a sumar una cursada.');
+        if (!proceed) return;
+        let prevAvailable = [];
+        try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+        newRecursar.disabled = true;
+        try{
+          const hydrated = await activeStore.recursar(currentPlan, code);
+          putSubjectDataInCache(currentPlan, code, hydrated);
+          currentEnrollment = hydrated;
+          applyCardStatusStyle(currentCard, hydrated.status);
+          updateAllCardCursarState();
+          try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
+          try{ computeStats(displayedSubjects); }catch(e){}
+          try{ if (planData) renderGroups(planData); }catch(e){}
+          const modalEl = document.getElementById('subjectModal');
+          if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
+        }catch(err){
+          console.error('Error al recursar', err);
+          alert('No se pudo recursar la materia: ' + (err && err.message ? err.message : err));
+        }finally{
+          newRecursar.disabled = false;
+        }
+      });
     }
   }
 
@@ -1738,7 +1647,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.keys(codeMap).forEach(code => {
       try{
         const stored = loadSubjectData(code);
-        const effectiveStatus = stored ? (stored.overrideStatus ? stored.overrideStatus : (stored.status ? stored.status : null)) : null;
+        const effectiveStatus = stored ? stored.status : null;
         applyCardStatusStyle(codeMap[code], effectiveStatus);
       }catch(e){/* ignore */}
     });
@@ -1944,7 +1853,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const subj of (list || [])){
       const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
       const stored = key ? loadSubjectData(key) : null;
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       if (status === 'Aprobada' || status === 'Promocionada') approved++;
       else if (status === 'Regularizada') regularized++;
     }
@@ -1961,20 +1870,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }catch(e){ electivasRequired = 0; }
 
-    // Count electivas that are present in localStorage (placed) and have saved statuses
+    // Count electivas that are placed on the board and have saved statuses
     try{
-      const raw = localStorage.getItem('electives');
-      if (raw){
-        const obj = JSON.parse(raw);
-        Object.keys(obj || {}).forEach(k => {
-          try{
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            if (status === 'Aprobada' || status === 'Promocionada') approved++;
-            else if (status === 'Regularizada') regularized++;
-          }catch(e){}
-        });
-      }
+      getElectivesForCurrentPlan().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        const status = stored ? stored.status : null;
+        if (status === 'Aprobada' || status === 'Promocionada') approved++;
+        else if (status === 'Regularizada') regularized++;
+      });
     }catch(e){}
 
     const total = baseTotal + electivasRequired;
@@ -2141,7 +2044,7 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmBtn.addEventListener('click', handler);
   }
 
-  // Insert electiva into a given column index and persist in localStorage under key 'electives'
+  // Insert electiva into a given column index and persist via activeStore (electivesCache)
   function performAddElectiveToColumn(subj, colIndex, placeholderEl, skipConfirm){
     try{
       // avoid duplicates
@@ -2158,6 +2061,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!proceed) return;
       }
       const newCard = createCard(subj);
+      const key = subj.code || subj.name;
       // mark as electiva and add a delete (trash) button on the top-right corner
       try{
         newCard.classList.add('card-electiva');
@@ -2176,23 +2080,14 @@ document.addEventListener('DOMContentLoaded', () => {
         removeBtn.style.padding = '0.15rem 0.4rem';
         removeBtn.innerHTML = '🗑';
         // deletion handler: stop propagation (don't open modal), remove from board and storage
-        removeBtn.addEventListener('click', (ev) => {
+        removeBtn.addEventListener('click', async (ev) => {
           ev.stopPropagation();
+          removeBtn.disabled = true;
           try{
-            const key = subj.code || subj.name;
-            // if subject in course, remove its stored data (dar de baja)
-            try{ const sk = getSubjectStorageKey(key); if (sk) localStorage.removeItem(sk); }catch(e){}
-            // remove from electives map
-            try{
-              const raw = localStorage.getItem('electives');
-              if (raw){ const obj = JSON.parse(raw); if (obj && obj[key]){ delete obj[key]; localStorage.setItem('electives', JSON.stringify(obj)); } }
-            }catch(e){ console.error('Error actualizando electives al eliminar', e); }
-            // upload updated electives map (skip if applying remote changes)
-            try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadElectives) window.firestoreUploadElectives(JSON.parse(localStorage.getItem('electives') || '{}')); }catch(err){ console.error('firestoreUploadElectives hook error', err); }
-            // notify backend to delete subject data as well
-            try{ if (window.firestoreDeleteSubject) window.firestoreDeleteSubject(key); }catch(err){ console.error('firestoreDeleteSubject hook error', err); }
-            // also request deletion of the elective entry under `electives.<code>` in Firestore
-            try{ if (!window.__firestoreApplyingRemote && window.firestoreDeleteElective) window.firestoreDeleteElective(key); }catch(err){ console.error('firestoreDeleteElective hook error', err); }
+            await activeStore.removeElective(currentPlan, key);
+            await activeStore.dropEnrollment(currentPlan, key);
+            electivesCache = electivesCache.filter(e => !(e.planCode === currentPlan && e.subjectCode === key));
+            putSubjectDataInCache(currentPlan, key, null);
             // Remove the card from DOM and replace with a placeholder in the same column and position
             const parent = newCard.parentNode;
             const next = newCard.nextSibling;
@@ -2207,7 +2102,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // refresh overlay and stats
             try{ setupOverlayAndInteractions(); }catch(e){}
             try{ computeStats(displayedSubjects); }catch(e){}
-          }catch(err){ console.error('Error eliminando electiva', err); }
+          }catch(err){
+            console.error('Error eliminando electiva', err);
+            alert('No se pudo eliminar la electiva: ' + (err && err.message ? err.message : err));
+            removeBtn.disabled = false;
+          }
         });
         // prepend remove button into the card body
         const body = newCard.querySelector('.card-body') || newCard;
@@ -2228,14 +2127,17 @@ document.addEventListener('DOMContentLoaded', () => {
         columnsContainer.appendChild(newCard);
       }
       // persist placement
-      try{
-        const raw = localStorage.getItem('electives');
-        const obj = raw ? JSON.parse(raw) : {};
-        obj[subj.code || subj.name] = { colIndex };
-  localStorage.setItem('electives', JSON.stringify(obj));
-  // upload electives map to Firestore when available (skip during remote application)
-  try{ if (!window.__firestoreApplyingRemote && window.firestoreUploadElectives) window.firestoreUploadElectives(obj); }catch(err){ console.error('firestoreUploadElectives hook error', err); }
-      }catch(e){ console.error('Error guardando electives', e); }
+      (async () => {
+        try{
+          await activeStore.setElective(currentPlan, key, colIndex);
+          const idx = electivesCache.findIndex(e => e.planCode === currentPlan && e.subjectCode === key);
+          const entry = { planCode: currentPlan, subjectCode: key, columnIndex: colIndex };
+          if (idx >= 0) electivesCache[idx] = entry; else electivesCache.push(entry);
+        }catch(e){
+          console.error('Error guardando electiva', e);
+          showElectivasAlert('danger', 'No se pudo guardar la electiva.');
+        }
+      })();
       // refresh overlays and stats
       setupOverlayAndInteractions();
       try{ computeStats(displayedSubjects); }catch(e){}
@@ -2243,43 +2145,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }catch(e){ console.error('Error agregando electiva', e); showElectivasAlert('danger','Error al agregar electiva.'); }
   }
 
-  // Restore electivas previously saved in localStorage into the dashboard.
-  // Behavior: read `localStorage.electives` and use electivasList (loaded from DATA_URL)
-  // to get the real metadata (so cards show the electiva name instead of just the code),
-  // then insert each electiva into its saved column, replacing placeholders when possible.
-  // NOTE: If an elective doesn't exist in the current plan's electivasList, it is NOT displayed.
+  // Restore electivas ya colocadas (electivesCache, poblado al bootear) dentro del tablero.
+  // Usa electivasList (cargado desde DATA_URL) para resolver nombre/horas de cada electiva.
+  // NOTE: Si una electiva ya no existe en el plan actual, no se muestra.
   function restoreElectivesFromStorage(){
-    try{
-      const raw = localStorage.getItem('electives');
-      if (!raw) return;
-      const stored = JSON.parse(raw);
-      if (!stored || Object.keys(stored).length === 0) return;
-      // Build lookup from electivasList (loaded from DATA_URL)
-      const list = Array.isArray(electivasList) ? electivasList : [];
-      const byCode = {};
-      const byName = {};
-      list.forEach(s => { if (s.code) byCode[s.code] = s; if (s.name) byName[s.name] = s; });
-      Object.keys(stored).forEach(key => {
-        try{
-          const entry = stored[key];
-          const colIndex = typeof entry.colIndex === 'number' ? entry.colIndex : parseInt(entry.colIndex,10);
-          // prefer matching by code first, then by name
-          let subjMeta = null;
-          if (byCode[key]) subjMeta = byCode[key];
-          else if (byName[key]) subjMeta = byName[key];
-          // If elective doesn't exist in the current plan, skip it (don't display)
-          if (!subjMeta) {
-            console.log('Elective not found in current plan, skipping:', key);
-            return; // skip this elective
-          }
-          const colEl = columnsContainer.querySelector(`.column-col[data-index="${colIndex}"]`);
-          let placeholderEl = null;
-          if (colEl) placeholderEl = colEl.querySelector('.card-electiva-add');
-          // insert without prompting
-          performAddElectiveToColumn(subjMeta, colIndex, placeholderEl, true);
-        }catch(e){ console.error('Error restaurando electiva', key, e); }
-      });
-    }catch(e){ console.error('Error leyendo electives from storage', e); }
+    const entries = getElectivesForCurrentPlan();
+    if (!entries.length) return;
+    const list = Array.isArray(electivasList) ? electivasList : [];
+    const byCode = {};
+    const byName = {};
+    list.forEach(s => { if (s.code) byCode[s.code] = s; if (s.name) byName[s.name] = s; });
+    entries.forEach(entry => {
+      try{
+        const colIndex = entry.columnIndex;
+        let subjMeta = byCode[entry.subjectCode] || byName[entry.subjectCode] || null;
+        if (!subjMeta) {
+          console.log('Elective not found in current plan, skipping:', entry.subjectCode);
+          return;
+        }
+        const colEl = columnsContainer.querySelector(`.column-col[data-index="${colIndex}"]`);
+        let placeholderEl = null;
+        if (colEl) placeholderEl = colEl.querySelector('.card-electiva-add');
+        performAddElectiveToColumn(subjMeta, colIndex, placeholderEl, true);
+      }catch(e){ console.error('Error restaurando electiva', entry.subjectCode, e); }
+    });
   }
 
   function showElectivasAlert(level, msg){
@@ -2340,14 +2229,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function saveSelectedStats(arr){
     const statsToSave = arr.slice(0, STATS_CONFIG.MAX_STATS);
     try{ localStorage.setItem('selectedStats', JSON.stringify(statsToSave)); }catch(e){}
-    // Upload to Firestore if available (skip when applying remote changes)
-    try{ 
-      if (!window.__firestoreApplyingRemote && window.firestoreUploadSelectedStats) {
-        window.firestoreUploadSelectedStats(statsToSave); 
-      }
-    } catch(e) { console.error('firestoreUploadSelectedStats hook error', e); }
+    if (activeStore === apiStore) {
+      activeStore.updatePreferences({ selectedStats: statsToSave }).catch(e => console.error('Error sincronizando selectedStats', e));
+    }
   }
-  
+
   // Load year started from localStorage
   function getYearStarted(){
     try{
@@ -2356,15 +2242,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }catch(e){}
     return null;
   }
-  
+
   function saveYearStarted(year){
     try{ localStorage.setItem('yearStarted', String(year)); }catch(e){}
-    // Upload to Firestore if available (skip when applying remote changes)
-    try{ 
-      if (!window.__firestoreApplyingRemote && window.firestoreUploadYearStarted) {
-        window.firestoreUploadYearStarted(year); 
-      }
-    } catch(e) { console.error('firestoreUploadYearStarted hook error', e); }
+    if (activeStore === apiStore) {
+      activeStore.updatePreferences({ yearStarted: year }).catch(e => console.error('Error sincronizando yearStarted', e));
+    }
   }
   
   // Initialize year started input in profile modal
@@ -2394,7 +2277,7 @@ document.addEventListener('DOMContentLoaded', () => {
       for (const subj of (displayedSubjects || [])){
         const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
         const stored = key ? loadSubjectData(key) : null;
-        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+        const status = stored ? stored.status : null;
         const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
         if (stored && !terminal.includes(status)){
           const wh = Number.isFinite(Number(subj.weekHours)) ? Number(subj.weekHours) : STATS_CONFIG.DEFAULT_WEEK_HOURS;
@@ -2402,26 +2285,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
       // Also include electivas in course
-      const rawElect = localStorage.getItem('electives');
-      if (rawElect){
-        const emap = JSON.parse(rawElect) || {};
-        const electList = Array.isArray(electivasList) ? electivasList : [];
-        const byCode = {};
-        const byName = {};
-        electList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
-        Object.keys(emap).forEach(k => {
-          try{
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
-            if (stored && !terminal.includes(status)){
-              const meta = byCode[k] || byName[k] || null;
-              const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : STATS_CONFIG.DEFAULT_WEEK_HOURS;
-              inCourseHours += wh;
-            }
-          }catch(e){}
-        });
-      }
+      const electList = Array.isArray(electivasList) ? electivasList : [];
+      const byCode = {};
+      const byName = {};
+      electList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
+      getElectivesForCurrentPlan().forEach(entry => {
+        try{
+          const stored = loadSubjectData(entry.subjectCode);
+          const status = stored ? stored.status : null;
+          const terminal = ['Aprobada','Promocionada','Regularizada','Desaprobada'];
+          if (stored && !terminal.includes(status)){
+            const meta = byCode[entry.subjectCode] || byName[entry.subjectCode] || null;
+            const wh = meta && Number.isFinite(Number(meta.weekHours)) ? Number(meta.weekHours) : STATS_CONFIG.DEFAULT_WEEK_HOURS;
+            inCourseHours += wh;
+          }
+        }catch(e){}
+      });
     }catch(e){ inCourseHours = 0; }
     return inCourseHours > 0 ? (String(inCourseHours) + ' hs') : '—';
   }
@@ -2433,21 +2312,25 @@ document.addEventListener('DOMContentLoaded', () => {
       for (const subj of (displayedSubjects || [])){
         const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
         const stored = key ? loadSubjectData(key) : null;
-        const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+        const status = stored ? stored.status : null;
         if (status === 'Aprobada' || status === 'Promocionada'){
           let grade = NaN;
           try{
-            if (status === 'Aprobada' && stored && stored.values){
-              for (let i = 1; i <= 4; i++){
-                const v = stored.values['final'+i];
-                const n = parseNum(v);
-                if (!Number.isNaN(n) && n >= 6){ grade = n; break; }
+            if (status === 'Aprobada' && stored && Array.isArray(stored.finals)){
+              const sorted = [...stored.finals].sort((a,b) => a.attemptNumber - b.attemptNumber);
+              for (const f of sorted){
+                if (f && f.grade !== null && f.grade !== undefined && f.grade >= 6){ grade = f.grade; break; }
               }
-            } else if (status === 'Promocionada' && stored && stored.values){
-              let p1 = NaN, p2 = NaN;
-              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial1_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p1 = n; break; } }
-              for (let i = 3; i >= 1; i--){ const v = stored.values['parcial2_'+i]; const n = parseNum(v); if (!Number.isNaN(n)){ p2 = n; break; } }
-              if (!Number.isNaN(p1) && !Number.isNaN(p2)) grade = Math.round((p1 + p2) / 2);
+            } else if (status === 'Promocionada' && stored && stored.partials && stored.schemeConfig){
+              let sum = 0, count = 0;
+              const n = stored.schemeConfig.partials ?? 2;
+              for (let p = 1; p <= n; p++){
+                const attempts = stored.partials[p] || {};
+                let eff = null;
+                for (let a = 3; a >= 1; a--){ if (attempts[a] !== null && attempts[a] !== undefined){ eff = attempts[a]; break; } }
+                if (eff !== null){ sum += eff; count++; }
+              }
+              if (count > 0) grade = Math.round(sum / count);
             }
           }catch(e){}
           if (!Number.isNaN(grade)){
@@ -2470,22 +2353,16 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const subj of (displayedSubjects || [])){
       const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
       const stored = key ? loadSubjectData(key) : null;
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       if (status === 'Aprobada' || status === 'Promocionada') approved++;
     }
     // Count electivas approved
     try{
-      const raw = localStorage.getItem('electives');
-      if (raw){
-        const obj = JSON.parse(raw);
-        Object.keys(obj || {}).forEach(k => {
-          try{
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            if (status === 'Aprobada' || status === 'Promocionada') approved++;
-          }catch(e){}
-        });
-      }
+      getElectivesForCurrentPlan().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        const status = stored ? stored.status : null;
+        if (status === 'Aprobada' || status === 'Promocionada') approved++;
+      });
     }catch(e){}
     // Compute total including electivas required
     let electivasRequired = 0;
@@ -2507,22 +2384,16 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const subj of (displayedSubjects || [])){
       const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
       const stored = key ? loadSubjectData(key) : null;
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       if (status === 'Regularizada') regularized++;
     }
     // Count electivas regularized
     try{
-      const raw = localStorage.getItem('electives');
-      if (raw){
-        const obj = JSON.parse(raw);
-        Object.keys(obj || {}).forEach(k => {
-          try{
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            if (status === 'Regularizada') regularized++;
-          }catch(e){}
-        });
-      }
+      getElectivesForCurrentPlan().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        const status = stored ? stored.status : null;
+        if (status === 'Regularizada') regularized++;
+      });
     }catch(e){}
     return String(regularized);
   }
@@ -2544,60 +2415,46 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const subj of (displayedSubjects || [])){
       const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
       const stored = key ? loadSubjectData(key) : null;
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       if ((status === 'Regularizada' || status === 'No regularizada') && canPromote(stored)){
         count++;
       }
     }
     // Also count electivas
     try{
-      const raw = localStorage.getItem('electives');
-      if (raw){
-        const obj = JSON.parse(raw);
-        Object.keys(obj || {}).forEach(k => {
-          try{
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            if ((status === 'Regularizada' || status === 'No regularizada') && canPromote(stored)){
-              count++;
-            }
-          }catch(e){}
-        });
-      }
+      getElectivesForCurrentPlan().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        const status = stored ? stored.status : null;
+        if ((status === 'Regularizada' || status === 'No regularizada') && canPromote(stored)){
+          count++;
+        }
+      });
     }catch(e){}
     return count > 0 ? String(count) : '—';
   }
-  
+
   function computeDebeRecuperar(){
     // Count subjects where status is "No regularizada" (must recover to regularize)
     let count = 0;
     for (const subj of (displayedSubjects || [])){
       const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
       const stored = key ? loadSubjectData(key) : null;
-      const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
+      const status = stored ? stored.status : null;
       if (status === 'No regularizada'){
         count++;
       }
     }
     // Also count electivas
     try{
-      const raw = localStorage.getItem('electives');
-      if (raw){
-        const obj = JSON.parse(raw);
-        Object.keys(obj || {}).forEach(k => {
-          try{
-            const stored = loadSubjectData(k);
-            const status = stored && stored.overrideStatus ? stored.overrideStatus : (stored && stored.status ? stored.status : null);
-            if (status === 'No regularizada'){
-              count++;
-            }
-          }catch(e){}
-        });
-      }
+      getElectivesForCurrentPlan().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        const status = stored ? stored.status : null;
+        if (status === 'No regularizada') count++;
+      });
     }catch(e){}
     return count > 0 ? String(count) : '—';
   }
-  
+
   function computeDesaprobadas(){
     // Sum all recursedCount values for subjects in the current plan
     let totalRecursed = 0;
@@ -2610,18 +2467,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Also count electivas
     try{
-      const raw = localStorage.getItem('electives');
-      if (raw){
-        const obj = JSON.parse(raw);
-        Object.keys(obj || {}).forEach(k => {
-          try{
-            const stored = loadSubjectData(k);
-            if (stored && typeof stored.recursedCount === 'number'){
-              totalRecursed += stored.recursedCount;
-            }
-          }catch(e){}
-        });
-      }
+      getElectivesForCurrentPlan().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        if (stored && typeof stored.recursedCount === 'number') totalRecursed += stored.recursedCount;
+      });
     }catch(e){}
     return String(totalRecursed);
   }
@@ -2768,6 +2617,119 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize year started input
   initYearStartedInput();
 
-  // Load the main plan (subjects + modules + electivas) from DATA_URL and render
-  loadPlanData();
+  // --- "Compartir públicamente" toggle: ligado a user_preferences.isPublic/shareToken ---
+  function initShareToggleUI(){
+    const toggle = document.getElementById('settings-share-toggle');
+    if (!toggle) return { applyState(){} };
+    const linkWrap = document.getElementById('settings-share-link-wrap');
+    const linkEl = document.getElementById('settings-share-link');
+    const noteEl = document.getElementById('settings-share-note');
+
+    function applyState(prefs){
+      const isPublic = !!(prefs && prefs.isPublic);
+      toggle.checked = isPublic;
+      toggle.disabled = activeStore !== apiStore;
+      if (isPublic && prefs.shareToken){
+        const shareUrl = `${window.location.origin}${window.location.pathname.replace(/index\.html$/, '')}share.html?uid=${prefs.shareToken}`;
+        if (linkEl) { linkEl.href = shareUrl; linkEl.textContent = shareUrl; }
+        if (linkWrap) linkWrap.style.display = '';
+        if (noteEl) noteEl.textContent = 'Tu tablero es público.';
+      } else {
+        if (linkWrap) linkWrap.style.display = 'none';
+        if (noteEl) noteEl.textContent = activeStore === apiStore
+          ? 'Activá para compartir tu tablero públicamente.'
+          : 'Activá para compartir tu tablero públicamente. Requiere iniciar sesión.';
+      }
+    }
+
+    toggle.addEventListener('change', async () => {
+      if (activeStore !== apiStore){
+        toggle.checked = false;
+        alert('Debés iniciar sesión para compartir tu tablero.');
+        return;
+      }
+      const isChecked = toggle.checked;
+      toggle.disabled = true;
+      try{
+        const prefs = await activeStore.updatePreferences({ isPublic: isChecked });
+        applyState(prefs);
+      }catch(err){
+        console.error('Error actualizando configuración de compartir', err);
+        toggle.checked = !isChecked;
+        alert('Error al actualizar la configuración de compartir.');
+      }finally{
+        toggle.disabled = false;
+      }
+    });
+
+    return { applyState };
+  }
+
+  // --- Inicialización de la app: esquemas, sesión, caches, y wiring de auth (GIS) ---
+  // NOTA: no llamar a esta función "bootstrap" — colisiona con el objeto global `bootstrap`
+  // de Bootstrap JS (window.bootstrap.Modal, etc.) usado en todo este archivo.
+  async function initApp(){
+    try{ schemesCache = await getEvaluationSchemes(); }catch(e){ console.error('Error cargando esquemas de evaluación', e); }
+
+    const shareToggleCtl = initShareToggleUI();
+
+    let initialUser = null;
+    try{
+      const me = await api.get('/auth/me');
+      if (me && me.authenticated) initialUser = me.user;
+    }catch(e){
+      // Sin conexión o error de red: degradar a modo invitado sin bloquear la app.
+      console.warn('No se pudo verificar la sesión, se usa modo invitado', e);
+    }
+    if (initialUser) activeStore = apiStore;
+
+    await Promise.all([refreshEnrollmentCache(), refreshElectivesCache()]);
+
+    let preferences = null;
+    try{ preferences = await activeStore.getPreferences(); }catch(e){ console.error('Error cargando preferencias', e); }
+
+    if (activeStore === apiStore && preferences){
+      if (preferences.activePlanCode && AVAILABLE_PLANS[preferences.activePlanCode]){
+        currentPlan = preferences.activePlanCode;
+        DATA_URL = AVAILABLE_PLANS[currentPlan];
+        localStorage.setItem('plan', currentPlan);
+        const programSelectEl = document.getElementById('programSelect');
+        if (programSelectEl) programSelectEl.value = currentPlan;
+      }
+      if (typeof preferences.yearStarted === 'number'){
+        localStorage.setItem('yearStarted', String(preferences.yearStarted));
+      }
+      if (Array.isArray(preferences.selectedStats) && preferences.selectedStats.length){
+        localStorage.setItem('selectedStats', JSON.stringify(preferences.selectedStats));
+      }
+      if (typeof preferences.showCorrelativas === 'boolean'){
+        localStorage.setItem('mostrarCorrelativas', preferences.showCorrelativas ? '1' : '0');
+        correlativasEnabled = preferences.showCorrelativas;
+        if (correlativasToggle) correlativasToggle.checked = correlativasEnabled;
+      }
+      if (typeof preferences.showStatus === 'boolean'){
+        localStorage.setItem('mostrarEstado', preferences.showStatus ? '1' : '0');
+        showStatusEnabled = preferences.showStatus;
+        if (showStatusToggle) showStatusToggle.checked = showStatusEnabled;
+      }
+    }
+    shareToggleCtl.applyState(preferences);
+
+    initAuth({
+      initialUser,
+      onLoginSuccess: async () => {
+        await switchStoreAndReload(apiStore);
+        try{ shareToggleCtl.applyState(await activeStore.getPreferences()); }catch(e){ console.error(e); }
+      },
+      onLogout: async () => {
+        await switchStoreAndReload(localGuestStore);
+        try{ shareToggleCtl.applyState(await activeStore.getPreferences()); }catch(e){ console.error(e); }
+      },
+    });
+
+    // Load the main plan (subjects + modules + electivas) from DATA_URL and render
+    loadPlanData();
+  }
+
+  initApp();
 });
