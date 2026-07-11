@@ -27,11 +27,10 @@ final class EnrollmentController
     public function create(Request $request): void
     {
         $user = AuthMiddleware::requireAuth($this->pdo);
-        $planCode = (string) $request->input('planCode', '');
         $subjectCode = (string) $request->input('subjectCode', '');
         $schemeCode = (string) $request->input('schemeCode', '');
 
-        if ($planCode === '' || $subjectCode === '' || $schemeCode === '') {
+        if ($subjectCode === '' || $schemeCode === '') {
             Response::error('missing_fields', 422);
         }
 
@@ -42,19 +41,23 @@ final class EnrollmentController
         }
 
         $repo = new EnrollmentRepository($this->pdo);
-        if ($repo->find((int) $user['id'], $planCode, $subjectCode)) {
+        if ($repo->find((int) $user['id'], $subjectCode)) {
             Response::error('already_enrolled', 409);
         }
 
-        $repo->create((int) $user['id'], $planCode, $subjectCode, (int) $scheme['id']);
-        Response::json($repo->findHydrated((int) $user['id'], $planCode, $subjectCode), 201);
+        $enrollmentId = $repo->create((int) $user['id'], $subjectCode, (int) $scheme['id']);
+        if ($enrollmentId === null) {
+            Response::error('unknown_subject', 422);
+        }
+
+        Response::json($repo->findHydrated((int) $user['id'], $subjectCode), 201);
     }
 
     public function updateSettings(Request $request, array $params): void
     {
         $user = AuthMiddleware::requireAuth($this->pdo);
         $repo = new EnrollmentRepository($this->pdo);
-        $enrollment = $repo->find((int) $user['id'], $params['planCode'], $params['subjectCode']);
+        $enrollment = $repo->find((int) $user['id'], $params['subjectCode']);
         if (!$enrollment) {
             Response::error('not_found', 404);
         }
@@ -73,39 +76,39 @@ final class EnrollmentController
         $year = $request->input('enrollmentYear');
         $repo->updateSchemeAndYear((int) $enrollment['id'], $schemeId, $year !== null ? (int) $year : null);
 
-        Response::json($repo->findHydrated((int) $user['id'], $params['planCode'], $params['subjectCode']));
+        Response::json($repo->findHydrated((int) $user['id'], $params['subjectCode']));
     }
 
     public function recursar(Request $request, array $params): void
     {
         $user = AuthMiddleware::requireAuth($this->pdo);
         $repo = new EnrollmentRepository($this->pdo);
-        $enrollment = $repo->find((int) $user['id'], $params['planCode'], $params['subjectCode']);
+        $enrollment = $repo->find((int) $user['id'], $params['subjectCode']);
         if (!$enrollment) {
             Response::error('not_found', 404);
         }
         $repo->recursar((int) $enrollment['id']);
-        Response::json($repo->findHydrated((int) $user['id'], $params['planCode'], $params['subjectCode']));
+        Response::json($repo->findHydrated((int) $user['id'], $params['subjectCode']));
     }
 
     public function setOverride(Request $request, array $params): void
     {
         $user = AuthMiddleware::requireAuth($this->pdo);
         $repo = new EnrollmentRepository($this->pdo);
-        $enrollment = $repo->find((int) $user['id'], $params['planCode'], $params['subjectCode']);
+        $enrollment = $repo->find((int) $user['id'], $params['subjectCode']);
         if (!$enrollment) {
             Response::error('not_found', 404);
         }
         $status = $request->input('status');
         $repo->setOverride((int) $enrollment['id'], $status !== null ? (string) $status : null);
-        Response::json($repo->findHydrated((int) $user['id'], $params['planCode'], $params['subjectCode']));
+        Response::json($repo->findHydrated((int) $user['id'], $params['subjectCode']));
     }
 
     public function saveResults(Request $request, array $params): void
     {
         $user = AuthMiddleware::requireAuth($this->pdo);
         $repo = new EnrollmentRepository($this->pdo);
-        $enrollment = $repo->find((int) $user['id'], $params['planCode'], $params['subjectCode']);
+        $enrollment = $repo->find((int) $user['id'], $params['subjectCode']);
         if (!$enrollment) {
             Response::error('not_found', 404);
         }
@@ -118,6 +121,6 @@ final class EnrollmentController
             $request->input('clearOverride', true) !== false
         );
 
-        Response::json($repo->findHydrated((int) $user['id'], $params['planCode'], $params['subjectCode']));
+        Response::json($repo->findHydrated((int) $user['id'], $params['subjectCode']));
     }
 }

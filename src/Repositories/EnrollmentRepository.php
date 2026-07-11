@@ -13,26 +13,41 @@ final class EnrollmentRepository
     {
     }
 
-    public function find(int $userId, string $planCode, string $subjectCode): ?array
+    // Las inscripciones están linkeadas a la MATERIA (global, compartida entre
+    // carreras), no a una carrera puntual — por eso el lookup es (user_id, subjectCode).
+    public function find(int $userId, string $subjectCode): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM enrollments WHERE user_id = :uid AND plan_code = :plan AND subject_code = :subject'
+            'SELECT e.*, s.code AS subject_code FROM enrollments e
+             JOIN subjects s ON s.id = e.subject_id
+             WHERE e.user_id = :uid AND s.code = :subject'
         );
-        $stmt->execute(['uid' => $userId, 'plan' => $planCode, 'subject' => $subjectCode]);
+        $stmt->execute(['uid' => $userId, 'subject' => $subjectCode]);
         $row = $stmt->fetch();
         return $row ?: null;
     }
 
-    public function create(int $userId, string $planCode, string $subjectCode, int $schemeId): int
+    public function subjectIdByCode(string $subjectCode): ?int
     {
+        $stmt = $this->pdo->prepare('SELECT id FROM subjects WHERE code = :code');
+        $stmt->execute(['code' => $subjectCode]);
+        $row = $stmt->fetch();
+        return $row ? (int) $row['id'] : null;
+    }
+
+    public function create(int $userId, string $subjectCode, int $schemeId): ?int
+    {
+        $subjectId = $this->subjectIdByCode($subjectCode);
+        if ($subjectId === null) {
+            return null;
+        }
         $stmt = $this->pdo->prepare(
-            'INSERT INTO enrollments (user_id, plan_code, subject_code, evaluation_scheme_id, enrollment_year)
-             VALUES (:uid, :plan, :subject, :scheme, :year)'
+            'INSERT INTO enrollments (user_id, subject_id, evaluation_scheme_id, enrollment_year)
+             VALUES (:uid, :subject, :scheme, :year)'
         );
         $stmt->execute([
             'uid' => $userId,
-            'plan' => $planCode,
-            'subject' => $subjectCode,
+            'subject' => $subjectId,
             'scheme' => $schemeId,
             'year' => (int) date('Y'),
         ]);
@@ -148,16 +163,20 @@ final class EnrollmentRepository
 
     public function allForUser(int $userId): array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM enrollments WHERE user_id = :uid');
+        $stmt = $this->pdo->prepare(
+            'SELECT e.*, s.code AS subject_code FROM enrollments e
+             JOIN subjects s ON s.id = e.subject_id
+             WHERE e.user_id = :uid'
+        );
         $stmt->execute(['uid' => $userId]);
 
         $schemes = new EvaluationSchemeRepository($this->pdo);
         return array_map(fn(array $row) => $this->hydrate($row, $schemes), $stmt->fetchAll());
     }
 
-    public function findHydrated(int $userId, string $planCode, string $subjectCode): ?array
+    public function findHydrated(int $userId, string $subjectCode): ?array
     {
-        $row = $this->find($userId, $planCode, $subjectCode);
+        $row = $this->find($userId, $subjectCode);
         if (!$row) {
             return null;
         }
@@ -182,7 +201,6 @@ final class EnrollmentRepository
         );
 
         return [
-            'planCode' => $row['plan_code'],
             'subjectCode' => $row['subject_code'],
             'schemeCode' => $scheme['code'] ?? null,
             'schemeConfig' => $scheme['config'] ?? null,
@@ -243,14 +261,18 @@ final class EnrollmentRepository
 
     public function importFromSnapshot(int $userId, array $entry): void
     {
-        $planCode = (string) $entry['planCode'];
         $subjectCode = (string) $entry['subjectCode'];
         $schemeCode = (string) ($entry['schemeCode'] ?? '2-partials');
 
         $schemes = new EvaluationSchemeRepository($this->pdo);
         $scheme = $schemes->findByCode($schemeCode) ?? $schemes->findByCode('2-partials');
 
-        $existing = $this->find($userId, $planCode, $subjectCode);
+        $subjectId = $this->subjectIdByCode($subjectCode);
+        if ($subjectId === null) {
+            return;
+        }
+
+        $existing = $this->find($userId, $subjectCode);
         if ($existing) {
             $enrollmentId = (int) $existing['id'];
             $this->clearResults($enrollmentId);
@@ -267,13 +289,12 @@ final class EnrollmentRepository
             ]);
         } else {
             $stmt = $this->pdo->prepare(
-                'INSERT INTO enrollments (user_id, plan_code, subject_code, evaluation_scheme_id, enrollment_year, recursed_count, status_override)
-                 VALUES (:uid, :plan, :subject, :scheme, :year, :recursed, :override)'
+                'INSERT INTO enrollments (user_id, subject_id, evaluation_scheme_id, enrollment_year, recursed_count, status_override)
+                 VALUES (:uid, :subject, :scheme, :year, :recursed, :override)'
             );
             $stmt->execute([
                 'uid' => $userId,
-                'plan' => $planCode,
-                'subject' => $subjectCode,
+                'subject' => $subjectId,
                 'scheme' => $scheme['id'],
                 'year' => (int) ($entry['enrollmentYear'] ?? date('Y')),
                 'recursed' => (int) ($entry['recursedCount'] ?? 0),

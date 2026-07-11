@@ -7,11 +7,13 @@ require __DIR__ . '/../../vendor/autoload.php';
 use App\Auth\AuthController;
 use App\Config\Database;
 use App\Config\Env;
+use App\Controllers\CareerController;
 use App\Controllers\ElectivesController;
 use App\Controllers\EnrollmentController;
 use App\Controllers\EvaluationSchemeController;
 use App\Controllers\PreferencesController;
 use App\Controllers\PublicController;
+use App\Controllers\UserCareerController;
 use App\Http\Request;
 use App\Http\Router;
 
@@ -30,18 +32,28 @@ $router->post('/api/auth/import-local', [$auth, 'importLocal']);
 $schemes = new EvaluationSchemeController($pdo);
 $router->get('/api/evaluation-schemes', [$schemes, 'index']);
 
+$careers = new CareerController($pdo);
+$router->get('/api/careers', [$careers, 'index']);
+$router->get('/api/careers/{code}/curriculum', [$careers, 'curriculum']);
+
+$userCareers = new UserCareerController($pdo);
+$router->get('/api/user-careers', [$userCareers, 'index']);
+$router->post('/api/user-careers', [$userCareers, 'enroll']);
+$router->delete('/api/user-careers/{careerCode}', [$userCareers, 'unenroll']);
+$router->patch('/api/user-careers/{careerCode}', [$userCareers, 'updateToggle']);
+
 $enrollments = new EnrollmentController($pdo);
 $router->get('/api/enrollments', [$enrollments, 'index']);
 $router->post('/api/enrollments', [$enrollments, 'create']);
-$router->patch('/api/enrollments/{planCode}/{subjectCode}', [$enrollments, 'updateSettings']);
-$router->post('/api/enrollments/{planCode}/{subjectCode}/recursar', [$enrollments, 'recursar']);
-$router->patch('/api/enrollments/{planCode}/{subjectCode}/override', [$enrollments, 'setOverride']);
-$router->put('/api/enrollments/{planCode}/{subjectCode}/results', [$enrollments, 'saveResults']);
+$router->patch('/api/enrollments/{subjectCode}', [$enrollments, 'updateSettings']);
+$router->post('/api/enrollments/{subjectCode}/recursar', [$enrollments, 'recursar']);
+$router->patch('/api/enrollments/{subjectCode}/override', [$enrollments, 'setOverride']);
+$router->put('/api/enrollments/{subjectCode}/results', [$enrollments, 'saveResults']);
 
 $electives = new ElectivesController($pdo);
 $router->get('/api/electives', [$electives, 'index']);
-$router->put('/api/electives/{planCode}/{subjectCode}', [$electives, 'upsert']);
-$router->delete('/api/electives/{planCode}/{subjectCode}', [$electives, 'remove']);
+$router->put('/api/electives/{careerCode}/{subjectCode}', [$electives, 'upsert']);
+$router->delete('/api/electives/{careerCode}/{subjectCode}', [$electives, 'remove']);
 
 $preferences = new PreferencesController($pdo);
 $router->get('/api/preferences', [$preferences, 'show']);
@@ -49,5 +61,6 @@ $router->patch('/api/preferences', [$preferences, 'update']);
 
 $public = new PublicController($pdo);
 $router->get('/api/public/{identifier}', [$public, 'show']);
+$router->get('/api/public/{identifier}/progress/{careerCode}', [$public, 'progress']);
 
 $router->dispatch($request);

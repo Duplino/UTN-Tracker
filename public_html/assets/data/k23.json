@@ -3,6 +3,8 @@
     "planName": "Ingeniería en Sistemas de Información - K23",
     "carrera": "Ingeniería en Sistemas de Información",
     "institution": "UTN",
+    "hasIntermediateTitle": true,
+    "intermediateTitle": "Analista Universitario en Sistemas de Información",
     "version": "1.0",
     "year": "2023"
   },
@@ -16,7 +18,8 @@
           "code": "SyPdN",
           "name": "Sistemas y Procesos de Negocio",
           "weekHours": 3,
-          "duration": "anual"
+          "duration": "anual",
+          "requiredForIntermediateTitle": true
         },
         {
           "code": "F1",

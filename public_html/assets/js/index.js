@@ -1,42 +1,59 @@
 import { api } from './apiClient.js';
 import { computeStatus } from './statusEngine.js';
 import { getEvaluationSchemes } from './evaluationSchemes.js';
+import { getCareers, getCareerCurriculum } from './careers.js';
 import { localGuestStore } from './localGuestStore.js';
 import { apiStore } from './apiStore.js';
 import { initAuth } from './auth.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Plan management: determine which plan to load
-  const AVAILABLE_PLANS = {
-    'k23': 'assets/data/k23.json',
-    'k23medio': 'assets/data/k23medio.json'
-  };
-  const DEFAULT_PLAN = 'k23';
+  // Carrera actualmente mostrada en el tablero. `userCareers` son las carreras en las
+  // que el usuario está anotado (controla qué aparece en el dropdown); se puebla en
+  // initApp()/onLoginSuccess/onLogout a partir de activeStore.getUserCareers().
+  let currentCareer = null;
+  let userCareers = [];
+  let showIntermediateTitleEnabled = false;
 
-  // Load saved plan from localStorage or use default
-  function getSavedPlan() {
-    const saved = localStorage.getItem('plan');
-    return (saved && AVAILABLE_PLANS[saved]) ? saved : DEFAULT_PLAN;
+  function getSavedCareer() {
+    return localStorage.getItem('career');
   }
 
-  function savePlan(planKey) {
-    localStorage.setItem('plan', planKey);
+  function saveCareer(careerCode) {
+    localStorage.setItem('career', careerCode);
     if (activeStore === apiStore) {
-      activeStore.updatePreferences({ activePlanCode: planKey }).catch(e => console.error('Error sincronizando plan', e));
+      activeStore.updatePreferences({ activeCareerCode: careerCode }).catch(e => console.error('Error sincronizando carrera', e));
     }
   }
 
-  let currentPlan = getSavedPlan();
-  let DATA_URL = AVAILABLE_PLANS[currentPlan];
+  // Entre las carreras en las que el usuario está anotado, elige cuál mostrar: la
+  // guardada en localStorage si sigue siendo válida, si no la primera disponible.
+  function pickInitialCareer() {
+    const saved = getSavedCareer();
+    if (saved && userCareers.some(c => c.code === saved)) return saved;
+    return userCareers.length ? userCareers[0].code : null;
+  }
 
-  // Electivas will be read from the main DATA_URL under the module with id 'electives'
+  function currentCareerEntry() {
+    return userCareers.find(c => c.code === currentCareer) || null;
+  }
+
+  function syncIntermediateTitleState() {
+    const entry = currentCareerEntry();
+    showIntermediateTitleEnabled = !!(entry && entry.showIntermediateTitle);
+    const wrap = document.getElementById('settings-intermediate-title-wrap');
+    const toggle = document.getElementById('settings-intermediate-title');
+    const hasIntermediate = !!(entry && entry.hasIntermediateTitle);
+    if (wrap) wrap.classList.toggle('d-none', !hasIntermediate);
+    if (toggle) toggle.checked = showIntermediateTitleEnabled;
+  }
+
   let planData = null;
   let electivasList = [];
   let columns = 5;
 
   const columnsContainer = document.querySelector('.columns-grid');
-  const tableViewContainer = document.querySelector('.table-view');
-  const progressBar = document.getElementById('progress-bar');
+  const progressBarIntermediate = document.getElementById('progress-bar-intermediate');
+  const progressBarFinal = document.getElementById('progress-bar-final');
   const progressLabel = document.getElementById('progress-label');
   let displayedSubjects = [];
 
@@ -52,7 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function refreshEnrollmentCache(){
     const list = await activeStore.getEnrollments();
     enrollmentCache = {};
-    list.forEach(e => { enrollmentCache[enrollmentCacheKey(e.planCode, e.subjectCode)] = e; });
+    list.forEach(e => { enrollmentCache[e.subjectCode] = e; });
   }
 
   async function refreshElectivesCache(){
@@ -62,49 +79,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function switchStoreAndReload(nextStore){
     activeStore = nextStore;
     await Promise.all([refreshEnrollmentCache(), refreshElectivesCache()]);
-    try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-renderizando tras cambio de sesión', e); }
+    userCareers = await activeStore.getUserCareers();
+    populateProgramSelect();
+    currentCareer = pickInitialCareer();
+    syncIntermediateTitleState();
+    loadPlanData();
   }
 
-  // View mode management: grid or table
-  let currentViewMode = 'grid'; // default to grid view
-
-  function getSavedViewMode() {
-    const saved = localStorage.getItem('viewMode');
-    return (saved === 'table' || saved === 'grid') ? saved : 'grid';
-  }
-
-  function saveViewMode(mode) {
-    localStorage.setItem('viewMode', mode);
-  }
-
-  function applyViewMode(mode) {
-    currentViewMode = mode;
-    const container = document.querySelector('.container-fluid');
-    if (mode === 'table') {
-      container.classList.add('view-mode-table');
-      container.classList.remove('view-mode-grid');
-    } else {
-      container.classList.add('view-mode-grid');
-      container.classList.remove('view-mode-table');
-    }
-
-    // Update button states
-    const btnGrid = document.getElementById('btn-view-grid');
-    const btnTable = document.getElementById('btn-view-table');
-    if (btnGrid && btnTable) {
-      if (mode === 'table') {
-        btnGrid.classList.remove('active');
-        btnTable.classList.add('active');
-      } else {
-        btnGrid.classList.add('active');
-        btnTable.classList.remove('active');
-      }
-    }
-  }
-
-  // Initialize view mode
-  currentViewMode = getSavedViewMode();
-  applyViewMode(currentViewMode);
+  // Detección de mobile: en pantallas angostas el tablero pasa a una sola columna,
+  // se oculta el overlay de flechas de correlativas (no aplica sin hover / sin
+  // columnas lado a lado) y el click en una materia bloqueada muestra un toast en
+  // vez del scroll+flash que se usa en desktop (ver onCardClick más abajo).
+  const mobileMediaQuery = window.matchMedia('(max-width: 768px)');
+  function isMobile(){ return mobileMediaQuery.matches; }
+  mobileMediaQuery.addEventListener('change', () => {
+    try{ clearOverlay(); }catch(e){}
+    try{ if (planData) renderGroups(planData); }catch(e){ console.error('Error re-renderizando tras cambio de viewport', e); }
+  });
 
   // Correlativas toggle: read persisted preference and bind toggle UI
   const correlativasToggle = document.getElementById('settings-correlativas');
@@ -176,30 +167,109 @@ document.addEventListener('DOMContentLoaded', async () => {
   }catch(e){/* ignore */}
 
 
-  // Program selector: allow user to switch between plans
+  // Program selector: solo lista las carreras en las que el usuario está anotado
+  // (userCareers, poblado en initApp()/switchStoreAndReload()); las opciones se generan
+  // dinámicamente, ya no hay un <option> fijo por carrera en el HTML.
   const programSelect = document.getElementById('programSelect');
+  function populateProgramSelect() {
+    if (!programSelect) return;
+    programSelect.innerHTML = userCareers.map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)}</option>`).join('');
+    if (currentCareer) programSelect.value = currentCareer;
+  }
   function initProgramSelector() {
     if (!programSelect) return;
-    // Set the dropdown to the current plan
-    programSelect.value = currentPlan;
-    // Handle plan change
     programSelect.addEventListener('change', (ev) => {
-      const newPlan = ev.target.value;
-      if (!AVAILABLE_PLANS[newPlan]) return;
-      // Save the new plan preference (does NOT delete other data like subjectData, electives)
-      savePlan(newPlan);
-      currentPlan = newPlan;
-      DATA_URL = AVAILABLE_PLANS[currentPlan];
-      // Reload the plan data
+      const newCareer = ev.target.value;
+      if (!userCareers.some(c => c.code === newCareer)) return;
+      saveCareer(newCareer);
+      currentCareer = newCareer;
+      syncIntermediateTitleState();
       loadPlanData();
     });
   }
-  
-  // Function to load plan data from the current DATA_URL
+
+  // Toggle "hasta el título intermedio": muestra/oculta las materias onlyForIntermediate
+  // (ej. Seminario Integrador) de la carrera activa y cambia la barra de progreso.
+  const intermediateTitleToggle = document.getElementById('settings-intermediate-title');
+  if (intermediateTitleToggle) {
+    intermediateTitleToggle.addEventListener('change', async (ev) => {
+      showIntermediateTitleEnabled = !!ev.target.checked;
+      const entry = currentCareerEntry();
+      if (entry) entry.showIntermediateTitle = showIntermediateTitleEnabled;
+      try{ await activeStore.setShowIntermediateTitle(currentCareer, showIntermediateTitleEnabled); }catch(e){ console.error('Error sincronizando título intermedio', e); }
+      try{ if (planData) renderGroups(planData); }catch(e){}
+    });
+  }
+
+  // Carga el curriculum de la carrera activa (GET /api/careers/{code}/curriculum) y renderiza.
+  // Anota al usuario en una carrera y, si no tenía ninguna activa todavía, la
+  // convierte en la actual y carga su tablero. Compartido entre el prompt del home
+  // (cuando no hay ninguna carrera anotada) y la lista "Mis carreras" del perfil.
+  async function enrollInCareer(careerCode){
+    userCareers = await activeStore.enrollCareer(careerCode);
+    populateProgramSelect();
+    if (!currentCareer){
+      currentCareer = pickInitialCareer();
+      syncIntermediateTitleState();
+      loadPlanData();
+    }
+  }
+
+  // Cuando el usuario (o invitado) no está anotado en ninguna carrera, en vez de
+  // mandarlo al perfil mostramos el listado de carreras disponibles directo en el
+  // home para que se anote ahí mismo.
+  async function renderCareerEnrollmentPrompt(){
+    if (!columnsContainer) return;
+    columnsContainer.style.gridTemplateColumns = '1fr';
+    const catalog = await getCareers();
+    columnsContainer.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'p-4';
+    wrap.innerHTML = '<h5 class="mb-1">Todavía no estás anotado en ninguna carrera</h5><p class="text-muted">Elegí una para empezar a armar tu tablero:</p>';
+    const list = document.createElement('div');
+    list.className = 'list-group';
+    if (!catalog.length){
+      wrap.appendChild(Object.assign(document.createElement('div'), { className: 'alert alert-info', textContent: 'No hay carreras disponibles todavía.' }));
+    } else {
+      catalog.forEach(career => {
+        const item = document.createElement('div');
+        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+        const label = document.createElement('span');
+        label.textContent = career.name;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-success btn-sm';
+        btn.textContent = 'Anotarme';
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try{
+            await enrollInCareer(career.code);
+          }catch(e){
+            console.error('Error anotándose a la carrera', e);
+            alert('No se pudo anotar a la carrera.');
+            btn.disabled = false;
+          }
+        });
+        item.appendChild(label);
+        item.appendChild(btn);
+        list.appendChild(item);
+      });
+      wrap.appendChild(list);
+    }
+    columnsContainer.appendChild(wrap);
+  }
+
   function loadPlanData() {
-    fetch(DATA_URL)
-      .then(r => r.json())
+    if (!currentCareer) {
+      planData = null;
+      electivasList = [];
+      try{ renderCareerEnrollmentPrompt(); }catch(e){ console.error('Error mostrando el listado de carreras', e); }
+      try{ computeStats([]); }catch(e){}
+      return;
+    }
+    getCareerCurriculum(currentCareer)
       .then(d => {
+        if (!d) throw new Error('curriculum_not_found');
         planData = d;
         const modules = Array.isArray(d.modules) ? d.modules : [];
         // electivas module typically has id 'electives' and render: false
@@ -208,39 +278,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         try{ renderGroups(d); }catch(e){ console.error('Error renderizando grupos', e); }
       })
       .catch(err => {
-        console.error('Error cargando plan desde DATA_URL', err);
+        console.error('Error cargando el curriculum de la carrera', err);
         if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-danger">No se pudo cargar el plan de materias.</div>';
       });
   }
-  
-  initProgramSelector();
 
-  // View mode toggle buttons
-  const btnViewGrid = document.getElementById('btn-view-grid');
-  const btnViewTable = document.getElementById('btn-view-table');
-  
-  if (btnViewGrid) {
-    btnViewGrid.addEventListener('click', () => {
-      applyViewMode('grid');
-      saveViewMode('grid');
-    });
-  }
-  
-  if (btnViewTable) {
-    btnViewTable.addEventListener('click', () => {
-      applyViewMode('table');
-      saveViewMode('table');
-      // Render table view if planData is available
-      if (planData) {
-        try { renderGroupsAsTable(planData); } catch(e) { console.error('Failed to render table view for current plan:', e); }
-      }
-    });
-  }
+  initProgramSelector();
 
   // Electivas button: open modal and load electivas from separate file
   const electivasBtn = document.getElementById('btn-electivas');
   function openElectivasModal(){
-    // Use electivasList populated when the main DATA_URL was loaded
+    // Use electivasList populated when the current career curriculum was loaded
     const list = Array.isArray(electivasList) ? electivasList : [];
     if (!list || list.length === 0){
       console.warn('No hay electivas cargadas en el plan');
@@ -258,22 +306,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // `activeStore`/`enrollmentCache`/`electivesCache` se inicializan en el bootstrap de auth
   // (ver más abajo, cerca del final del archivo) antes del primer renderGroups().
 
-  function enrollmentCacheKey(planCode, code){
-    return `${planCode}:${code}`;
-  }
-
   // Lectura síncrona desde el cache poblado al inicio (o tras cada escritura). El resto del
   // archivo (render, arrows, stats) sigue leyendo con esta misma firma que tenía antes.
+  // Las inscripciones son globales por materia (no por carrera), así que el cache va
+  // keyeado directo por subjectCode.
   function loadSubjectData(code){
     if (!code) return null;
-    return enrollmentCache[enrollmentCacheKey(currentPlan, code)] || null;
+    return enrollmentCache[code] || null;
   }
 
-  function putSubjectDataInCache(planCode, code, hydrated){
+  function putSubjectDataInCache(code, hydrated){
     if (!code) return;
-    const key = enrollmentCacheKey(planCode, code);
-    if (hydrated) enrollmentCache[key] = hydrated;
-    else delete enrollmentCache[key];
+    if (hydrated) enrollmentCache[code] = hydrated;
+    else delete enrollmentCache[code];
   }
 
   // Una materia "tiene progreso" simplemente si ya existe una inscripción (creada al
@@ -292,13 +337,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }).length;
   }
 
-  function getElectivesForCurrentPlan(){
-    return (electivesCache || []).filter(e => e.planCode === currentPlan);
+  function getElectivesForCurrentCareer(){
+    return (electivesCache || []).filter(e => e.careerCode === currentCareer);
   }
 
   function countPassedElectivasForColumn(colIndex){
     let count = 0;
-    getElectivesForCurrentPlan().forEach(e => {
+    getElectivesForCurrentCareer().forEach(e => {
       if (e.columnIndex === colIndex){
         const stored = loadSubjectData(e.subjectCode);
         const st = stored ? stored.status : null;
@@ -506,6 +551,57 @@ document.addEventListener('DOMContentLoaded', async () => {
     return true;
   }
 
+  // Resuelve el nombre de una materia por código, buscando en las materias del plan
+  // actualmente mostradas y en la lista de electivas (con fallback al código mismo).
+  function getSubjectNameByCode(code){
+    if (!code) return code;
+    const fromDisplayed = (displayedSubjects || []).find(s => s.code === code);
+    if (fromDisplayed) return fromDisplayed.name || code;
+    const fromElectivas = (electivasList || []).find(s => s.code === code);
+    if (fromElectivas) return fromElectivas.name || code;
+    return code;
+  }
+
+  // Nombres de las materias de 'cursar' que le faltan a una card para dejar de estar bloqueada.
+  function getMissingRequirementNames(card){
+    if (!card) return [];
+    const reqObj = card.dataset.requirements ? JSON.parse(card.dataset.requirements) : { cursar: [] };
+    const cursar = reqObj.cursar || [];
+    const missing = [];
+    cursar.forEach(r => {
+      const id = (typeof r === 'string') ? r : (r.id || r.code);
+      if (!id) return;
+      const stored = loadSubjectData(id);
+      const status = stored ? stored.status : null;
+      const type = (typeof r === 'object' && r.type) ? r.type : 'aprobada';
+      const met = type === 'regularizada'
+        ? ['Regularizada','Aprobada','Promocionada'].includes(status)
+        : ['Aprobada','Promocionada'].includes(status);
+      if (!met) missing.push(getSubjectNameByCode(id));
+    });
+    return missing;
+  }
+
+  // Formatea una lista al estilo español: "A", "A y B", "A, B y C".
+  function formatSpanishList(items){
+    if (!items || items.length === 0) return '';
+    if (items.length === 1) return items[0];
+    return `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`;
+  }
+
+  // Toast (mobile) con las materias que faltan para poder cursar.
+  function showMissingRequirementsToast(card){
+    const bodyEl = document.getElementById('requirements-toast-body');
+    const toastEl = document.getElementById('requirements-toast');
+    if (!bodyEl || !toastEl) return;
+    const missing = getMissingRequirementNames(card);
+    bodyEl.textContent = missing.length
+      ? `Faltan ${formatSpanishList(missing)}.`
+      : 'Todavía no cumplís los requisitos para cursar esta materia.';
+    const toast = bootstrap.Toast.getOrCreateInstance(toastEl);
+    toast.show();
+  }
+
   // Update all cards to mark as disabled if they don't meet cursar requirements
   function renderGroups(data){
     const modules = Array.isArray(data.modules) ? data.modules : [];
@@ -516,15 +612,38 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Para cada módulo separamos: materias normales (nunca incluyen onlyForIntermediate,
+    // ej. Seminario Integrador), cuáles de esas son parte del título intermedio
+    // (requiredForIntermediateTitle), y los "extras" onlyForIntermediate propios del módulo.
+    // Con el toggle de título intermedio prendido, el tablero se reduce a SOLO ese
+    // recorrido (materias requeridas + extras), ocultando el resto de la carrera —
+    // incluidos módulos enteros (ej. niveles 4/5, electivas) que no aporten nada ahí.
+    const moduleViews = visibleModules
+      .map(module => {
+        const allSubjects = Array.isArray(module.subjects) ? module.subjects : [];
+        const normalSubjects = allSubjects.filter(s => !s.onlyForIntermediate);
+        const intermediateRequired = normalSubjects.filter(s => s.requiredForIntermediateTitle);
+        const intermediateExtras = allSubjects.filter(s => s.onlyForIntermediate);
+        return { module, normalSubjects, intermediateRequired, intermediateExtras };
+      })
+      .filter(v => !showIntermediateTitleEnabled || v.intermediateRequired.length > 0 || v.intermediateExtras.length > 0);
+
+    if (moduleViews.length === 0) {
+      columnsContainer.innerHTML = '<div class="alert alert-info">Esta carrera no tiene materias definidas para el título intermedio.</div>';
+      displayedSubjects = [];
+      try{ computeStats(displayedSubjects); }catch(e){}
+      return;
+    }
+
     // Use number of visible modules as columns (limit to max 8 for layout sanity)
-    columns = Math.min(Math.max(visibleModules.length, 1), 8);
+    columns = Math.min(Math.max(moduleViews.length, 1), 8);
     columnsContainer.innerHTML = '';
-    
+
     // Dynamically adjust the grid columns based on the number of visible modules
     columnsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
 
     // assign consecutive data-index values for visible columns
-    visibleModules.forEach((module, visIdx) => {
+    moduleViews.forEach(({ module, normalSubjects, intermediateRequired, intermediateExtras }, visIdx) => {
       const col = document.createElement('div');
       col.className = 'column-col';
       col.dataset.index = visIdx;
@@ -532,14 +651,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Column header with module name (no color in new format)
       const header = document.createElement('div');
       header.className = 'mb-2';
-      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
-      const electivasCount = Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0;
-      const modulePassed = countPassedSubjects(subjects) + countPassedElectivasForColumn(visIdx);
-      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong> <span class="text-muted small">${modulePassed}/${subjects.length + electivasCount}</span>`;
+      const countBaseSubjects = showIntermediateTitleEnabled ? intermediateRequired : normalSubjects;
+      // Las electivas no son parte del título intermedio (el título intermedio nunca las
+      // pidió históricamente), así que se ocultan por completo con el toggle prendido.
+      const electivasCount = showIntermediateTitleEnabled ? 0 : (Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0);
+      const modulePassed = countPassedSubjects(countBaseSubjects) + (showIntermediateTitleEnabled ? 0 : countPassedElectivasForColumn(visIdx));
+      header.innerHTML = `<strong>${escapeHtml(module.name)}</strong> <span class="text-muted small">${modulePassed}/${countBaseSubjects.length + electivasCount}</span>`;
       col.appendChild(header);
 
       // Render all subjects per module
-      subjects.forEach(subj => col.appendChild(createCard(subj, module)));
+      const renderedSubjects = showIntermediateTitleEnabled ? [...intermediateRequired, ...intermediateExtras] : normalSubjects;
+      renderedSubjects.forEach(subj => col.appendChild(createCard(subj, module)));
 
       // Insert electiva placeholders according to module.electivas (if present)
       for (let i = 0; i < electivasCount; i++){
@@ -549,204 +671,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       columnsContainer.appendChild(col);
     });
 
-    // Compute stats from all displayed subjects (use visible modules)
+    // Las estadísticas / barra de progreso siempre se calculan sobre el total completo de
+    // la carrera (sin importar el toggle), para que ambos tramos del progreso se puedan
+    // mostrar aunque el tablero esté mostrando solo el recorrido del título intermedio.
     displayedSubjects = [];
     visibleModules.forEach(m => {
-      if (Array.isArray(m.subjects)) displayedSubjects.push(...m.subjects);
+      const allSubjects = Array.isArray(m.subjects) ? m.subjects : [];
+      displayedSubjects.push(...allSubjects.filter(s => !s.onlyForIntermediate));
     });
 
     // Setup overlay SVG and interactivity for correlativas
     setupOverlayAndInteractions();
-    // restore any previously added electivas from localStorage (will replace placeholders)
-    try{ restoreElectivesFromStorage(); }catch(e){/* ignore */}
+    // restore any previously added electivas from localStorage (will replace placeholders).
+    // Se saltea con el toggle prendido: los índices de columna no corresponden a la vista
+    // filtrada y las electivas no son parte del título intermedio de todos modos.
+    if (!showIntermediateTitleEnabled){
+      try{ restoreElectivesFromStorage(); }catch(e){/* ignore */}
+    }
     // Compute stats after cursar state is updated (so .card-available classes are present)
     computeStats(displayedSubjects);
-    
-    // Also render table view if in table mode
-    if (currentViewMode === 'table') {
-      try { renderGroupsAsTable(data); } catch(e) { console.error('Failed to render table view after grid update:', e); }
-    }
-  }
-
-  function renderGroupsAsTable(data) {
-    const modules = Array.isArray(data.modules) ? data.modules : [];
-    // filter out modules that should not be rendered
-    const visibleModules = modules.filter(m => m && m.render !== false);
-    
-    if (visibleModules.length === 0) {
-      tableViewContainer.innerHTML = '<div class="alert alert-info">No hay módulos disponibles.</div>';
-      return;
-    }
-
-    tableViewContainer.innerHTML = '';
-
-    visibleModules.forEach(module => {
-      // Create group segment
-      const groupDiv = document.createElement('div');
-      groupDiv.className = 'table-view-group';
-
-      // Group header
-      const headerDiv = document.createElement('div');
-      headerDiv.className = 'table-view-group-header';
-      const tableSubjects = Array.isArray(module.subjects) ? module.subjects : [];
-      const moduleIndex = visibleModules.indexOf(module);
-      const tableElectivasCount = Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0;
-      const tableModulePassed = countPassedSubjects(tableSubjects) + countPassedElectivasForColumn(moduleIndex);
-      headerDiv.innerHTML = `${escapeHtml(module.name)} <span class="text-muted fw-normal small">${tableModulePassed}/${tableSubjects.length + tableElectivasCount}</span>`;
-      groupDiv.appendChild(headerDiv);
-
-      // Create table for subjects
-      const table = document.createElement('table');
-      table.className = 'table table-view-subjects';
-
-      // Table header
-      const thead = document.createElement('thead');
-      thead.innerHTML = `
-        <tr>
-          <th style="width: 15%;">Código</th>
-          <th style="width: 45%;">Materia</th>
-          <th style="width: 15%;">Horas</th>
-          <th style="width: 25%;">Estado</th>
-        </tr>
-      `;
-      table.appendChild(thead);
-
-      // Table body
-      const tbody = document.createElement('tbody');
-      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
-      
-      subjects.forEach(subj => {
-        const row = createTableRow(subj, module);
-        tbody.appendChild(row);
-      });
-
-      // Add electivas from cache if any belong to this module
-      try {
-        getElectivesForCurrentPlan().forEach(entry => {
-          if (entry.columnIndex === moduleIndex) {
-            const electiva = electivasList.find(e => e.code === entry.subjectCode || e.name === entry.subjectCode);
-            if (electiva) {
-              const row = createTableRow(electiva, module);
-              tbody.appendChild(row);
-            }
-          }
-        });
-      } catch(e) { console.error('Failed to load electivas for table view:', e); }
-
-      table.appendChild(tbody);
-      groupDiv.appendChild(table);
-      tableViewContainer.appendChild(groupDiv);
-    });
-  }
-
-  function createTableRow(subject, group = null) {
-    const row = document.createElement('tr');
-    row.dataset.code = subject.code || '';
-    row.style.cursor = 'pointer';
-
-    // Get stored data for this subject
-    const stored = loadSubjectData(subject.code);
-    const status = stored ? stored.status : null;
-    const statusDesc = getStatusDescription(status);
-    
-    // Apply status background class
-    const statusMapping = {
-      'Aprobada': 'table-row-aprobada',
-      'Desaprobada': 'table-row-desaprobada',
-      'Promocionada': 'table-row-promocionada',
-      'Regularizada': 'table-row-regularizada'
-    };
-    const statusClass = statusMapping[status];
-    if (statusClass) row.classList.add(statusClass);
-
-    // Get recursed count for Roman numeral display
-    const recursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
-    let romanNumeralHtml = '';
-    if (recursedCount > 0) {
-      const cursadaNumber = recursedCount + 1;
-      const cursadaNumeral = toRomanNumeral(cursadaNumber);
-      romanNumeralHtml = `<span class="table-view-recursed" title="Cursada ${cursadaNumeral}">${cursadaNumeral}</span>`;
-    }
-
-    // Code column
-    const codeCell = document.createElement('td');
-    codeCell.textContent = subject.code || '';
-    row.appendChild(codeCell);
-
-    // Name column
-    const nameCell = document.createElement('td');
-    nameCell.innerHTML = `${escapeHtml(subject.name)}${romanNumeralHtml}`;
-    row.appendChild(nameCell);
-
-    // Hours column (plain text with C/A indicator)
-    const hoursCell = document.createElement('td');
-    const weekHours = typeof subject.weekHours === 'number' ? subject.weekHours : 6;
-    const duration = subject.duration || 'anual';
-    const durationIndicator = duration === 'cuatrimestral' ? 'C' : 'A';
-    hoursCell.textContent = `${weekHours} hs - ${durationIndicator}`;
-    row.appendChild(hoursCell);
-
-    // Status column
-    const statusCell = document.createElement('td');
-    const promotable = (status === 'Regularizada' || status === 'No regularizada') && canPromote(stored);
-    if (statusDesc) {
-      statusCell.textContent = promotable ? `${statusDesc} • Puede promocionar` : statusDesc;
-    } else {
-      statusCell.textContent = '-';
-    }
-    row.appendChild(statusCell);
-
-    // Check if subject is disabled (doesn't meet cursar requirements)
-    const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
-    const cursarReqs = reqsObj.cursar || [];
-    let meetsRequirements = true;
-    
-    if (cursarReqs && cursarReqs.length > 0) {
-      for (const req of cursarReqs) {
-        const reqId = (typeof req === 'string') ? req : (req.id || req.code);
-        if (!reqId) continue;
-        const reqStored = loadSubjectData(reqId);
-        const reqStatus = reqStored ? reqStored.status : null;
-        const reqType = (typeof req === 'object' && req.type) ? req.type : 'aprobada';
-        
-        let reqMet = false;
-        if (reqType === 'regularizada') {
-          reqMet = ['Regularizada', 'Aprobada', 'Promocionada'].includes(reqStatus);
-        } else {
-          reqMet = ['Aprobada', 'Promocionada'].includes(reqStatus);
-        }
-        
-        if (!reqMet) {
-          meetsRequirements = false;
-          break;
-        }
-      }
-    }
-
-    if (!meetsRequirements && !status) {
-      row.classList.add('table-row-disabled');
-    }
-
-    // Add click handler to open modal
-    row.addEventListener('click', (ev) => {
-      // If disabled, do nothing (in grid view, disabled cards show requirements on click)
-      // In table view, we simply don't open the modal for disabled subjects
-      if (row.classList.contains('table-row-disabled')) {
-        return;
-      }
-      
-      // Find the corresponding card in the grid view and trigger its click
-      const code = subject.code || '';
-      if (code) {
-        const card = columnsContainer.querySelector(`.card-subject[data-code="${code}"]`);
-        if (card) {
-          // Trigger the card's click to reuse all existing modal logic
-          card.click();
-        }
-      }
-    });
-
-    return row;
   }
 
   function createCard(subject, group = null){
@@ -840,9 +783,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function onCardClick(e){
     // open modal and populate minimal info
     currentCard = e.currentTarget;
-    // If card is disabled (doesn't meet cursar requirements) highlight missing requirements instead of opening modal
+    // If card is disabled (doesn't meet cursar requirements) show the missing requirements
+    // instead of opening modal. En mobile usamos un toast (no hay hover ni tiene sentido el
+    // scroll con una sola columna); en desktop mantenemos el scroll+flash de siempre.
     if (currentCard.classList && currentCard.classList.contains('card-disabled')){
-      try{ highlightMissingRequirements(currentCard); }catch(err){/* ignore */}
+      if (isMobile()){
+        try{ showMissingRequirementsToast(currentCard); }catch(err){/* ignore */}
+      } else {
+        try{ highlightMissingRequirements(currentCard); }catch(err){/* ignore */}
+      }
       return;
     }
     const code = currentCard.dataset.code || '';
@@ -957,14 +906,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.disabled = true;
       let hydrated;
       try{
-        hydrated = await activeStore.createEnrollment(currentPlan, code, schemeCode);
+        hydrated = await activeStore.createEnrollment(code, schemeCode);
       }catch(err){
         console.error('Error creando inscripción', err);
         alert('No se pudo anotar a la materia: ' + (err && err.message ? err.message : err));
         btn.disabled = false;
         return;
       }
-      putSubjectDataInCache(currentPlan, code, hydrated);
+      putSubjectDataInCache(code, hydrated);
       currentEnrollment = hydrated;
 
       // Si el modal se abrió para colocar una electiva pendiente, insertarla en el tablero
@@ -1169,13 +1118,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status = overrideValue === 'computed' ? null : overrideValue;
     let hydrated;
     try{
-      hydrated = await activeStore.setOverride(currentPlan, effectiveCode, status);
+      hydrated = await activeStore.setOverride(effectiveCode, status);
     }catch(err){
       console.error('Error aplicando override', err);
       alert('No se pudo actualizar el estado: ' + (err && err.message ? err.message : err));
       return;
     }
-    putSubjectDataInCache(currentPlan, effectiveCode, hydrated);
+    putSubjectDataInCache(effectiveCode, hydrated);
     currentEnrollment = hydrated;
 
     setStatusBanner(hydrated.status);
@@ -1428,8 +1377,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const checklist = readDynamicChecklist(schemeConfig);
       newSave.disabled = true;
       try{
-        const hydrated = await activeStore.saveResults(currentPlan, code, { partials, finals, checklist, clearOverride: true });
-        putSubjectDataInCache(currentPlan, code, hydrated);
+        const hydrated = await activeStore.saveResults(code, { partials, finals, checklist, clearOverride: true });
+        putSubjectDataInCache(code, hydrated);
         currentEnrollment = hydrated;
         applyCardStatusStyle(currentCard, hydrated.status);
         updateAllCardCursarState();
@@ -1482,11 +1431,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         newApply.disabled = true;
         try{
-          const hydrated = await activeStore.updateEnrollmentSettings(currentPlan, code, {
+          const hydrated = await activeStore.updateEnrollmentSettings(code, {
             schemeCode: schemeChanged ? newSchemeCode : undefined,
             enrollmentYear: Number.isFinite(newYear) ? newYear : undefined,
           });
-          putSubjectDataInCache(currentPlan, code, hydrated);
+          putSubjectDataInCache(code, hydrated);
           currentEnrollment = hydrated;
           panel.classList.add('d-none');
           applyCardStatusStyle(currentCard, hydrated.status);
@@ -1511,8 +1460,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
         newRecursar.disabled = true;
         try{
-          const hydrated = await activeStore.recursar(currentPlan, code);
-          putSubjectDataInCache(currentPlan, code, hydrated);
+          const hydrated = await activeStore.recursar(code);
+          putSubjectDataInCache(code, hydrated);
           currentEnrollment = hydrated;
           applyCardStatusStyle(currentCard, hydrated.status);
           updateAllCardCursarState();
@@ -1686,8 +1635,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
     }catch(err){/* ignore */}
-    // Respect the user's toggle preference for correlativas for normal cards
-    if (!correlativasEnabled) return;
+    // Respect the user's toggle preference for correlativas for normal cards, and skip
+    // entirely on mobile (una sola columna, sin hover real en touch).
+    if (!correlativasEnabled || isMobile()) return;
     // clear previous drawings
     clearOverlay();
     const reqObj = card.dataset.requirements ? JSON.parse(card.dataset.requirements) : { cursar: [], aprobar: [] };
@@ -1845,20 +1795,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Barra de progreso dividida en dos segmentos de color: el primero mide el avance
+  // hasta el título intermedio (materias requiredForIntermediateTitle), el segundo el
+  // resto de la carrera. Cada segmento ocupa, dentro del ancho total de la barra, la
+  // proporción de materias que representa; dentro de eso, se llena según lo aprobado/
+  // regularizado. Las electivas y las materias comunes (sin requiredForIntermediateTitle)
+  // caen siempre en el segundo segmento. Las materias "onlyForIntermediate" (Seminario
+  // Integrador) nunca entran en ningún total — `list` ya viene sin ellas (ver renderGroups).
   function computeStats(list){
-    // Compute approved and regularized counts based on saved statuses in localStorage
     const baseTotal = Array.isArray(list) ? list.length : 0;
-    let approved = 0;
-    let regularized = 0;
+    let approved = 0, regularized = 0;
+    let intermediateTotal = 0, intermediateApproved = 0, intermediateRegularized = 0;
     for (const subj of (list || [])){
       const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
       const stored = key ? loadSubjectData(key) : null;
       const status = stored ? stored.status : null;
-      if (status === 'Aprobada' || status === 'Promocionada') approved++;
-      else if (status === 'Regularizada') regularized++;
+      const isIntermediate = !!subj.requiredForIntermediateTitle;
+      if (isIntermediate) intermediateTotal++;
+      if (status === 'Aprobada' || status === 'Promocionada') {
+        approved++;
+        if (isIntermediate) intermediateApproved++;
+      } else if (status === 'Regularizada') {
+        regularized++;
+        if (isIntermediate) intermediateRegularized++;
+      }
     }
 
     // Add required electivas per visible module to the total (even if not yet added to tablero)
+    // Las electivas nunca son parte del título intermedio (ver comentario arriba).
     let electivasRequired = 0;
     try{
       if (planData && Array.isArray(planData.modules)){
@@ -1872,7 +1836,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Count electivas that are placed on the board and have saved statuses
     try{
-      getElectivesForCurrentPlan().forEach(entry => {
+      getElectivesForCurrentCareer().forEach(entry => {
         const stored = loadSubjectData(entry.subjectCode);
         const status = stored ? stored.status : null;
         if (status === 'Aprobada' || status === 'Promocionada') approved++;
@@ -1881,18 +1845,67 @@ document.addEventListener('DOMContentLoaded', async () => {
     }catch(e){}
 
     const total = baseTotal + electivasRequired;
+    const restoTotal = total - intermediateTotal;
+    const restoApproved = approved - intermediateApproved;
+    const restoRegularized = regularized - intermediateRegularized;
 
-    // Progress formula: (approved + regularized/2) / total
-    let progress = 0;
-    if (total > 0){
-      progress = ((approved + (regularized / 2)) / total) * 100;
-      if (!Number.isFinite(progress)) progress = 0;
+    // Tramo 1: hasta el título intermedio — 0-100% de ESE subconjunto nada más, para
+    // que quede claro cuánto falta puntualmente para el título intermedio.
+    let intermediatePct = 0;
+    if (intermediateTotal > 0){
+      intermediatePct = ((intermediateApproved + intermediateRegularized / 2) / intermediateTotal) * 100;
+      if (!Number.isFinite(intermediatePct)) intermediatePct = 0;
     }
-    const pct = Math.round(progress);
-    progressBar.style.width = `${pct}%`;
-    progressBar.setAttribute('aria-valuenow', pct);
-    progressLabel.textContent = total > 0 ? `${pct}%` : '—';
-    
+    const intermediatePctRounded = Math.round(intermediatePct);
+
+    // Tramo 2: resto de la carrera (todo lo que no es requisito del título intermedio) —
+    // 0-100% de ese resto.
+    let restoPct = 0;
+    if (restoTotal > 0){
+      restoPct = ((restoApproved + restoRegularized / 2) / restoTotal) * 100;
+      if (!Number.isFinite(restoPct)) restoPct = 0;
+    }
+    const restoPctRounded = Math.round(restoPct);
+
+    // Progreso global de la carrera (todas las materias, incluidas las del título
+    // intermedio) — es el número que se muestra junto a "final de la carrera",
+    // aunque la barra en sí solo pinte en ese tramo lo específico del resto.
+    let globalPct = 0;
+    if (total > 0){
+      globalPct = ((approved + regularized / 2) / total) * 100;
+      if (!Number.isFinite(globalPct)) globalPct = 0;
+    }
+    const globalPctRounded = Math.round(globalPct);
+
+    const hasIntermediate = intermediateTotal > 0;
+    const intermediateWrap = document.getElementById('progress-intermediate-wrap');
+    if (intermediateWrap) intermediateWrap.classList.toggle('d-none', !hasIntermediate);
+
+    // Ancho de cada segmento de la barra única: proporción que representa ese
+    // tramo sobre el total de la carrera.
+    const segmentIntermediate = document.getElementById('progress-segment-intermediate');
+    const segmentFinal = document.getElementById('progress-segment-final');
+    const intermediateShare = total > 0 ? (intermediateTotal / total) * 100 : 0;
+    const restoShare = total > 0 ? 100 - intermediateShare : 100;
+    if (segmentIntermediate){
+      segmentIntermediate.classList.toggle('d-none', !hasIntermediate);
+      segmentIntermediate.style.width = `${intermediateShare}%`;
+    }
+    if (segmentFinal) segmentFinal.style.width = `${hasIntermediate ? restoShare : 100}%`;
+
+    if (progressBarIntermediate){
+      progressBarIntermediate.style.width = `${intermediatePctRounded}%`;
+      progressBarIntermediate.setAttribute('aria-valuenow', intermediatePctRounded);
+    }
+    const progressLabelIntermediate = document.getElementById('progress-label-intermediate');
+    if (progressLabelIntermediate) progressLabelIntermediate.textContent = hasIntermediate ? `${intermediatePctRounded}%` : '—';
+
+    if (progressBarFinal){
+      progressBarFinal.style.width = `${restoPctRounded}%`;
+      progressBarFinal.setAttribute('aria-valuenow', restoPctRounded);
+    }
+    progressLabel.textContent = total > 0 ? `${globalPctRounded}%` : '—';
+
     // Render dynamic stats row cards
     try{ renderStatsRowCards(); }catch(e){ console.error('Error rendering stats row', e); }
   }
@@ -2084,10 +2097,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           ev.stopPropagation();
           removeBtn.disabled = true;
           try{
-            await activeStore.removeElective(currentPlan, key);
-            await activeStore.dropEnrollment(currentPlan, key);
-            electivesCache = electivesCache.filter(e => !(e.planCode === currentPlan && e.subjectCode === key));
-            putSubjectDataInCache(currentPlan, key, null);
+            await activeStore.removeElective(currentCareer, key);
+            await activeStore.dropEnrollment(key);
+            electivesCache = electivesCache.filter(e => !(e.careerCode === currentCareer && e.subjectCode === key));
+            putSubjectDataInCache(key, null);
             // Remove the card from DOM and replace with a placeholder in the same column and position
             const parent = newCard.parentNode;
             const next = newCard.nextSibling;
@@ -2129,9 +2142,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       // persist placement
       (async () => {
         try{
-          await activeStore.setElective(currentPlan, key, colIndex);
-          const idx = electivesCache.findIndex(e => e.planCode === currentPlan && e.subjectCode === key);
-          const entry = { planCode: currentPlan, subjectCode: key, columnIndex: colIndex };
+          await activeStore.setElective(currentCareer, key, colIndex);
+          const idx = electivesCache.findIndex(e => e.careerCode === currentCareer && e.subjectCode === key);
+          const entry = { careerCode: currentCareer, subjectCode: key, columnIndex: colIndex };
           if (idx >= 0) electivesCache[idx] = entry; else electivesCache.push(entry);
         }catch(e){
           console.error('Error guardando electiva', e);
@@ -2146,10 +2159,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Restore electivas ya colocadas (electivesCache, poblado al bootear) dentro del tablero.
-  // Usa electivasList (cargado desde DATA_URL) para resolver nombre/horas de cada electiva.
+  // Usa electivasList (cargado del curriculum de la carrera activa) para resolver nombre/horas de cada electiva.
   // NOTE: Si una electiva ya no existe en el plan actual, no se muestra.
   function restoreElectivesFromStorage(){
-    const entries = getElectivesForCurrentPlan();
+    const entries = getElectivesForCurrentCareer();
     if (!entries.length) return;
     const list = Array.isArray(electivasList) ? electivasList : [];
     const byCode = {};
@@ -2191,10 +2204,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     DEFAULT_WEEK_HOURS: 6,           // Default weekly hours when not specified
     MIN_YEAR_STARTED: 1990,          // Minimum year for "year started" input
     MAX_YEAR_STARTED: 2099,          // Maximum year for "year started" input
-    // Academic weight formula coefficients (Peso = 11*Aprobadas - 5*Años - 3*Desaprobadas)
+    // Fórmula de peso académico:
+    //   P = 11·MAp_total − 7·FAd_total − 19·FAu_ciclo − 17·MAb_ciclo + 5·MR_ciclo
+    // MAp_total: materias aprobadas/promocionadas en total.
+    // FAd_total: finales adeudados (materias regularizadas, sin importar el año).
+    // MR_ciclo: materias regularizadas cuyo año de inscripción es el año actual.
+    // FAu_ciclo (finales ausentes en el ciclo) y MAb_ciclo (materias abandonadas en el
+    // ciclo) se saltean por completo: hoy no hay forma de determinarlos con los datos
+    // que guardamos, así que sus coeficientes no están implementados (a propósito).
     PESO_COEF_APROBADAS: 11,
-    PESO_COEF_ANTIGUEDAD: 5,
-    PESO_COEF_DESAPROBADAS: 3
+    PESO_COEF_FINALES_ADEUDADOS: 7,
+    PESO_COEF_REGULARIZADAS_CICLO: 5
   };
   
   // All available stats definitions
@@ -2289,7 +2309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const byCode = {};
       const byName = {};
       electList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
-      getElectivesForCurrentPlan().forEach(entry => {
+      getElectivesForCurrentCareer().forEach(entry => {
         try{
           const stored = loadSubjectData(entry.subjectCode);
           const status = stored ? stored.status : null;
@@ -2358,7 +2378,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Count electivas approved
     try{
-      getElectivesForCurrentPlan().forEach(entry => {
+      getElectivesForCurrentCareer().forEach(entry => {
         const stored = loadSubjectData(entry.subjectCode);
         const status = stored ? stored.status : null;
         if (status === 'Aprobada' || status === 'Promocionada') approved++;
@@ -2389,7 +2409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Count electivas regularized
     try{
-      getElectivesForCurrentPlan().forEach(entry => {
+      getElectivesForCurrentCareer().forEach(entry => {
         const stored = loadSubjectData(entry.subjectCode);
         const status = stored ? stored.status : null;
         if (status === 'Regularizada') regularized++;
@@ -2422,7 +2442,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Also count electivas
     try{
-      getElectivesForCurrentPlan().forEach(entry => {
+      getElectivesForCurrentCareer().forEach(entry => {
         const stored = loadSubjectData(entry.subjectCode);
         const status = stored ? stored.status : null;
         if ((status === 'Regularizada' || status === 'No regularizada') && canPromote(stored)){
@@ -2446,7 +2466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Also count electivas
     try{
-      getElectivesForCurrentPlan().forEach(entry => {
+      getElectivesForCurrentCareer().forEach(entry => {
         const stored = loadSubjectData(entry.subjectCode);
         const status = stored ? stored.status : null;
         if (status === 'No regularizada') count++;
@@ -2467,7 +2487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Also count electivas
     try{
-      getElectivesForCurrentPlan().forEach(entry => {
+      getElectivesForCurrentCareer().forEach(entry => {
         const stored = loadSubjectData(entry.subjectCode);
         if (stored && typeof stored.recursedCount === 'number') totalRecursed += stored.recursedCount;
       });
@@ -2483,30 +2503,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     return years >= 0 ? String(years) : '—';
   }
   
-  function computePesoAcademico(){
-    // Formula: COEF_APROBADAS*Aprobadas - COEF_ANTIGUEDAD*Años - COEF_DESAPROBADAS*Desaprobadas
-    // Get approved count (number only)
-    const aprobStr = computeMateriasAprobadas();
-    const aprobMatch = aprobStr.match(/^(\d+)/);
-    const aprobadas = aprobMatch ? parseInt(aprobMatch[1], 10) : 0;
-    
-    // Get años antiguedad
-    const yearStarted = getYearStarted();
-    let aniosAntiguedad = 0;
-    if (yearStarted){
-      const currentYear = new Date().getFullYear();
-      aniosAntiguedad = currentYear - yearStarted;
-      if (aniosAntiguedad < 0) aniosAntiguedad = 0;
+  // Cuenta, en una sola pasada por todas las materias (plan + electivas), lo que necesita
+  // la fórmula de peso académico: aprobadas/promocionadas en total, regularizadas en total
+  // (= finales adeudados) y regularizadas cuyo año de inscripción es el ciclo actual.
+  function getPesoAcademicoCounts(){
+    let aprobadas = 0;
+    let regularizadasTotal = 0;
+    let regularizadasCiclo = 0;
+    const currentYear = new Date().getFullYear();
+
+    function tally(stored){
+      if (!stored) return;
+      if (stored.status === 'Aprobada' || stored.status === 'Promocionada') {
+        aprobadas++;
+      } else if (stored.status === 'Regularizada') {
+        regularizadasTotal++;
+        if (stored.enrollmentYear === currentYear) regularizadasCiclo++;
+      }
     }
-    
-    // Get desaprobadas (recursed count)
-    const desaprobadasStr = computeDesaprobadas();
-    const desaprobadas = parseInt(desaprobadasStr, 10) || 0;
-    
-    // Calculate peso using configured coefficients
-    const peso = STATS_CONFIG.PESO_COEF_APROBADAS * aprobadas 
-               - STATS_CONFIG.PESO_COEF_ANTIGUEDAD * aniosAntiguedad 
-               - STATS_CONFIG.PESO_COEF_DESAPROBADAS * desaprobadas;
+
+    for (const subj of (displayedSubjects || [])){
+      const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+      tally(key ? loadSubjectData(key) : null);
+    }
+    try{
+      getElectivesForCurrentCareer().forEach(entry => tally(loadSubjectData(entry.subjectCode)));
+    }catch(e){}
+
+    return { aprobadas, regularizadasTotal, regularizadasCiclo };
+  }
+
+  function computePesoAcademico(){
+    // P = 11·MAp_total − 7·FAd_total + 5·MR_ciclo (FAu_ciclo y MAb_ciclo no implementados, ver STATS_CONFIG)
+    const { aprobadas, regularizadasTotal, regularizadasCiclo } = getPesoAcademicoCounts();
+    const peso = STATS_CONFIG.PESO_COEF_APROBADAS * aprobadas
+               - STATS_CONFIG.PESO_COEF_FINALES_ADEUDADOS * regularizadasTotal
+               + STATS_CONFIG.PESO_COEF_REGULARIZADAS_CICLO * regularizadasCiclo;
     return String(peso);
   }
   
@@ -2543,8 +2575,56 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="small text-muted">${escapeHtml(statDef.name)}</div>
         <div class="h5 mb-0">${escapeHtml(value)}</div>
       `;
+      if (statId === 'pesoAcademico'){
+        card.style.cursor = 'pointer';
+        card.title = 'Ver composición del peso académico';
+        card.addEventListener('click', openPesoAcademicoModal);
+      }
       container.appendChild(card);
     });
+  }
+
+  // Detalle de la fórmula de peso académico, incluyendo los componentes salteados
+  // (FAu_ciclo/MAb_ciclo) como filas meramente visuales, sin afectar el total.
+  function openPesoAcademicoModal(){
+    const tbody = document.getElementById('peso-academico-table-body');
+    const totalEl = document.getElementById('peso-academico-total');
+    if (!tbody || !totalEl) return;
+
+    const { aprobadas, regularizadasTotal, regularizadasCiclo } = getPesoAcademicoCounts();
+    const aporteAprobadas = STATS_CONFIG.PESO_COEF_APROBADAS * aprobadas;
+    const aporteFinalesAdeudados = -STATS_CONFIG.PESO_COEF_FINALES_ADEUDADOS * regularizadasTotal;
+    const aporteRegularizadasCiclo = STATS_CONFIG.PESO_COEF_REGULARIZADAS_CICLO * regularizadasCiclo;
+    const total = aporteAprobadas + aporteFinalesAdeudados + aporteRegularizadasCiclo;
+
+    const rows = [
+      { name: 'Materias aprobadas / promocionadas (MAp_total)', coef: '+11', value: String(aprobadas), aporte: aporteAprobadas },
+      { name: 'Finales adeudados (FAd_total)', coef: '−7', value: String(regularizadasTotal), aporte: aporteFinalesAdeudados },
+      { name: 'Finales ausentes en el ciclo (FAu_ciclo)', coef: '−19', value: 'No disponible', aporte: null },
+      { name: 'Materias abandonadas en el ciclo (MAb_ciclo)', coef: '−17', value: 'No disponible', aporte: null },
+      { name: 'Materias regularizadas en el ciclo (MR_ciclo)', coef: '+5', value: String(regularizadasCiclo), aporte: aporteRegularizadasCiclo },
+    ];
+
+    tbody.innerHTML = rows.map(r => {
+      const disabled = r.aporte === null;
+      const aporteText = disabled ? '—' : (r.aporte >= 0 ? `+${r.aporte}` : String(r.aporte));
+      return `
+        <tr class="${disabled ? 'text-muted' : ''}">
+          <td>${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.coef)}</td>
+          <td>${escapeHtml(r.value)}</td>
+          <td class="text-end">${escapeHtml(aporteText)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    totalEl.textContent = (total >= 0 ? `+${total}` : String(total));
+
+    const modalEl = document.getElementById('pesoAcademicoModal');
+    if (modalEl){
+      const inst = bootstrap.Modal.getOrCreateInstance(modalEl);
+      inst.show();
+    }
   }
   
   // =====================================================
@@ -2613,7 +2693,80 @@ document.addEventListener('DOMContentLoaded', async () => {
       populateStatsModalTable();
     });
   }
-  
+
+  // =====================================================
+  // Mis carreras (perfil): anotarse / darse de baja. Darse de baja NO borra
+  // enrollments/electivas — solo saca la carrera del dropdown (ver careerCode
+  // notes en apiStore.js/localGuestStore.js: los resultados están linkeados a la
+  // materia, no a la carrera).
+  // =====================================================
+
+  async function populateCareersModalTable(){
+    const tbody = document.getElementById('careers-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="2" class="text-muted small">Cargando…</td></tr>';
+    const catalog = await getCareers();
+    tbody.innerHTML = '';
+    catalog.forEach(career => {
+      const isEnrolled = userCareers.some(c => c.code === career.code);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(career.name)}</td>
+        <td class="text-center"></td>
+      `;
+      const actionCell = tr.querySelector('td:last-child');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      if (isEnrolled){
+        btn.className = 'btn btn-outline-danger btn-sm';
+        btn.innerHTML = '✕';
+        btn.title = 'Darme de baja';
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try{
+            await activeStore.unenrollCareer(career.code);
+            userCareers = await activeStore.getUserCareers();
+            populateProgramSelect();
+            if (currentCareer === career.code){
+              currentCareer = pickInitialCareer();
+              syncIntermediateTitleState();
+              loadPlanData();
+            }
+            await populateCareersModalTable();
+          }catch(e){
+            console.error('Error dándose de baja de la carrera', e);
+            alert('No se pudo dar de baja de la carrera.');
+            btn.disabled = false;
+          }
+        });
+      } else {
+        btn.className = 'btn btn-outline-success btn-sm';
+        btn.innerHTML = '+';
+        btn.title = 'Anotarme';
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try{
+            await enrollInCareer(career.code);
+            await populateCareersModalTable();
+          }catch(e){
+            console.error('Error anotándose a la carrera', e);
+            alert('No se pudo anotar a la carrera.');
+            btn.disabled = false;
+          }
+        });
+      }
+      actionCell.appendChild(btn);
+      tbody.appendChild(tr);
+    });
+  }
+
+  const profileModalEl = document.getElementById('profileModal');
+  if (profileModalEl){
+    profileModalEl.addEventListener('show.bs.modal', () => {
+      populateCareersModalTable();
+    });
+  }
+
   // Initialize year started input
   initYearStartedInput();
 
@@ -2685,17 +2838,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await Promise.all([refreshEnrollmentCache(), refreshElectivesCache()]);
 
+    userCareers = await activeStore.getUserCareers();
+    populateProgramSelect();
+
     let preferences = null;
     try{ preferences = await activeStore.getPreferences(); }catch(e){ console.error('Error cargando preferencias', e); }
 
+    if (preferences && preferences.activeCareerCode && userCareers.some(c => c.code === preferences.activeCareerCode)){
+      localStorage.setItem('career', preferences.activeCareerCode);
+    }
+    currentCareer = pickInitialCareer();
+    if (programSelect && currentCareer) programSelect.value = currentCareer;
+    syncIntermediateTitleState();
+
     if (activeStore === apiStore && preferences){
-      if (preferences.activePlanCode && AVAILABLE_PLANS[preferences.activePlanCode]){
-        currentPlan = preferences.activePlanCode;
-        DATA_URL = AVAILABLE_PLANS[currentPlan];
-        localStorage.setItem('plan', currentPlan);
-        const programSelectEl = document.getElementById('programSelect');
-        if (programSelectEl) programSelectEl.value = currentPlan;
-      }
       if (typeof preferences.yearStarted === 'number'){
         localStorage.setItem('yearStarted', String(preferences.yearStarted));
       }
@@ -2727,7 +2883,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       },
     });
 
-    // Load the main plan (subjects + modules + electivas) from DATA_URL and render
+    // Carga el curriculum de la carrera activa y renderiza el tablero.
     loadPlanData();
   }
 

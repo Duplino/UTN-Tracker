@@ -9,7 +9,6 @@ use PDO;
 final class PreferencesRepository
 {
     private const FIELD_MAP = [
-        'activePlanCode' => 'active_plan_code',
         'showCorrelativas' => 'show_correlativas',
         'showStatus' => 'show_status',
         'viewMode' => 'view_mode',
@@ -62,6 +61,21 @@ final class PreferencesRepository
             }
         }
 
+        // activeCareerCode no es una columna directa: hay que resolver el código a
+        // careers.id (o NULL si no se encontró / se mandó vacío).
+        if (array_key_exists('activeCareerCode', $fields)) {
+            $careerId = null;
+            $code = $fields['activeCareerCode'];
+            if ($code) {
+                $stmt = $this->pdo->prepare('SELECT id FROM careers WHERE code = :code');
+                $stmt->execute(['code' => $code]);
+                $row = $stmt->fetch();
+                $careerId = $row ? (int) $row['id'] : null;
+            }
+            $sets[] = 'active_career_id = :active_career_id';
+            $params['active_career_id'] = $careerId;
+        }
+
         if ($sets !== []) {
             $sql = 'UPDATE user_preferences SET ' . implode(', ', $sets) . ' WHERE user_id = :uid';
             $this->pdo->prepare($sql)->execute($params);
@@ -72,8 +86,15 @@ final class PreferencesRepository
 
     private function hydrate(array $row): array
     {
+        $activeCareerCode = null;
+        if ($row['active_career_id'] !== null) {
+            $stmt = $this->pdo->prepare('SELECT code FROM careers WHERE id = :id');
+            $stmt->execute(['id' => (int) $row['active_career_id']]);
+            $activeCareerCode = $stmt->fetchColumn() ?: null;
+        }
+
         return [
-            'activePlanCode' => $row['active_plan_code'],
+            'activeCareerCode' => $activeCareerCode,
             'showCorrelativas' => (bool) $row['show_correlativas'],
             'showStatus' => (bool) $row['show_status'],
             'viewMode' => $row['view_mode'],

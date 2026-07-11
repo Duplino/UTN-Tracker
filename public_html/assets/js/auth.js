@@ -8,7 +8,7 @@ import { localGuestStore } from './localGuestStore.js';
 // TODO(usuario): completar con el Client ID real de Google Cloud Console
 // (APIs & Services -> Credentials -> OAuth 2.0 Client IDs -> tipo "Web application").
 // Sin esto el botón de Google no va a funcionar.
-export const GOOGLE_CLIENT_ID = 'PENDIENTE_CONFIGURAR';
+export const GOOGLE_CLIENT_ID = '791264678302-rfpc1qgq84g80eqlij67vt8ifjkdqf8u.apps.googleusercontent.com';
 
 let wired = false;
 let currentUser = null;

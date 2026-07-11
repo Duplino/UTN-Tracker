@@ -12,23 +12,18 @@
 	<body>
 		<div class="container-fluid">
 			<!-- Top toolbar (not a navbar) -->
-			<div class="toolbar d-flex justify-content-between align-items-center">
-				<div class="d-flex align-items-center" role="group" aria-label="Herramientas">
-					<select id="programSelect" class="form-select me-2" aria-label="Programas">
-						<option value="k23">Ingeniería en Sistemas de Información - K23</option>
-						<option value="k23medio">Analista en Sistemas de Información - K23</option>
+			<div class="toolbar d-flex flex-wrap justify-content-between align-items-center gap-2">
+				<div class="d-flex align-items-center gap-2" role="group" aria-label="Herramientas">
+					<select id="programSelect" class="form-select" aria-label="Carreras">
+						<!-- Opciones generadas dinámicamente por JS según las carreras en las que estás anotado -->
 					</select>
-					<div class="btn-group me-2" role="group" aria-label="Vista">
-						<button type="button" class="btn btn-outline-secondary active" id="btn-view-grid" title="Vista de tablero">
-							<i class="bi bi-grid-3x3-gap"></i>
-						</button>
-						<button type="button" class="btn btn-outline-secondary" id="btn-view-table" title="Vista de tabla">
-							<i class="bi bi-table"></i>
-						</button>
+					<div id="settings-intermediate-title-wrap" class="form-check form-switch d-none text-nowrap" title="Mostrar el mapa hasta el título intermedio">
+						<input class="form-check-input" type="checkbox" id="settings-intermediate-title" role="switch">
+						<label class="form-check-label small" for="settings-intermediate-title">Título intermedio</label>
 					</div>
 					<button class="btn btn-outline-secondary" id="btn-electivas">electivas</button>
 				</div>
-				<div class="btn-group">
+				<div class="btn-group" role="group" aria-label="Acciones">
 					<button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#helpModal" id="btn-help">
 						Ayuda
 					</button>
@@ -42,7 +37,6 @@
 						<i class="bi bi-bar-chart"></i>
 					</button>
 				</div>
-	
 			</div>
 
 			<!-- Columns with subject cards -->
@@ -50,10 +44,15 @@
 				<!-- Columns produced dynamically by JS -->
 			</section>
 
-			<!-- Table view (hidden by default) -->
-			<section class="table-view" aria-label="Materias">
-				<!-- Table produced dynamically by JS -->
-			</section>
+			<!-- Toast de requisitos faltantes (solo mobile, ver assets/js/index.js) -->
+			<div class="toast-container requirements-toast-container position-fixed bottom-0 start-50 translate-middle-x p-3">
+				<div id="requirements-toast" class="toast align-items-center text-bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+					<div class="d-flex">
+						<div class="toast-body" id="requirements-toast-body"></div>
+						<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+					</div>
+				</div>
+			</div>
 
 			<!-- Bottom statistics and progress -->
 			<section class="mt-3">
@@ -62,12 +61,27 @@
 				</div>
 
 				<div class="progress-wrap">
-					<div class="d-flex justify-content-between">
-						<small class="text-muted">Progreso de aprobadas</small>
-						<small id="progress-label" class="text-muted">0%</small>
+					<!-- Fila de etiqueta del tramo 1 (hasta el título intermedio), oculta si la
+					     carrera no tiene título intermedio. -->
+					<div id="progress-intermediate-wrap" class="d-flex justify-content-between d-none">
+						<small class="text-muted">Progreso hasta el título intermedio</small>
+						<small id="progress-label-intermediate" class="text-muted">0%</small>
 					</div>
-					<div class="progress" aria-hidden="false">
-						<div id="progress-bar" class="progress-bar bg-success" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100"></div>
+					<!-- Una única barra de progreso dividida en dos segmentos: el ancho de cada
+					     segmento representa su proporción sobre el total de la carrera (Tramo 1:
+					     título intermedio / Tramo 2: resto), y el relleno interno de cada segmento
+					     representa el avance dentro de ese tramo (0-100% de ese tramo nada más). -->
+					<div class="progress progress-split" aria-hidden="false">
+						<div id="progress-segment-intermediate" class="progress-segment d-none">
+							<div id="progress-bar-intermediate" class="progress-segment-fill bg-info" role="progressbar" aria-labelledby="progress-label-intermediate" aria-valuemin="0" aria-valuemax="100"></div>
+						</div>
+						<div id="progress-segment-final" class="progress-segment">
+							<div id="progress-bar-final" class="progress-segment-fill bg-success" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100"></div>
+						</div>
+					</div>
+					<div class="d-flex justify-content-between">
+						<small class="text-muted">Progreso hasta el final de la carrera</small>
+						<small id="progress-label" class="text-muted">0%</small>
 					</div>
 				</div>
 			</section>
@@ -233,6 +247,19 @@
 				  <input id="profile-year-started" type="number" min="1990" max="2099" step="1" class="form-control" placeholder="Ej: 2020" />
 				  <div class="form-text">Año en el que aprobó el TIVU (para calcular antigüedad).</div>
 				</div>
+				<!-- Mis carreras: anotarse/darse de baja. Darse de baja NO borra las notas ya
+				     cargadas (están linkeadas a la materia, no a la carrera). -->
+				<hr class="my-3">
+				<div class="mb-2">
+				  <label class="form-label small mb-1">Mis carreras</label>
+				  <div class="table-responsive">
+					<table class="table table-sm table-hover stats-table mb-0">
+					  <tbody id="careers-table-body">
+						<!-- Filas generadas por JS -->
+					  </tbody>
+					</table>
+				  </div>
+				</div>
 			  </div>
 			  <div class="modal-footer">
 				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -305,6 +332,46 @@
 					</tbody>
 				  </table>
 				</div>
+			  </div>
+			  <div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			  </div>
+			</div>
+		  </div>
+		</div>
+
+		<!-- Peso académico: detalle de la fórmula -->
+		<div class="modal fade" id="pesoAcademicoModal" tabindex="-1" aria-labelledby="pesoAcademicoModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered modal-lg">
+			<div class="modal-content">
+			  <div class="modal-header">
+				<h5 class="modal-title" id="pesoAcademicoModalLabel">Composición del peso académico</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			  </div>
+			  <div class="modal-body">
+				<p class="small text-muted mb-2">P = 11·MAp_total − 7·FAd_total − 19·FAu_ciclo − 17·MAb_ciclo + 5·MR_ciclo</p>
+				<div class="table-responsive">
+				  <table class="table table-sm">
+					<thead>
+					  <tr>
+						<th>Componente</th>
+						<th>Coeficiente</th>
+						<th>Valor</th>
+						<th class="text-end">Aporte</th>
+					  </tr>
+					</thead>
+					<tbody id="peso-academico-table-body">
+					  <!-- Filas generadas por JS -->
+					</tbody>
+					<tfoot>
+					  <tr class="fw-bold">
+						<td colspan="3">Peso académico</td>
+						<td class="text-end" id="peso-academico-total">—</td>
+					  </tr>
+					</tfoot>
+				  </table>
+				</div>
+				<p class="small text-muted mb-0">Los componentes marcados como "no disponible" todavía no se pueden calcular y no afectan el resultado.</p>
 			  </div>
 			  <div class="modal-footer">
 				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>

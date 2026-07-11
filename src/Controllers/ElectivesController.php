@@ -31,7 +31,10 @@ final class ElectivesController
             Response::error('missing_column_index', 422);
         }
         $repo = new ElectivesRepository($this->pdo);
-        $repo->upsert((int) $user['id'], $params['planCode'], $params['subjectCode'], (int) $columnIndex);
+        $ok = $repo->upsert((int) $user['id'], $params['careerCode'], $params['subjectCode'], (int) $columnIndex);
+        if (!$ok) {
+            Response::error('unknown_career_or_subject', 422);
+        }
         Response::noContent();
     }
 
@@ -39,7 +42,7 @@ final class ElectivesController
     {
         $user = AuthMiddleware::requireAuth($this->pdo);
         $repo = new ElectivesRepository($this->pdo);
-        $repo->remove((int) $user['id'], $params['planCode'], $params['subjectCode']);
+        $repo->remove((int) $user['id'], $params['careerCode'], $params['subjectCode']);
         Response::noContent();
     }
 }

@@ -1,7 +1,8 @@
 -- UTN-Tracker: esquema relacional (MySQL 8.0+, InnoDB, utf8mb4)
--- El plan de estudios (materias/módulos/correlativas) NO vive acá: sigue en
--- public_html/assets/data/*.json. Estas tablas son solo lo transaccional:
--- usuarios, sesiones, esquemas de evaluación e inscripciones/resultados.
+-- El plan de estudios (carreras/módulos/materias/correlativas) vive acá también
+-- (tablas careers/career_modules/subjects/career_subjects/subject_requirements),
+-- ya no en JSON estático. Las materias son un catálogo GLOBAL compartido entre
+-- carreras: los resultados (enrollments) se linkean a la materia, no a la carrera.
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -35,9 +36,85 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- =====================================================
+-- CAREERS / PLAN DE ESTUDIOS
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS careers (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(50) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  has_intermediate_title TINYINT(1) NOT NULL DEFAULT 0,
+  intermediate_title_name VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_careers_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS career_modules (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  career_id INT UNSIGNED NOT NULL,
+  code VARCHAR(50) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  display_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  electives_slots TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_career_modules (career_id, code),
+  KEY idx_career_modules_career_id (career_id),
+  CONSTRAINT fk_career_modules_career FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Catálogo GLOBAL de materias, compartido entre carreras (ej. Análisis Matemático I
+-- aprobada cuenta para cualquier carrera que la incluya).
+CREATE TABLE IF NOT EXISTS subjects (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(50) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  week_hours TINYINT UNSIGNED NOT NULL DEFAULT 6,
+  duration ENUM('anual','cuatrimestral') NOT NULL DEFAULT 'anual',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_subjects_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Dónde vive cada materia dentro de una carrera (módulo, si es electiva, si es
+-- solo para el título intermedio, si cuenta como requisito del título intermedio).
+CREATE TABLE IF NOT EXISTS career_subjects (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  career_id INT UNSIGNED NOT NULL,
+  module_id INT UNSIGNED NULL,
+  subject_id INT UNSIGNED NOT NULL,
+  is_elective TINYINT(1) NOT NULL DEFAULT 0,
+  only_for_intermediate TINYINT(1) NOT NULL DEFAULT 0,
+  required_for_intermediate_title TINYINT(1) NOT NULL DEFAULT 0,
+  display_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_career_subjects (career_id, subject_id),
+  KEY idx_career_subjects_module_id (module_id),
+  CONSTRAINT fk_career_subjects_career FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_career_subjects_module FOREIGN KEY (module_id) REFERENCES career_modules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_career_subjects_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Correlativas: career_subject_id es la materia "para la cual" es requisito;
+-- required_subject_id es la materia requerida (global, no atada a una carrera:
+-- el cumplimiento se evalúa sobre el estado global de esa materia).
+CREATE TABLE IF NOT EXISTS subject_requirements (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  career_subject_id INT UNSIGNED NOT NULL,
+  required_subject_id INT UNSIGNED NOT NULL,
+  requirement_kind ENUM('cursar','aprobar') NOT NULL,
+  status_type ENUM('regularizada','aprobada') NOT NULL DEFAULT 'aprobada',
+  KEY idx_subject_requirements_career_subject_id (career_subject_id),
+  CONSTRAINT fk_subject_requirements_career_subject FOREIGN KEY (career_subject_id) REFERENCES career_subjects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_subject_requirements_required_subject FOREIGN KEY (required_subject_id) REFERENCES subjects(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =====================================================
+-- USER PREFERENCES / CAREERS / ELECTIVES
+-- =====================================================
+
 CREATE TABLE IF NOT EXISTS user_preferences (
   user_id INT UNSIGNED PRIMARY KEY,
-  active_plan_code VARCHAR(50) NULL,
+  active_career_id INT UNSIGNED NULL,
   show_correlativas TINYINT(1) NOT NULL DEFAULT 1,
   show_status TINYINT(1) NOT NULL DEFAULT 1,
   view_mode VARCHAR(20) NOT NULL DEFAULT 'board',
@@ -47,18 +124,35 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   share_token CHAR(32) NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_user_preferences_share_token (share_token),
-  CONSTRAINT fk_user_preferences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_user_preferences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_preferences_career FOREIGN KEY (active_career_id) REFERENCES careers(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- En qué carreras está anotado un usuario (controla qué aparece en el dropdown);
+-- darse de baja borra esta fila nada más, nunca las inscripciones/resultados.
+CREATE TABLE IF NOT EXISTS user_careers (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  career_id INT UNSIGNED NOT NULL,
+  show_intermediate_title TINYINT(1) NOT NULL DEFAULT 0,
+  enrolled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_careers (user_id, career_id),
+  KEY idx_user_careers_user_id (user_id),
+  CONSTRAINT fk_user_careers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_careers_career FOREIGN KEY (career_id) REFERENCES careers(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS user_electives (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
-  plan_code VARCHAR(50) NOT NULL,
-  subject_code VARCHAR(50) NOT NULL,
+  career_id INT UNSIGNED NOT NULL,
+  subject_id INT UNSIGNED NOT NULL,
   column_index TINYINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_user_electives (user_id, plan_code, subject_code),
-  CONSTRAINT fk_user_electives_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  UNIQUE KEY uq_user_electives (user_id, career_id, subject_id),
+  CONSTRAINT fk_user_electives_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_electives_career FOREIGN KEY (career_id) REFERENCES careers(id),
+  CONSTRAINT fk_user_electives_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =====================================================
@@ -76,23 +170,23 @@ CREATE TABLE IF NOT EXISTS evaluation_schemes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =====================================================
--- ENROLLMENTS
+-- ENROLLMENTS (linkeadas a la MATERIA, no a la carrera)
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS enrollments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
-  plan_code VARCHAR(50) NOT NULL,
-  subject_code VARCHAR(50) NOT NULL,
+  subject_id INT UNSIGNED NOT NULL,
   evaluation_scheme_id INT UNSIGNED NOT NULL,
   enrollment_year SMALLINT NOT NULL,
   recursed_count INT UNSIGNED NOT NULL DEFAULT 0,
   status_override VARCHAR(20) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_enrollments_user_subject (user_id, plan_code, subject_code),
+  UNIQUE KEY uq_enrollments_user_subject (user_id, subject_id),
   KEY idx_enrollments_user_id (user_id),
   CONSTRAINT fk_enrollments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_enrollments_subject FOREIGN KEY (subject_id) REFERENCES subjects(id),
   CONSTRAINT fk_enrollments_scheme FOREIGN KEY (evaluation_scheme_id) REFERENCES evaluation_schemes(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

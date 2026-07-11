@@ -3,16 +3,23 @@
 // de la app (modal, render, stats) pueda usar siempre la misma interfaz de "store" sin
 // ramificar por estado de auth. Ver assets/js/apiStore.js para la contraparte remota.
 //
+// Las inscripciones están linkeadas a la MATERIA, no a la carrera (una materia común
+// aprobada cuenta para cualquier carrera que la incluya), por eso `subjectData:<code>`
+// ya no lleva el código de carrera. Las electivas sí mantienen el scope por carrera.
+//
 // Claves de localStorage usadas:
-//  - `subjectData:<planCode>:<subjectCode>` -> raw enrollment (ver `hydrate()` abajo)
-//  - `electives` -> array JSON [{planCode, subjectCode, columnIndex}, ...]
+//  - `subjectData:<subjectCode>` -> raw enrollment (ver `hydrate()` abajo)
+//  - `electives` -> array JSON [{careerCode, subjectCode, columnIndex}, ...]
+//  - `enrolledCareers` -> array JSON [{careerCode, showIntermediateTitle}, ...]
 //  - `preferences` -> objeto JSON (mismo shape que GET /api/preferences)
 
 import { computeStatus } from './statusEngine.js';
 import { getEvaluationSchemes, findSchemeByCode } from './evaluationSchemes.js';
+import { getCareers } from './careers.js';
 
 const ENROLLMENT_PREFIX = 'subjectData:';
 const ELECTIVES_KEY = 'electives';
+const ENROLLED_CAREERS_KEY = 'enrolledCareers';
 const PREFERENCES_KEY = 'preferences';
 
 const DEFAULT_SELECTED_STATS = ['horasSemanales', 'promedio', 'materiasAprobadas', 'finalesPendientes', 'materiasCursables'];
@@ -21,8 +28,8 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function enrollmentKey(planCode, subjectCode) {
-  return `${ENROLLMENT_PREFIX}${planCode}:${subjectCode}`;
+function enrollmentKey(subjectCode) {
+  return `${ENROLLMENT_PREFIX}${subjectCode}`;
 }
 
 function readJson(key, fallback) {
@@ -45,15 +52,15 @@ function writeJson(key, value) {
   }
 }
 
-function readRawEnrollment(planCode, subjectCode) {
-  return readJson(enrollmentKey(planCode, subjectCode), null);
+function readRawEnrollment(subjectCode) {
+  return readJson(enrollmentKey(subjectCode), null);
 }
 
-function writeRawEnrollment(planCode, subjectCode, raw) {
-  writeJson(enrollmentKey(planCode, subjectCode), raw);
+function writeRawEnrollment(subjectCode, raw) {
+  writeJson(enrollmentKey(subjectCode), raw);
 }
 
-async function hydrate(planCode, subjectCode, raw) {
+async function hydrate(subjectCode, raw) {
   if (!raw) return null;
   const schemes = await getEvaluationSchemes();
   const scheme = findSchemeByCode(schemes, raw.schemeCode);
@@ -64,7 +71,6 @@ async function hydrate(planCode, subjectCode, raw) {
   const override = raw.statusOverride || null;
   const status = computeStatus(config, partials, finals, checklist, override);
   return {
-    planCode,
     subjectCode,
     schemeCode: raw.schemeCode || null,
     schemeConfig: config,
@@ -79,15 +85,14 @@ async function hydrate(planCode, subjectCode, raw) {
   };
 }
 
-function listAllEnrollmentRefs() {
+function listAllEnrollmentCodes() {
   const out = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (!k || !k.startsWith(ENROLLMENT_PREFIX)) continue;
     const rest = k.slice(ENROLLMENT_PREFIX.length);
-    const sep = rest.indexOf(':');
-    if (sep === -1) continue; // formato viejo (subjectData:<code>, sin plan) - se ignora
-    out.push({ planCode: rest.slice(0, sep), subjectCode: rest.slice(sep + 1) });
+    if (rest.includes(':')) continue; // formato viejo (subjectData:<plan>:<code>) - se ignora
+    out.push(rest);
   }
   return out;
 }
@@ -109,23 +114,23 @@ export const localGuestStore = {
   kind: 'local',
 
   async getEnrollments() {
-    const refs = listAllEnrollmentRefs();
+    const codes = listAllEnrollmentCodes();
     const results = [];
-    for (const { planCode, subjectCode } of refs) {
-      const raw = readRawEnrollment(planCode, subjectCode);
-      const hydrated = await hydrate(planCode, subjectCode, raw);
+    for (const subjectCode of codes) {
+      const raw = readRawEnrollment(subjectCode);
+      const hydrated = await hydrate(subjectCode, raw);
       if (hydrated) results.push(hydrated);
     }
     return results;
   },
 
-  async getEnrollment(planCode, subjectCode) {
-    const raw = readRawEnrollment(planCode, subjectCode);
-    return hydrate(planCode, subjectCode, raw);
+  async getEnrollment(subjectCode) {
+    const raw = readRawEnrollment(subjectCode);
+    return hydrate(subjectCode, raw);
   },
 
-  async createEnrollment(planCode, subjectCode, schemeCode) {
-    if (readRawEnrollment(planCode, subjectCode)) {
+  async createEnrollment(subjectCode, schemeCode) {
+    if (readRawEnrollment(subjectCode)) {
       const err = new Error('already_enrolled');
       err.status = 409;
       throw err;
@@ -140,12 +145,12 @@ export const localGuestStore = {
       checklist: {},
       updatedAt: nowIso(),
     };
-    writeRawEnrollment(planCode, subjectCode, raw);
-    return hydrate(planCode, subjectCode, raw);
+    writeRawEnrollment(subjectCode, raw);
+    return hydrate(subjectCode, raw);
   },
 
-  async updateEnrollmentSettings(planCode, subjectCode, { schemeCode, enrollmentYear } = {}) {
-    const raw = readRawEnrollment(planCode, subjectCode) || {
+  async updateEnrollmentSettings(subjectCode, { schemeCode, enrollmentYear } = {}) {
+    const raw = readRawEnrollment(subjectCode) || {
       schemeCode: null, enrollmentYear: new Date().getFullYear(), recursedCount: 0,
       statusOverride: null, partials: {}, finals: [], checklist: {},
     };
@@ -160,12 +165,12 @@ export const localGuestStore = {
       raw.enrollmentYear = enrollmentYear;
     }
     raw.updatedAt = nowIso();
-    writeRawEnrollment(planCode, subjectCode, raw);
-    return hydrate(planCode, subjectCode, raw);
+    writeRawEnrollment(subjectCode, raw);
+    return hydrate(subjectCode, raw);
   },
 
-  async recursar(planCode, subjectCode) {
-    const raw = readRawEnrollment(planCode, subjectCode) || {
+  async recursar(subjectCode) {
+    const raw = readRawEnrollment(subjectCode) || {
       schemeCode: null, enrollmentYear: new Date().getFullYear(), recursedCount: 0,
       statusOverride: null, partials: {}, finals: [], checklist: {},
     };
@@ -175,23 +180,23 @@ export const localGuestStore = {
     raw.checklist = {};
     raw.statusOverride = null;
     raw.updatedAt = nowIso();
-    writeRawEnrollment(planCode, subjectCode, raw);
-    return hydrate(planCode, subjectCode, raw);
+    writeRawEnrollment(subjectCode, raw);
+    return hydrate(subjectCode, raw);
   },
 
-  async setOverride(planCode, subjectCode, status) {
-    const raw = readRawEnrollment(planCode, subjectCode) || {
+  async setOverride(subjectCode, status) {
+    const raw = readRawEnrollment(subjectCode) || {
       schemeCode: null, enrollmentYear: new Date().getFullYear(), recursedCount: 0,
       statusOverride: null, partials: {}, finals: [], checklist: {},
     };
     raw.statusOverride = status || null;
     raw.updatedAt = nowIso();
-    writeRawEnrollment(planCode, subjectCode, raw);
-    return hydrate(planCode, subjectCode, raw);
+    writeRawEnrollment(subjectCode, raw);
+    return hydrate(subjectCode, raw);
   },
 
-  async saveResults(planCode, subjectCode, { partials, finals, checklist, clearOverride } = {}) {
-    const raw = readRawEnrollment(planCode, subjectCode) || {
+  async saveResults(subjectCode, { partials, finals, checklist, clearOverride } = {}) {
+    const raw = readRawEnrollment(subjectCode) || {
       schemeCode: null, enrollmentYear: new Date().getFullYear(), recursedCount: 0,
       statusOverride: null, partials: {}, finals: [], checklist: {},
     };
@@ -200,40 +205,89 @@ export const localGuestStore = {
     raw.checklist = checklist || {};
     if (clearOverride !== false) raw.statusOverride = null;
     raw.updatedAt = nowIso();
-    writeRawEnrollment(planCode, subjectCode, raw);
-    return hydrate(planCode, subjectCode, raw);
+    writeRawEnrollment(subjectCode, raw);
+    return hydrate(subjectCode, raw);
   },
 
   // No hay endpoint de "baja" en el backend (ver apiStore.dropEnrollment); en modo local
   // sí podemos borrar la clave completa, que es el comportamiento histórico de "Dar de baja".
-  async dropEnrollment(planCode, subjectCode) {
-    localStorage.removeItem(enrollmentKey(planCode, subjectCode));
+  async dropEnrollment(subjectCode) {
+    localStorage.removeItem(enrollmentKey(subjectCode));
   },
 
-  // --- Electivas ---
+  // --- Electivas (scope por carrera) ---
   async getElectives() {
     const arr = readJson(ELECTIVES_KEY, []);
     return Array.isArray(arr) ? arr : [];
   },
 
-  async setElective(planCode, subjectCode, columnIndex) {
+  async setElective(careerCode, subjectCode, columnIndex) {
     const arr = await this.getElectives();
-    const idx = arr.findIndex((e) => e.planCode === planCode && e.subjectCode === subjectCode);
-    const entry = { planCode, subjectCode, columnIndex };
+    const idx = arr.findIndex((e) => e.careerCode === careerCode && e.subjectCode === subjectCode);
+    const entry = { careerCode, subjectCode, columnIndex };
     if (idx >= 0) arr[idx] = entry; else arr.push(entry);
     writeJson(ELECTIVES_KEY, arr);
   },
 
-  async removeElective(planCode, subjectCode) {
+  async removeElective(careerCode, subjectCode) {
     const arr = await this.getElectives();
-    const next = arr.filter((e) => !(e.planCode === planCode && e.subjectCode === subjectCode));
+    const next = arr.filter((e) => !(e.careerCode === careerCode && e.subjectCode === subjectCode));
     writeJson(ELECTIVES_KEY, next);
+  },
+
+  // --- Carreras: en cuáles está "anotado" el invitado (local nada más). Si todavía no
+  // eligió ninguna, se auto-anota en todas las carreras del catálogo (hoy solo hay una)
+  // para no romper la experiencia de quien ya usaba la app antes de esta feature. ---
+  async getUserCareers() {
+    let list = readJson(ENROLLED_CAREERS_KEY, null);
+    if (!Array.isArray(list) || list.length === 0) {
+      const catalog = await getCareers();
+      list = catalog.map((c) => ({ careerCode: c.code, showIntermediateTitle: false }));
+      writeJson(ENROLLED_CAREERS_KEY, list);
+    }
+    const catalog = await getCareers();
+    return list
+      .map((entry) => {
+        const career = catalog.find((c) => c.code === entry.careerCode);
+        if (!career) return null;
+        return {
+          code: career.code,
+          name: career.name,
+          hasIntermediateTitle: career.hasIntermediateTitle,
+          intermediateTitle: career.intermediateTitle,
+          showIntermediateTitle: !!entry.showIntermediateTitle,
+        };
+      })
+      .filter(Boolean);
+  },
+
+  async enrollCareer(careerCode) {
+    const list = readJson(ENROLLED_CAREERS_KEY, []);
+    if (!list.some((e) => e.careerCode === careerCode)) {
+      list.push({ careerCode, showIntermediateTitle: false });
+      writeJson(ENROLLED_CAREERS_KEY, list);
+    }
+    return this.getUserCareers();
+  },
+
+  async unenrollCareer(careerCode) {
+    const list = readJson(ENROLLED_CAREERS_KEY, []);
+    writeJson(ENROLLED_CAREERS_KEY, list.filter((e) => e.careerCode !== careerCode));
+  },
+
+  async setShowIntermediateTitle(careerCode, value) {
+    const list = readJson(ENROLLED_CAREERS_KEY, []);
+    const idx = list.findIndex((e) => e.careerCode === careerCode);
+    if (idx >= 0) {
+      list[idx].showIntermediateTitle = !!value;
+      writeJson(ENROLLED_CAREERS_KEY, list);
+    }
   },
 
   // --- Preferencias ---
   async getPreferences() {
     const defaults = {
-      activePlanCode: 'k23',
+      activeCareerCode: null,
       showCorrelativas: true,
       showStatus: false,
       viewMode: 'grid',

@@ -1,0 +1,304 @@
+// =====================
+// USERS
+// =====================
+
+Table users {
+  id int [pk, increment]
+  firebase_uid varchar [unique, not null]
+  email varchar
+  created_at datetime
+}
+
+// =====================
+// CAREERS / DEGREES
+// =====================
+
+Table degrees {
+  id int [pk, increment]
+  name varchar
+}
+
+Table user_study_plans {
+  id int [pk, increment]
+  user_id int
+  study_plan_id int
+  start_year int
+  is_active boolean
+}
+
+// =====================
+// STUDY PLANS
+// =====================
+
+Table study_plans {
+  id int [pk, increment]
+  degree_id int
+  name varchar // "Plan 2008"
+}
+
+// =====================
+// MODULES (niveles)
+// =====================
+
+Table modules {
+  id int [pk, increment]
+  study_plan_id int
+  name varchar // "Primer Nivel"
+  order_index int
+}
+
+// =====================
+// SUBJECTS (materia abstracta)
+// =====================
+
+Table subjects {
+  id int [pk, increment]
+  code varchar
+  name varchar
+}
+
+// =====================
+// SUBJECT IN PLAN
+// =====================
+
+Table plan_subjects {
+  id int [pk, increment]
+  study_plan_id int
+  subject_id int
+  module_id int
+  elective boolean
+}
+
+// =====================
+// SUBJECT OFFERINGS (anual/cuatrimestral)
+// =====================
+
+Table subject_offerings {
+  id int [pk, increment]
+  subject_id int
+  duration varchar // 'annual' | 'cuatrimestral'
+  week_hours int
+}
+
+// =====================
+// REQUIREMENTS (correlativas)
+// =====================
+
+Table requirements {
+  id int [pk, increment]
+  subject_id int
+  required_subject_id int
+  condition varchar // 'regularizada' | 'aprobada'
+}
+
+// =====================
+// COURSES (comisiones reales)
+// =====================
+
+Table courses {
+  id int [pk, increment]
+  subject_offering_id int
+  commission varchar
+  year int
+  professor varchar
+}
+
+// =====================
+// ENROLLMENTS
+// =====================
+
+Table enrollments {
+  id int [pk, increment]
+  user_id int
+  course_id int
+  created_at datetime
+}
+
+// =====================
+// EVALUATIONS (parcial/final)
+// =====================
+
+Table evaluations {
+  id int [pk, increment]
+  course_id int
+  name varchar // "Parcial 1"
+  type varchar // 'partial' | 'final'
+  eval_order int
+}
+
+// =====================
+// EVALUATION INSTANCES (fechas)
+// =====================
+
+Table evaluation_instances {
+  id int [pk, increment]
+  evaluation_id int
+  date date
+  instance_type varchar // 'regular' | 'recuperatorio'
+  source varchar // 'user' | 'suggested' | 'official'
+  created_by_user_id int
+}
+
+// =====================
+// RESULTS
+// =====================
+
+Table evaluation_results {
+  id int [pk, increment]
+  user_id int
+  evaluation_instance_id int
+  grade decimal
+  attended boolean
+  created_at datetime
+}
+
+// =====================
+// RELATIONSHIPS
+// =====================
+
+Ref: user_study_plans.user_id > users.id
+Ref: user_study_plans.study_plan_id > study_plans.id
+
+Ref: study_plans.degree_id > degrees.id
+Ref: modules.study_plan_id > study_plans.id
+
+Ref: plan_subjects.study_plan_id > study_plans.id
+Ref: plan_subjects.subject_id > subjects.id
+Ref: plan_subjects.module_id > modules.id
+
+Ref: subject_offerings.subject_id > subjects.id
+
+Ref: requirements.subject_id > subjects.id
+Ref: requirements.required_subject_id > subjects.id
+
+Ref: courses.subject_offering_id > subject_offerings.id
+
+Ref: enrollments.user_id > users.id
+Ref: enrollments.course_id > courses.id
+
+Ref: evaluations.course_id > courses.id
+
+Ref: evaluation_instances.evaluation_id > evaluations.id
+Ref: evaluation_instances.created_by_user_id > users.id
+
+Ref: evaluation_results.user_id > users.id
+Ref: evaluation_results.evaluation_instance_id > evaluation_instances.id
+
+
+// =====================
+// USERS
+// =====================
+
+Records users(id, firebase_uid, email, created_at){
+  1, "uid_abc123", "fscaliseg@gmail.com", "2026-01-01"
+}
+
+// =====================
+// DEGREES
+// =====================
+
+Records degrees(id, name){
+  1, "Ingeniería en Sistemas"
+}
+
+
+// =====================
+// STUDY PLAN
+// =====================
+
+Records study_plans(id, degree_id, name){
+  1, 1, "Plan 2008"
+}
+
+// =====================
+// MODULES
+// =====================
+
+Records modules(id, study_plan_id, name, order_index){
+  1, 1, "Primer Nivel", 1
+}
+
+// =====================
+// SUBJECTS
+// =====================
+
+Records subjects(id, code, name){
+  1, "AM1", "Análisis Matemático I"
+  2, "AM2", "Análisis Matemático II"
+}
+
+// =====================
+// PLAN SUBJECTS
+// =====================
+
+Records plan_subjects(id, study_plan_id, subject_id, module_id, elective){
+  1, 1, 1, 1, false
+  2, 1, 2, 1, false
+}
+
+// =====================
+// SUBJECT OFFERINGS
+// =====================
+
+Records subject_offerings(id, subject_id, duration, week_hours){
+  1, 1, "annual", 5
+  2, 1, "cuatrimestral", 10
+  3, 2, "annual", 5
+  4, 2, "cuatrimestral", 10
+}
+
+// =====================
+// REQUIREMENTS (correlativas)
+// =====================
+
+Records requirements(id, subject_id, required_subject_id, condition){
+  1, 2, 1, "regularizada"
+}
+
+// =====================
+// COURSES
+// =====================
+
+Records courses(id, subject_offering_id, commission, year, professor){
+  1, 4, "K1051", 2026, "Perez"
+}
+
+// =====================
+// ENROLLMENTS
+// =====================
+
+Records enrollments(id, user_id, course_id, created_at){
+  1, 1, 1, "2026-03-01"
+}
+
+// =====================
+// EVALUATIONS
+// =====================
+
+Records evaluations(id, course_id, name, type, eval_order){
+  1, 1, "Parcial 1", "partial", 1
+  2, 1, "Parcial 2", "partial", 2
+  3, 1, "Final", "final", 1
+}
+
+// =====================
+// EVALUATION INSTANCES
+// =====================
+
+Records evaluation_instances(id, evaluation_id, date, instance_type, source, created_by_user_id){
+  1, 1, "2026-04-15", "regular", "user", 1
+  2, 1, "2026-04-30", "recuperatorio", "user", 1
+  3, 2, "2026-06-10", "regular", "user", 1
+  4, 3, "2026-07-20", "regular", "user", 1
+}
+
+// =====================
+// RESULTS
+// =====================
+
+Records evaluation_results(id, user_id, evaluation_instance_id, grade, attended, created_at){
+  1, 1, 1, 6.0, true, "2026-04-15"
+  2, 1, 2, 8.0, true, "2026-04-30"
+  3, 1, 3, 7.0, true, "2026-06-10"
+  4, 1, 4, null, false, "2026-07-20"
+}

@@ -1,21 +1,13 @@
 // Share page JavaScript - Read-only public profile view. Consume GET /api/public/{id}
 // (mismo shape que usa index.js: enrollments ya vienen con `status` calculado server-side).
 import { api } from './apiClient.js';
+import { getCareers, getCareerCurriculum } from './careers.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Plan management: determine which plan to load
-  const AVAILABLE_PLANS = {
-    'k23': 'assets/data/k23.json',
-    'k23medio': 'assets/data/k23medio.json'
-  };
-  const DEFAULT_PLAN = 'k23';
-  const PLAN_NAMES = {
-    'k23': 'Ingeniería en Sistemas de Información - K23',
-    'k23medio': 'Analista en Sistemas de Información - K23'
-  };
-
-  let currentPlan = DEFAULT_PLAN;
-  let DATA_URL = AVAILABLE_PLANS[currentPlan];
+  // El share view no tiene selector de carrera ni toggle de título intermedio (a
+  // diferencia de index.js): siempre muestra la carrera activa del dueño del perfil
+  // (preferences.activeCareerCode) y nunca las materias onlyForIntermediate.
+  let currentCareer = null;
   let planData = null;
   let electivasList = [];
   let columns = 5;
@@ -266,7 +258,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const header = document.createElement('div');
       header.className = 'mb-2';
-      const subjects = Array.isArray(module.subjects) ? module.subjects : [];
+      // El share view nunca muestra materias onlyForIntermediate (ej. Seminario
+      // Integrador) — no hay toggle de título intermedio acá, a diferencia de index.js.
+      const subjects = (Array.isArray(module.subjects) ? module.subjects : []).filter(s => !s.onlyForIntermediate);
       const modulePassed = countPassedSubjects(subjects);
       header.innerHTML = `<strong>${escapeHtml(module.name)}</strong> <span class="text-muted small">${modulePassed}/${subjects.length}</span>`;
       col.appendChild(header);
@@ -285,7 +279,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     displayedSubjects = [];
     visibleModules.forEach(m => {
-      if (Array.isArray(m.subjects)) displayedSubjects.push(...m.subjects);
+      const subjects = (Array.isArray(m.subjects) ? m.subjects : []).filter(s => !s.onlyForIntermediate);
+      displayedSubjects.push(...subjects);
     });
     setupOverlayAndInteractions();
     computeStats(displayedSubjects);
@@ -300,7 +295,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let slotCounter = 0;
     for (const entry of electivesList) {
-      if (entry.planCode !== currentPlan) continue;
+      if (entry.careerCode !== currentCareer) continue;
       const electiveMeta = byCode[entry.subjectCode] || byName[entry.subjectCode];
       if (!electiveMeta) continue;
       if (entry.columnIndex === colIndex) {
@@ -560,8 +555,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function electivesForCurrentPlan() {
-    return electivesList.filter(e => e.planCode === currentPlan);
+  function electivesForCurrentCareer() {
+    return electivesList.filter(e => e.careerCode === currentCareer);
   }
 
   function computeStats(list) {
@@ -589,7 +584,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) { electivasRequired = 0; }
 
     try {
-      electivesForCurrentPlan().forEach(entry => {
+      electivesForCurrentCareer().forEach(entry => {
         const stored = loadSubjectData(entry.subjectCode);
         const status = stored ? stored.status : null;
         if (status === 'Aprobada' || status === 'Promocionada') approved++;
@@ -614,7 +609,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const byCode = {};
       const byName = {};
       electivasList.forEach(e => { if (e.code) byCode[e.code] = e; if (e.name) byName[e.name] = e; });
-      electivesForCurrentPlan().forEach(entry => {
+      electivesForCurrentCareer().forEach(entry => {
         const stored = loadSubjectData(entry.subjectCode);
         const status = stored ? stored.status : null;
         if (stored && !terminal.includes(status)) {
@@ -699,9 +694,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function loadPlanData() {
-    fetch(DATA_URL)
-      .then(r => r.json())
+    if (!currentCareer) {
+      if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-info">Esta persona todavía no está anotada en ninguna carrera.</div>';
+      return;
+    }
+    getCareerCurriculum(currentCareer)
       .then(d => {
+        if (!d) throw new Error('curriculum_not_found');
         planData = d;
         const modules = Array.isArray(d.modules) ? d.modules : [];
         const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
@@ -709,7 +708,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { renderGroups(d); } catch (e) { console.error('Error renderizando grupos', e); }
       })
       .catch(err => {
-        console.error('Error cargando plan desde DATA_URL', err);
+        console.error('Error cargando el curriculum de la carrera', err);
         if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-danger">No se pudo cargar el plan de materias.</div>';
       });
   }
@@ -729,12 +728,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     (data.enrollments || []).forEach(e => { enrollmentsByCode[e.subjectCode] = e; });
     electivesList = data.electives || [];
 
-    const remotePlan = (data.preferences && data.preferences.activePlanCode) || DEFAULT_PLAN;
-    currentPlan = AVAILABLE_PLANS[remotePlan] ? remotePlan : DEFAULT_PLAN;
-    DATA_URL = AVAILABLE_PLANS[currentPlan];
+    const userCareers = Array.isArray(data.userCareers) ? data.userCareers : [];
+    const activeCareerCode = data.preferences && data.preferences.activeCareerCode;
+    currentCareer = (activeCareerCode && userCareers.some(c => c.code === activeCareerCode))
+      ? activeCareerCode
+      : (userCareers[0] ? userCareers[0].code : null);
 
     const programBadge = document.getElementById('share-program');
-    if (programBadge && PLAN_NAMES[currentPlan]) programBadge.textContent = PLAN_NAMES[currentPlan];
+    if (programBadge && currentCareer) {
+      const careerEntry = userCareers.find(c => c.code === currentCareer);
+      if (careerEntry) {
+        programBadge.textContent = careerEntry.name;
+      } else {
+        const catalog = await getCareers();
+        const fallback = catalog.find(c => c.code === currentCareer);
+        if (fallback) programBadge.textContent = fallback.name;
+      }
+    }
 
     loadPlanData();
   } catch (err) {

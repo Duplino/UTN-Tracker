@@ -87,14 +87,13 @@ final class AuthController
         $skipped = [];
 
         foreach ($entries as $entry) {
-            $planCode = (string) ($entry['planCode'] ?? '');
             $subjectCode = (string) ($entry['subjectCode'] ?? '');
             $updatedAt = (string) ($entry['updatedAt'] ?? '');
-            if ($planCode === '' || $subjectCode === '' || $updatedAt === '') {
+            if ($subjectCode === '' || $updatedAt === '') {
                 continue;
             }
 
-            $existing = $repo->find((int) $user['id'], $planCode, $subjectCode);
+            $existing = $repo->find((int) $user['id'], $subjectCode);
             if ($existing && strtotime((string) $existing['updated_at']) >= strtotime($updatedAt)) {
                 $skipped[] = $subjectCode;
                 continue;

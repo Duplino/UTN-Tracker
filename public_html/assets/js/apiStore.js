@@ -1,6 +1,11 @@
 // Store remoto: misma interfaz que localGuestStore.js pero pegándole a /api/* a través de
 // apiClient.js (cookies de sesión, same-origin). Usado cuando GET /api/auth/me indica que
 // hay una sesión activa.
+//
+// Las inscripciones (notas/checklist/override) están linkeadas a la MATERIA, no a la
+// carrera — por eso sus métodos ya no reciben `careerCode`. Las electivas sí mantienen
+// el scope por carrera (dónde se coloca visualmente una electiva es una decisión por
+// carrera).
 
 import { api } from './apiClient.js';
 
@@ -16,60 +21,80 @@ export const apiStore = {
     return Array.isArray(res?.enrollments) ? res.enrollments : [];
   },
 
-  async getEnrollment(planCode, subjectCode) {
+  async getEnrollment(subjectCode) {
     const all = await this.getEnrollments();
-    return all.find((e) => e.planCode === planCode && e.subjectCode === subjectCode) || null;
+    return all.find((e) => e.subjectCode === subjectCode) || null;
   },
 
-  async createEnrollment(planCode, subjectCode, schemeCode) {
-    return api.post('/enrollments', { planCode, subjectCode, schemeCode });
+  async createEnrollment(subjectCode, schemeCode) {
+    return api.post('/enrollments', { subjectCode, schemeCode });
   },
 
-  async updateEnrollmentSettings(planCode, subjectCode, { schemeCode, enrollmentYear } = {}) {
+  async updateEnrollmentSettings(subjectCode, { schemeCode, enrollmentYear } = {}) {
     const body = {};
     if (schemeCode !== undefined && schemeCode !== null) body.schemeCode = schemeCode;
     if (enrollmentYear !== undefined && enrollmentYear !== null) body.enrollmentYear = enrollmentYear;
-    return api.patch(`/enrollments/${enc(planCode)}/${enc(subjectCode)}`, body);
+    return api.patch(`/enrollments/${enc(subjectCode)}`, body);
   },
 
-  async recursar(planCode, subjectCode) {
-    return api.post(`/enrollments/${enc(planCode)}/${enc(subjectCode)}/recursar`);
+  async recursar(subjectCode) {
+    return api.post(`/enrollments/${enc(subjectCode)}/recursar`);
   },
 
-  async setOverride(planCode, subjectCode, status) {
-    return api.patch(`/enrollments/${enc(planCode)}/${enc(subjectCode)}/override`, { status: status ?? null });
+  async setOverride(subjectCode, status) {
+    return api.patch(`/enrollments/${enc(subjectCode)}/override`, { status: status ?? null });
   },
 
-  async saveResults(planCode, subjectCode, { partials, finals, checklist, clearOverride } = {}) {
+  async saveResults(subjectCode, { partials, finals, checklist, clearOverride } = {}) {
     const body = {
       partials: partials || {},
       finals: finals || {},
       checklist: checklist || {},
     };
     if (clearOverride === false) body.clearOverride = false;
-    return api.put(`/enrollments/${enc(planCode)}/${enc(subjectCode)}/results`, body);
+    return api.put(`/enrollments/${enc(subjectCode)}/results`, body);
   },
 
   // El backend no expone un endpoint de "baja" real (no hay DELETE /enrollments).
   // Mejor aproximación disponible: resetear resultados y limpiar el override; la
   // inscripción sigue existiendo del lado del servidor mostrando "Faltan notas".
-  async dropEnrollment(planCode, subjectCode) {
-    await this.saveResults(planCode, subjectCode, { partials: {}, finals: {}, checklist: {}, clearOverride: true });
-    return this.setOverride(planCode, subjectCode, null);
+  async dropEnrollment(subjectCode) {
+    await this.saveResults(subjectCode, { partials: {}, finals: {}, checklist: {}, clearOverride: true });
+    return this.setOverride(subjectCode, null);
   },
 
-  // --- Electivas ---
+  // --- Electivas (scope por carrera) ---
   async getElectives() {
     const res = await api.get('/electives');
     return Array.isArray(res?.placements) ? res.placements : [];
   },
 
-  async setElective(planCode, subjectCode, columnIndex) {
-    await api.put(`/electives/${enc(planCode)}/${enc(subjectCode)}`, { columnIndex });
+  async setElective(careerCode, subjectCode, columnIndex) {
+    await api.put(`/electives/${enc(careerCode)}/${enc(subjectCode)}`, { columnIndex });
   },
 
-  async removeElective(planCode, subjectCode) {
-    await api.delete(`/electives/${enc(planCode)}/${enc(subjectCode)}`);
+  async removeElective(careerCode, subjectCode) {
+    await api.delete(`/electives/${enc(careerCode)}/${enc(subjectCode)}`);
+  },
+
+  // --- Carreras: en cuáles está anotado el usuario (el catálogo público de carreras
+  // y su curriculum se leen directo de assets/js/careers.js, no dependen del store) ---
+  async getUserCareers() {
+    const res = await api.get('/user-careers');
+    return Array.isArray(res?.careers) ? res.careers : [];
+  },
+
+  async enrollCareer(careerCode) {
+    const res = await api.post('/user-careers', { careerCode });
+    return Array.isArray(res?.careers) ? res.careers : [];
+  },
+
+  async unenrollCareer(careerCode) {
+    await api.delete(`/user-careers/${enc(careerCode)}`);
+  },
+
+  async setShowIntermediateTitle(careerCode, value) {
+    await api.patch(`/user-careers/${enc(careerCode)}`, { showIntermediateTitle: !!value });
   },
 
   // --- Preferencias ---
