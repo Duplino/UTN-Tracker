@@ -13,6 +13,7 @@ use App\Controllers\EnrollmentController;
 use App\Controllers\EvaluationSchemeController;
 use App\Controllers\PreferencesController;
 use App\Controllers\PublicController;
+use App\Controllers\SubjectRetakeController;
 use App\Controllers\UserCareerController;
 use App\Http\Request;
 use App\Http\Router;
@@ -46,9 +47,14 @@ $enrollments = new EnrollmentController($pdo);
 $router->get('/api/enrollments', [$enrollments, 'index']);
 $router->post('/api/enrollments', [$enrollments, 'create']);
 $router->patch('/api/enrollments/{subjectCode}', [$enrollments, 'updateSettings']);
+$router->delete('/api/enrollments/{subjectCode}', [$enrollments, 'remove']);
 $router->post('/api/enrollments/{subjectCode}/recursar', [$enrollments, 'recursar']);
 $router->patch('/api/enrollments/{subjectCode}/override', [$enrollments, 'setOverride']);
 $router->put('/api/enrollments/{subjectCode}/results', [$enrollments, 'saveResults']);
+
+$retakes = new SubjectRetakeController($pdo);
+$router->get('/api/subject-retakes', [$retakes, 'index']);
+$router->patch('/api/subject-retakes/{subjectCode}', [$retakes, 'update']);
 
 $electives = new ElectivesController($pdo);
 $router->get('/api/electives', [$electives, 'index']);

@@ -30,7 +30,7 @@ curl "https://tu-dominio/api/public/9f3a1c.../progress/S23"
 {
   "career": "Ingeniería Mecánica - S23",
   "rest": {
-    "total": 19,
+    "total": 26,
     "subjectsStatus": {
       "approved": 1,
       "promoted": 7,
@@ -61,7 +61,7 @@ La clave `"intermediate"` directamente no aparece; `"rest"` cubre toda la carrer
 {
   "career": "Ingeniería en Sistemas de Información - K23",
   "rest": {
-    "total": 20,
+    "total": 27,
     "subjectsStatus": { "approved": 10, "promoted": 5, "regularized": 2, "inProgress": 3 },
     "average": 8.1
   }
@@ -73,7 +73,7 @@ La clave `"intermediate"` directamente no aparece; `"rest"` cubre toda la carrer
 - **career**: nombre de la carrera (`careers.name`).
 - **rest**: progreso en "el resto de la carrera" — todo lo que no cuenta para el título intermedio (o toda la carrera, si no tiene título intermedio).
 - **intermediate**: progreso específico hacia el título intermedio. Solo aparece si `careers.has_intermediate_title` es true para esa carrera. Incluye además `name`, el nombre del título intermedio (`careers.intermediate_title_name`, ej. "Técnico Universitario en Mecánica").
-- **total**: cantidad total de materias de ese balde (tronco + electivas ya elegidas por el usuario para esa sección), sin importar su estado. Sirve para que el cliente sepa cuánto falta: `total - (approved + promoted + regularized + inProgress)` son las materias sin cursar, `Desaprobada` o `No regularizada` (ver más abajo). Sumando `rest.total + intermediate.total` se obtiene el total de la carrera completa.
+- **total**: cantidad de materias que hacen falta para completar ese balde — no lo que el usuario ya cargó, sino lo que exige el plan. Para `rest` incluye el cupo de electivas (`career_modules.electives_slots`) aunque el usuario todavía no haya elegido ninguna. Sirve para que el cliente sepa cuánto falta: `total - (approved + promoted + regularized + inProgress)` son las materias pendientes (sin cursar, `Desaprobada` o `No regularizada`). Sumando `rest.total + intermediate.total` se obtiene el total de la carrera completa.
 - **subjectsStatus**: conteo de materias por estado, dentro de ese balde (intermedio o resto):
   - `approved`: estado `Aprobada`.
   - `promoted`: estado `Promocionada`.
@@ -81,9 +81,12 @@ La clave `"intermediate"` directamente no aparece; `"rest"` cubre toda la carrer
   - `inProgress`: estado `Faltan notas` (cursando, sin notas cargadas todavía).
 - **average**: promedio de las materias `Aprobada`/`Promocionada` de ese balde, redondeado a 2 decimales, usando la misma nota "representativa" que ya calcula el frontend (`computePromedio` en `assets/js/index.js`/`share.js`): para `Aprobada` es la nota del primer final aprobado (≥6, en orden de intento); para `Promocionada` es el promedio redondeado de la última nota cargada de cada parcial. `null` si no hay ninguna materia que cuente para el promedio en ese balde.
 
-## Cómo se clasifican las electivas
+## Cómo se cuentan las electivas
 
-Una electiva que el usuario ya eligió (`PUT /api/electives/...`) se cuenta en `total` y, si tiene una inscripción con nota, también en `subjectsStatus`/`average` — igual que cualquier materia del tronco. Se asigna a `intermediate` o `rest` según el módulo/columna del tablero donde el usuario la colocó (`user_electives.column_index`): si ese módulo tiene alguna materia fija que cuenta para el título intermedio, la electiva cuenta ahí; si no, cuenta para `rest`. Las electivas ofrecidas pero **no elegidas** por el usuario no aparecen en ningún lado (no hay nada que contar todavía).
+Las electivas **siempre** cuentan del lado de `rest` — ninguna carrera exige electivas para el título intermedio, solo para el título de grado.
+
+- **`total`**: no depende de si el usuario ya eligió una electiva o no. Es el cupo fijo de la carrera (`SUM(career_modules.electives_slots)` de todos los módulos), porque esas materias hay que cursarlas sí o sí para recibirse, las haya elegido el usuario o no todavía.
+- **`subjectsStatus`/`average`**: acá sí solo entran las electivas que el usuario ya eligió (`user_electives`, vía `PUT /api/electives/...`) y para las que además cargó una inscripción con estado. Una electiva ofrecida pero no elegida no tiene estado que mostrar, así que no suma ahí (pero sí ya está contada en `total`).
 
 ## Qué NO cuenta
 

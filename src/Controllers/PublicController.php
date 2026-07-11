@@ -41,8 +41,11 @@ final class PublicController
 
     // Progreso general de un usuario público en UNA carrera puntual (si tiene más de
     // una, el caller elige cuál via {careerCode}), discriminado entre título
-    // intermedio y el resto de la carrera. Incluye tanto materias del tronco como
-    // las electivas que el usuario haya elegido (user_electives).
+    // intermedio y el resto de la carrera. El 'total' de cada balde cuenta lo que
+    // hace falta para recibirse, no lo que el usuario ya cargó: las materias de
+    // tronco siempre cuentan, y las electivas cuentan por su cupo fijo
+    // (career_modules.electives_slots) aunque el usuario todavía no haya elegido
+    // ninguna — siempre del lado de 'rest', el título intermedio nunca las exige.
     public function progress(Request $request, array $params): void
     {
         $userId = $this->resolveUserId($params['identifier']);
@@ -80,41 +83,35 @@ final class PublicController
         }
 
         $buckets = ['intermediate' => $this->emptyBucket(), 'rest' => $this->emptyBucket()];
-        // moduleIsIntermediate: por posición (mismo índice 0-based que
-        // user_electives.column_index — ver createAddElectivaPlaceholder/visIdx en
-        // assets/js/index.js), true si ese módulo tiene alguna materia del tronco
-        // que cuenta para el título intermedio. Sirve para clasificar las
-        // electivas elegidas por el usuario, que no tienen su propio flag
-        // requiredForIntermediateTitle (esa clasificación depende de en qué
-        // columna/módulo las haya colocado, no de la materia en sí).
-        $moduleIsIntermediate = [];
-        foreach ($curriculum['modules'] as $index => $module) {
+        foreach ($curriculum['modules'] as $module) {
             if ($module['id'] === 'electives') {
-                continue;
+                continue; // pool de electivas ofrecidas (no elegidas) — no es tronco, no cuenta acá
             }
-            $moduleIsIntermediate[$index] = false;
             foreach ($module['subjects'] as $subject) {
                 if ($subject['requiredForIntermediateTitle']) {
                     $bucketKey = 'intermediate';
-                    $moduleIsIntermediate[$index] = true;
                 } elseif (!$subject['onlyForIntermediate']) {
                     $bucketKey = 'rest';
                 } else {
                     continue;
                 }
-                $this->tallySubject($buckets[$bucketKey], $enrollmentByCode[$subject['code']] ?? null);
+                $buckets[$bucketKey]['total']++;
+                $this->tallyStatus($buckets[$bucketKey], $enrollmentByCode[$subject['code']] ?? null);
             }
+            // Las materias electivas SIEMPRE van al título de grado, nunca al
+            // intermedio — el cupo (cuántas hacen falta) es electives_slots del
+            // módulo, independientemente de si el usuario ya eligió alguna.
+            $buckets['rest']['total'] += $module['electivas'];
         }
 
+        // Encima del cupo ya sumado arriba, las electivas que el usuario ya eligió
+        // (y para las que cargó notas) suman a subjectsStatus/average de 'rest' —
+        // pero no vuelven a sumar a 'total', que ya cuenta el cupo fijo.
         foreach ((new ElectivesRepository($this->pdo))->allForUser($userId) as $placement) {
             if ($placement['careerCode'] !== $career['code']) {
                 continue;
             }
-            if (!array_key_exists($placement['columnIndex'], $moduleIsIntermediate)) {
-                continue; // column_index fuera de rango (dato viejo/inconsistente): ignorar
-            }
-            $bucketKey = $moduleIsIntermediate[$placement['columnIndex']] ? 'intermediate' : 'rest';
-            $this->tallySubject($buckets[$bucketKey], $enrollmentByCode[$placement['subjectCode']] ?? null);
+            $this->tallyStatus($buckets['rest'], $enrollmentByCode[$placement['subjectCode']] ?? null);
         }
 
         $response = [
@@ -138,13 +135,12 @@ final class PublicController
         ];
     }
 
-    // 'total' cuenta TODAS las materias del balde (incluidas electivas elegidas),
-    // tengan o no uno de los 4 estados de subjectsStatus — así el cliente puede
-    // sumar total - (approved+promoted+regularized+inProgress) para saber cuántas
-    // faltan (sin cursar, Desaprobada o No regularizada), que no tienen balde propio.
-    private function tallySubject(array &$bucket, ?array $enrollment): void
+    // Suma el estado de una materia (o electiva ya elegida) a subjectsStatus/average,
+    // si tiene alguno de los 4 estados contemplados. No toca 'total': eso se cuenta
+    // aparte (una vez por materia de tronco, y el cupo fijo de electives_slots por
+    // módulo para las electivas), independientemente de si hay o no inscripción.
+    private function tallyStatus(array &$bucket, ?array $enrollment): void
     {
-        $bucket['total']++;
         $status = $enrollment['status'] ?? null;
         switch ($status) {
             case 'Aprobada':

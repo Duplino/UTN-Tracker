@@ -65,6 +65,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   let enrollmentCache = {};
   let electivesCache = [];
   let schemesCache = [];
+  // Conteo de recursadas por materia que sobrevive a que se borre la inscripción
+  // (recursar y dar de baja borran la fila de enrollments, pero el número de
+  // cursada tiene que seguir mostrándose en la tarjeta aunque quede disponible
+  // de nuevo). Se puebla junto con enrollmentCache/electivesCache y se corrige
+  // puntualmente después de recursar/editar el número (ver doRecursar más abajo).
+  let retakesCache = {};
 
   async function refreshEnrollmentCache(){
     const list = await activeStore.getEnrollments();
@@ -76,9 +82,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     electivesCache = await activeStore.getElectives();
   }
 
+  async function refreshRetakesCache(){
+    try{ retakesCache = await activeStore.getSubjectRetakes(); }
+    catch(e){ console.error('Error cargando conteo de recursadas', e); retakesCache = {}; }
+  }
+
   async function switchStoreAndReload(nextStore){
     activeStore = nextStore;
-    await Promise.all([refreshEnrollmentCache(), refreshElectivesCache()]);
+    await Promise.all([refreshEnrollmentCache(), refreshElectivesCache(), refreshRetakesCache()]);
     userCareers = await activeStore.getUserCareers();
     populateProgramSelect();
     currentCareer = pickInitialCareer();
@@ -727,7 +738,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Get recursed count for Roman numeral display - only show on cards when recursedCount > 0 (II, III, etc.)
-    const recursedCount = (stored && typeof stored.recursedCount === 'number') ? stored.recursedCount : 0;
+    // Recursar/dar de baja borran la inscripción activa, así que para una materia sin
+    // inscripción (disponible de nuevo) el conteo sale de retakesCache, no de `stored`.
+    const recursedCount = (stored && typeof stored.recursedCount === 'number')
+      ? stored.recursedCount
+      : (retakesCache[subject.code] || 0);
     let romanNumeralHtml = '';
     if (recursedCount > 0) {
       const cursadaNumber = recursedCount + 1; // 1 recurse = Cursada II, 2 recurses = Cursada III, etc.
@@ -780,6 +795,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Subject modal behavior
   let currentCard = null;
   let currentEnrollment = null; // enrollment hidratado de la materia con el modal abierto (o null si no está inscripta)
+
+  // Badge "Cursada I/II/..." del header del modal. Es solo texto (no clickeable);
+  // para editarlo está el campo "Número de cursada" en el panel de configuración
+  // (⚙) — no borra notas, a diferencia de "Recursar". Extraída de onCardClick para
+  // poder refrescarla también después de editar el número sin cerrar el modal.
+  function updateRecursedBadge(code){
+    const titleEl = document.getElementById('subjectModalLabel');
+    if (!titleEl) return;
+    const existingRecursedBadge = document.getElementById('subject-recursed-badge');
+    if (existingRecursedBadge) existingRecursedBadge.remove();
+    const currentRecursedCount = (currentEnrollment && typeof currentEnrollment.recursedCount === 'number')
+      ? currentEnrollment.recursedCount
+      : (retakesCache[code] || 0);
+    const cursadaNumber = currentRecursedCount + 1;
+    const cursadaNumeral = toRomanNumeral(cursadaNumber);
+    const badge = document.createElement('span');
+    badge.id = 'subject-recursed-badge';
+    badge.className = 'badge bg-secondary ms-2';
+    badge.style.fontSize = '0.75rem';
+    badge.style.fontWeight = 'normal';
+    badge.style.verticalAlign = 'middle';
+    badge.textContent = `Cursada ${cursadaNumeral}`;
+    badge.title = currentRecursedCount > 0
+      ? `Has recursado esta materia ${currentRecursedCount} vez${currentRecursedCount !== 1 ? 'es' : ''}`
+      : '';
+    titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
+  }
+
   async function onCardClick(e){
     // open modal and populate minimal info
     currentCard = e.currentTarget;
@@ -808,25 +851,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     titleEl.textContent = `${name} ${code ? '(' + code + ')' : ''}`;
 
-    // Display recursedCount badge in modal header ("Cursada I", "Cursada II", ...). Para
-    // editar el número real hay que usar "Recursar" desde el panel de configuración.
-    const existingRecursedBadge = document.getElementById('subject-recursed-badge');
-    if (existingRecursedBadge) existingRecursedBadge.remove();
     currentEnrollment = loadSubjectData(code);
-    const currentRecursedCount = (currentEnrollment && typeof currentEnrollment.recursedCount === 'number') ? currentEnrollment.recursedCount : 0;
-    const cursadaNumber = currentRecursedCount + 1;
-    const cursadaNumeral = toRomanNumeral(cursadaNumber);
-    const badge = document.createElement('span');
-    badge.id = 'subject-recursed-badge';
-    badge.className = 'badge bg-secondary ms-2';
-    badge.style.fontSize = '0.75rem';
-    badge.style.fontWeight = 'normal';
-    badge.style.verticalAlign = 'middle';
-    badge.textContent = `Cursada ${cursadaNumeral}`;
-    badge.title = currentRecursedCount > 0
-      ? `Has recursado esta materia ${currentRecursedCount} vez${currentRecursedCount !== 1 ? 'es' : ''}`
-      : '';
-    titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
+    updateRecursedBadge(code);
 
     const modalEl = document.getElementById('subjectModal');
     if (!modalEl) return;
@@ -1092,7 +1118,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         <li><a class="dropdown-item" href="#" data-override="Faltan notas">Faltan notas</a></li>
       </ul>
     `;
-    alertDiv.appendChild(dropdownDiv);
+    const rightWrap = document.createElement('div');
+    rightWrap.className = 'd-flex align-items-center gap-2';
+
+    if (status === 'Desaprobada'){
+      const recursarBtn = document.createElement('button');
+      recursarBtn.type = 'button';
+      recursarBtn.className = 'btn btn-sm btn-outline-danger';
+      recursarBtn.textContent = 'Recursar';
+      recursarBtn.addEventListener('click', async () => {
+        const effectiveCode = currentCard && currentCard.dataset && currentCard.dataset.code ? currentCard.dataset.code : '';
+        if (!effectiveCode) return;
+        recursarBtn.disabled = true;
+        try{ await doRecursar(effectiveCode); }finally{ recursarBtn.disabled = false; }
+      });
+      rightWrap.appendChild(recursarBtn);
+    }
+
+    rightWrap.appendChild(dropdownDiv);
+    alertDiv.appendChild(rightWrap);
 
     statusContainer.appendChild(alertDiv);
 
@@ -1330,7 +1374,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const status = computeStatus(schemeConfig, partials, finalsArr, checklist, null);
 
-    if (status === 'Regularizada' || status === 'Aprobada'){
+    // Esquema "libre" (n === 0): no hay cursada que regularizar, el final está
+    // disponible directamente. Para el resto, sigue esperando a Regularizada/Aprobada.
+    if (n === 0 || status === 'Regularizada' || status === 'Aprobada'){
       let attemptsToShow = 1;
       for (let i = 1; i <= 4; i++){
         const f = finalsRaw[i];
@@ -1396,14 +1442,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Panel de configuración de la materia (⚙): cambiar esquema/año, o recursar.
+  // Panel de configuración de la materia (⚙): cambiar esquema/año/número de cursada,
+  // recursar, o darse de baja.
   function bindSubjectSettingsPanel(code, stored){
     const toggleBtn = document.getElementById('subject-settings-toggle');
     const panel = document.getElementById('subject-settings-panel');
     const schemeSelect = document.getElementById('subject-scheme-select');
     const yearInput = document.getElementById('subject-year-input');
+    const cursadaInput = document.getElementById('subject-cursada-input');
     const applyBtn = document.getElementById('subject-settings-apply');
     const recursarBtn = document.getElementById('subject-recursar-action');
+    const unenrollBtn = document.getElementById('subject-unenroll-action');
     if (!toggleBtn || !panel) return;
 
     panel.classList.add('d-none');
@@ -1417,6 +1466,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       schemeSelect.value = stored.schemeCode || '';
     }
     if (yearInput) yearInput.value = stored.enrollmentYear || new Date().getFullYear();
+    // "Cursada I" == recursedCount 0: se muestra/edita en base 1 para que coincida
+    // con el numeral romano del badge del modal, no con el recursedCount crudo.
+    const currentCursadaNumber = (typeof stored.recursedCount === 'number' ? stored.recursedCount : 0) + 1;
+    if (cursadaInput) cursadaInput.value = currentCursadaNumber;
 
     if (applyBtn){
       const newApply = applyBtn.cloneNode(true);
@@ -1424,13 +1477,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       newApply.addEventListener('click', async () => {
         const newSchemeCode = schemeSelect ? schemeSelect.value : stored.schemeCode;
         const newYear = yearInput ? parseInt(yearInput.value, 10) : stored.enrollmentYear;
+        const newCursadaNumber = cursadaInput ? parseInt(cursadaInput.value, 10) : currentCursadaNumber;
         const schemeChanged = newSchemeCode && newSchemeCode !== stored.schemeCode;
+        const cursadaChanged = Number.isFinite(newCursadaNumber) && newCursadaNumber !== currentCursadaNumber;
         if (schemeChanged){
           const proceed = window.confirm('Cambiar el esquema de evaluación puede borrar las notas ya cargadas para esta materia. ¿Continuar?');
           if (!proceed) return;
         }
         newApply.disabled = true;
         try{
+          if (cursadaChanged){
+            // Endpoint separado: el conteo de recursadas vive independiente de la
+            // inscripción (sobrevive a recursar/dar de baja), no es un "ajuste" más.
+            retakesCache[code] = Math.max(0, newCursadaNumber - 1);
+            await activeStore.setRecursedCount(code, retakesCache[code]);
+          }
           const hydrated = await activeStore.updateEnrollmentSettings(code, {
             schemeCode: schemeChanged ? newSchemeCode : undefined,
             enrollmentYear: Number.isFinite(newYear) ? newYear : undefined,
@@ -1438,13 +1499,19 @@ document.addEventListener('DOMContentLoaded', async () => {
           putSubjectDataInCache(code, hydrated);
           currentEnrollment = hydrated;
           panel.classList.add('d-none');
+          updateRecursedBadge(code);
           applyCardStatusStyle(currentCard, hydrated.status);
           try{ computeStats(displayedSubjects); }catch(e){}
+          // Reactivar ANTES de re-renderizar: renderEnrolledSubject vuelve a llamar
+          // bindSubjectSettingsPanel, que clona este mismo botón (cloneNode copia el
+          // atributo disabled) — si lo reactivamos recién en el finally, ya es tarde:
+          // el clon que quedó en el DOM nace deshabilitado y este 'newApply' es un
+          // nodo viejo, desconectado, sobre el que ya no se puede hacer nada.
+          newApply.disabled = false;
           await renderEnrolledSubject(code);
         }catch(err){
           console.error('Error actualizando configuración de la materia', err);
           alert('No se pudo actualizar la configuración: ' + (err && err.message ? err.message : err));
-        }finally{
           newApply.disabled = false;
         }
       });
@@ -1454,29 +1521,72 @@ document.addEventListener('DOMContentLoaded', async () => {
       const newRecursar = recursarBtn.cloneNode(true);
       recursarBtn.parentNode.replaceChild(newRecursar, recursarBtn);
       newRecursar.addEventListener('click', async () => {
-        const proceed = window.confirm('¿Marcar esta materia como recursada? Se van a borrar las notas cargadas y se va a sumar una cursada.');
-        if (!proceed) return;
-        let prevAvailable = [];
-        try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
         newRecursar.disabled = true;
-        try{
-          const hydrated = await activeStore.recursar(code);
-          putSubjectDataInCache(code, hydrated);
-          currentEnrollment = hydrated;
-          applyCardStatusStyle(currentCard, hydrated.status);
-          updateAllCardCursarState();
-          try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
-          try{ computeStats(displayedSubjects); }catch(e){}
-          try{ if (planData) renderGroups(planData); }catch(e){}
-          const modalEl = document.getElementById('subjectModal');
-          if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
-        }catch(err){
-          console.error('Error al recursar', err);
-          alert('No se pudo recursar la materia: ' + (err && err.message ? err.message : err));
-        }finally{
-          newRecursar.disabled = false;
-        }
+        try{ await doRecursar(code); }finally{ newRecursar.disabled = false; }
       });
+    }
+
+    if (unenrollBtn){
+      const newUnenroll = unenrollBtn.cloneNode(true);
+      unenrollBtn.parentNode.replaceChild(newUnenroll, unenrollBtn);
+      newUnenroll.addEventListener('click', async () => {
+        newUnenroll.disabled = true;
+        try{ await doUnenroll(code); }finally{ newUnenroll.disabled = false; }
+      });
+    }
+  }
+
+  // Acción de "recursar": confirma, llama al backend, refresca tarjeta/stats/tablero
+  // y cierra el modal. Compartida por el botón del panel de ajustes y por el botón
+  // que aparece directamente en el banner de estado cuando la materia está Desaprobada.
+  // Recursar borra la inscripción entera (la materia vuelve a verse disponible para
+  // "Empezar", igual que una no iniciada) pero el conteo de recursadas persiste y
+  // sube en 1 — por eso la tarjeta va a mostrar el numeral (ej. "II") aunque ya no
+  // haya una inscripción activa.
+  async function doRecursar(code){
+    const proceed = window.confirm('¿Marcar esta materia como recursada? Se van a borrar las notas cargadas y la materia va a quedar disponible para volver a cursar, sumando una cursada.');
+    if (!proceed) return;
+    let prevAvailable = [];
+    try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+    try{
+      const result = await activeStore.recursar(code);
+      retakesCache[code] = (result && typeof result.recursedCount === 'number') ? result.recursedCount : (retakesCache[code] || 0) + 1;
+      putSubjectDataInCache(code, null);
+      currentEnrollment = null;
+      applyCardStatusStyle(currentCard, null);
+      updateAllCardCursarState();
+      try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
+      try{ computeStats(displayedSubjects); }catch(e){}
+      try{ if (planData) renderGroups(planData); }catch(e){}
+      const modalEl = document.getElementById('subjectModal');
+      if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
+    }catch(err){
+      console.error('Error al recursar', err);
+      alert('No se pudo recursar la materia: ' + (err && err.message ? err.message : err));
+    }
+  }
+
+  // Baja completa (distinto de recursar): borra la inscripción entera, la materia
+  // vuelve a verse "no iniciada" (borde punteado), sin sumar una cursada.
+  async function doUnenroll(code){
+    const proceed = window.confirm('¿Dar de baja esta materia? Se va a borrar toda la inscripción (notas incluidas) y la materia va a volver a verse como no iniciada.');
+    if (!proceed) return;
+    let prevAvailable = [];
+    try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+    try{
+      await activeStore.dropEnrollment(code);
+      putSubjectDataInCache(code, null);
+      currentEnrollment = null;
+      applyCardStatusStyle(currentCard, null);
+      updateAllCardCursarState();
+      try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
+      try{ computeStats(displayedSubjects); }catch(e){}
+      try{ if (planData) renderGroups(planData); }catch(e){}
+      const modalEl = document.getElementById('subjectModal');
+      if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
+    }catch(err){
+      console.error('Error al dar de baja', err);
+      alert('No se pudo dar de baja la materia: ' + (err && err.message ? err.message : err));
     }
   }
 
@@ -2836,7 +2946,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (initialUser) activeStore = apiStore;
 
-    await Promise.all([refreshEnrollmentCache(), refreshElectivesCache()]);
+    await Promise.all([refreshEnrollmentCache(), refreshElectivesCache(), refreshRetakesCache()]);
 
     userCareers = await activeStore.getUserCareers();
     populateProgramSelect();

@@ -9,6 +9,7 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Repositories\EnrollmentRepository;
 use App\Repositories\EvaluationSchemeRepository;
+use App\Repositories\SubjectRetakeRepository;
 use PDO;
 
 final class EnrollmentController
@@ -79,6 +80,22 @@ final class EnrollmentController
         Response::json($repo->findHydrated((int) $user['id'], $params['subjectCode']));
     }
 
+    public function remove(Request $request, array $params): void
+    {
+        $user = AuthMiddleware::requireAuth($this->pdo);
+        $repo = new EnrollmentRepository($this->pdo);
+        $enrollment = $repo->find((int) $user['id'], $params['subjectCode']);
+        if (!$enrollment) {
+            Response::error('not_found', 404);
+        }
+        $repo->delete((int) $enrollment['id']);
+        Response::noContent();
+    }
+
+    // Recursar borra la inscripción entera (la materia vuelve a verse "disponible
+    // para cursar", como si no se hubiera iniciado) y suma 1 al conteo persistente de
+    // subject_retakes, que sobrevive a esa baja — por eso no hay un enrollment que
+    // devolver hidratado, a diferencia del resto de los endpoints de esta clase.
     public function recursar(Request $request, array $params): void
     {
         $user = AuthMiddleware::requireAuth($this->pdo);
@@ -87,8 +104,10 @@ final class EnrollmentController
         if (!$enrollment) {
             Response::error('not_found', 404);
         }
-        $repo->recursar((int) $enrollment['id']);
-        Response::json($repo->findHydrated((int) $user['id'], $params['subjectCode']));
+        $repo->delete((int) $enrollment['id']);
+        $recursedCount = (new SubjectRetakeRepository($this->pdo))
+            ->increment((int) $user['id'], (int) $enrollment['subject_id']);
+        Response::json(['subjectCode' => $params['subjectCode'], 'recursedCount' => $recursedCount, 'enrolled' => false]);
     }
 
     public function setOverride(Request $request, array $params): void

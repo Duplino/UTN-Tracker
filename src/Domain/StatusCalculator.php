@@ -54,13 +54,28 @@ final class StatusCalculator
             $states[$p] = ['first' => $a1, 'second' => $a2, 'effective' => $effective];
         }
 
+        // Esquemas "libre" (partials=0, solo final) no tienen parciales que
+        // marquen actividad — sin esto, anyEntered nunca pasaría a true y
+        // quedaría en "Faltan notas" para siempre, aunque ya haya un final cargado.
+        if (!$anyEntered) {
+            foreach ($finals as $final) {
+                if (($final['grade'] ?? null) !== null) {
+                    $anyEntered = true;
+                    break;
+                }
+            }
+        }
+
         if (!$anyEntered) {
             return 'Faltan notas';
         }
 
         $checklistOk = self::checklistGate($config, $checklist);
 
-        $allRegularizedByGrades = true;
+        // Sin parciales no hay nada que regularizar (no es "vacuously true": es
+        // que la regularización, como la promoción, no existe en un esquema
+        // "libre" — solo el final define el resultado).
+        $allRegularizedByGrades = $partialCount > 0;
         foreach ($states as $state) {
             if ($state['effective'] === null || $state['effective'] < $regularizationMinNote) {
                 $allRegularizedByGrades = false;
@@ -94,7 +109,10 @@ final class StatusCalculator
             }
         }
 
-        $promotionEligible = !$hardFail
+        // partialCount > 0: promocionar es "eximirse del final por buenos
+        // parciales" — sin parciales (esquema "libre") no hay de qué eximirse.
+        $promotionEligible = $partialCount > 0
+            && !$hardFail
             && $totalHigh >= $requiredHighCount
             && $remainingOk
             && $checklistOk('promotion');

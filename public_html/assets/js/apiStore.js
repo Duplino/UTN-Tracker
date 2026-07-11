@@ -37,8 +37,21 @@ export const apiStore = {
     return api.patch(`/enrollments/${enc(subjectCode)}`, body);
   },
 
+  // Borra la inscripción entera (vuelve a "disponible para cursar") y suma 1 al
+  // conteo persistente de recursadas. Devuelve { subjectCode, recursedCount,
+  // enrolled: false } — ya no un enrollment hidratado, porque ya no hay ninguno.
   async recursar(subjectCode) {
     return api.post(`/enrollments/${enc(subjectCode)}/recursar`);
+  },
+
+  // --- Conteo de recursadas (independiente de la inscripción activa) ---
+  async getSubjectRetakes() {
+    const res = await api.get('/subject-retakes');
+    return (res && res.retakes) || {};
+  },
+
+  async setRecursedCount(subjectCode, recursedCount) {
+    return api.patch(`/subject-retakes/${enc(subjectCode)}`, { recursedCount });
   },
 
   async setOverride(subjectCode, status) {
@@ -55,12 +68,10 @@ export const apiStore = {
     return api.put(`/enrollments/${enc(subjectCode)}/results`, body);
   },
 
-  // El backend no expone un endpoint de "baja" real (no hay DELETE /enrollments).
-  // Mejor aproximación disponible: resetear resultados y limpiar el override; la
-  // inscripción sigue existiendo del lado del servidor mostrando "Faltan notas".
+  // Baja completa: borra la inscripción entera (DELETE /enrollments/{code}), no solo
+  // sus notas — la materia vuelve a verse como "no iniciada".
   async dropEnrollment(subjectCode) {
-    await this.saveResults(subjectCode, { partials: {}, finals: {}, checklist: {}, clearOverride: true });
-    return this.setOverride(subjectCode, null);
+    await api.delete(`/enrollments/${enc(subjectCode)}`);
   },
 
   // --- Electivas (scope por carrera) ---

@@ -9,6 +9,9 @@
 //
 // Claves de localStorage usadas:
 //  - `subjectData:<subjectCode>` -> raw enrollment (ver `hydrate()` abajo)
+//  - `subjectRetakes` -> objeto JSON { subjectCode: recursedCount, ... }. Separado
+//    de `subjectData:<code>` a propósito: "recursar"/"dar de baja" borran esa clave
+//    entera, pero el conteo de recursadas tiene que sobrevivir a eso.
 //  - `electives` -> array JSON [{careerCode, subjectCode, columnIndex}, ...]
 //  - `enrolledCareers` -> array JSON [{careerCode, showIntermediateTitle}, ...]
 //  - `preferences` -> objeto JSON (mismo shape que GET /api/preferences)
@@ -18,6 +21,7 @@ import { getEvaluationSchemes, findSchemeByCode } from './evaluationSchemes.js';
 import { getCareers } from './careers.js';
 
 const ENROLLMENT_PREFIX = 'subjectData:';
+const RETAKES_KEY = 'subjectRetakes';
 const ELECTIVES_KEY = 'electives';
 const ENROLLED_CAREERS_KEY = 'enrolledCareers';
 const PREFERENCES_KEY = 'preferences';
@@ -60,6 +64,14 @@ function writeRawEnrollment(subjectCode, raw) {
   writeJson(enrollmentKey(subjectCode), raw);
 }
 
+function readRetakes() {
+  return readJson(RETAKES_KEY, {});
+}
+
+function writeRetakes(map) {
+  writeJson(RETAKES_KEY, map);
+}
+
 async function hydrate(subjectCode, raw) {
   if (!raw) return null;
   const schemes = await getEvaluationSchemes();
@@ -75,7 +87,9 @@ async function hydrate(subjectCode, raw) {
     schemeCode: raw.schemeCode || null,
     schemeConfig: config,
     enrollmentYear: raw.enrollmentYear ?? new Date().getFullYear(),
-    recursedCount: raw.recursedCount || 0,
+    // Fuente de verdad: el mapa `subjectRetakes`, no `raw.recursedCount` — sobrevive
+    // a recursar/dar de baja (que borran esta clave `raw` entera).
+    recursedCount: readRetakes()[subjectCode] || 0,
     statusOverride: override,
     status,
     partials,
@@ -138,7 +152,6 @@ export const localGuestStore = {
     const raw = {
       schemeCode,
       enrollmentYear: new Date().getFullYear(),
-      recursedCount: 0,
       statusOverride: null,
       partials: {},
       finals: [],
@@ -151,7 +164,7 @@ export const localGuestStore = {
 
   async updateEnrollmentSettings(subjectCode, { schemeCode, enrollmentYear } = {}) {
     const raw = readRawEnrollment(subjectCode) || {
-      schemeCode: null, enrollmentYear: new Date().getFullYear(), recursedCount: 0,
+      schemeCode: null, enrollmentYear: new Date().getFullYear(),
       statusOverride: null, partials: {}, finals: [], checklist: {},
     };
     if (schemeCode !== undefined && schemeCode !== null && schemeCode !== raw.schemeCode) {
@@ -169,24 +182,21 @@ export const localGuestStore = {
     return hydrate(subjectCode, raw);
   },
 
+  // Recursar borra la inscripción entera (vuelve a "disponible para cursar") y suma
+  // 1 al conteo persistente `subjectRetakes`, que sobrevive a esa baja. Devuelve un
+  // objeto liviano (no un enrollment hidratado, porque ya no queda ninguno), mismo
+  // shape que la contraparte remota (ver apiStore.recursar).
   async recursar(subjectCode) {
-    const raw = readRawEnrollment(subjectCode) || {
-      schemeCode: null, enrollmentYear: new Date().getFullYear(), recursedCount: 0,
-      statusOverride: null, partials: {}, finals: [], checklist: {},
-    };
-    raw.recursedCount = (raw.recursedCount || 0) + 1;
-    raw.partials = {};
-    raw.finals = [];
-    raw.checklist = {};
-    raw.statusOverride = null;
-    raw.updatedAt = nowIso();
-    writeRawEnrollment(subjectCode, raw);
-    return hydrate(subjectCode, raw);
+    localStorage.removeItem(enrollmentKey(subjectCode));
+    const retakes = readRetakes();
+    retakes[subjectCode] = (retakes[subjectCode] || 0) + 1;
+    writeRetakes(retakes);
+    return { subjectCode, recursedCount: retakes[subjectCode], enrolled: false };
   },
 
   async setOverride(subjectCode, status) {
     const raw = readRawEnrollment(subjectCode) || {
-      schemeCode: null, enrollmentYear: new Date().getFullYear(), recursedCount: 0,
+      schemeCode: null, enrollmentYear: new Date().getFullYear(),
       statusOverride: null, partials: {}, finals: [], checklist: {},
     };
     raw.statusOverride = status || null;
@@ -197,7 +207,7 @@ export const localGuestStore = {
 
   async saveResults(subjectCode, { partials, finals, checklist, clearOverride } = {}) {
     const raw = readRawEnrollment(subjectCode) || {
-      schemeCode: null, enrollmentYear: new Date().getFullYear(), recursedCount: 0,
+      schemeCode: null, enrollmentYear: new Date().getFullYear(),
       statusOverride: null, partials: {}, finals: [], checklist: {},
     };
     raw.partials = partials || {};
@@ -209,10 +219,23 @@ export const localGuestStore = {
     return hydrate(subjectCode, raw);
   },
 
-  // No hay endpoint de "baja" en el backend (ver apiStore.dropEnrollment); en modo local
-  // sí podemos borrar la clave completa, que es el comportamiento histórico de "Dar de baja".
+  // Baja completa: borra la clave entera, la materia vuelve a verse como "no
+  // iniciada". A propósito NO toca `subjectRetakes` (el conteo de recursadas
+  // persiste, no se pierde por dar de baja).
   async dropEnrollment(subjectCode) {
     localStorage.removeItem(enrollmentKey(subjectCode));
+  },
+
+  // --- Conteo de recursadas (independiente de la inscripción activa) ---
+  async getSubjectRetakes() {
+    return readRetakes();
+  },
+
+  async setRecursedCount(subjectCode, recursedCount) {
+    const retakes = readRetakes();
+    retakes[subjectCode] = Math.max(0, recursedCount);
+    writeRetakes(retakes);
+    return { subjectCode, recursedCount: retakes[subjectCode] };
   },
 
   // --- Electivas (scope por carrera) ---

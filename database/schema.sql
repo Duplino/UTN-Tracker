@@ -179,6 +179,9 @@ CREATE TABLE IF NOT EXISTS enrollments (
   subject_id INT UNSIGNED NOT NULL,
   evaluation_scheme_id INT UNSIGNED NOT NULL,
   enrollment_year SMALLINT NOT NULL,
+  -- Legacy: el conteo de recursadas ya no vive acá (ver subject_retakes más abajo),
+  -- porque "recursar" borra esta fila entera y el conteo tiene que sobrevivir a eso.
+  -- Se deja la columna para no romper filas viejas; código nuevo no la lee/escribe.
   recursed_count INT UNSIGNED NOT NULL DEFAULT 0,
   status_override VARCHAR(20) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -188,6 +191,19 @@ CREATE TABLE IF NOT EXISTS enrollments (
   CONSTRAINT fk_enrollments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_enrollments_subject FOREIGN KEY (subject_id) REFERENCES subjects(id),
   CONSTRAINT fk_enrollments_scheme FOREIGN KEY (evaluation_scheme_id) REFERENCES evaluation_schemes(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Conteo de recursadas por (usuario, materia): independiente de `enrollments` a
+-- propósito, porque "recursar" y "dar de baja" borran la inscripción activa, pero
+-- el número de cursada tiene que sobrevivir a eso (se sigue mostrando en la
+-- tarjeta aunque la materia vuelva a verse "disponible para cursar").
+CREATE TABLE IF NOT EXISTS subject_retakes (
+  user_id INT UNSIGNED NOT NULL,
+  subject_id INT UNSIGNED NOT NULL,
+  recursed_count INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, subject_id),
+  CONSTRAINT fk_subject_retakes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_subject_retakes_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS enrollment_partials (

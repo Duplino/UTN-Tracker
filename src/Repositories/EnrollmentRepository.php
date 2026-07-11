@@ -67,18 +67,18 @@ final class EnrollmentRepository
         }
     }
 
-    public function recursar(int $enrollmentId): void
-    {
-        $this->clearResults($enrollmentId);
-        $this->pdo->prepare(
-            'UPDATE enrollments SET recursed_count = recursed_count + 1, status_override = NULL WHERE id = :id'
-        )->execute(['id' => $enrollmentId]);
-    }
-
     public function setOverride(int $enrollmentId, ?string $status): void
     {
         $this->pdo->prepare('UPDATE enrollments SET status_override = :status WHERE id = :id')
             ->execute(['status' => $status, 'id' => $enrollmentId]);
+    }
+
+    // Baja completa (no "recursar"): borra la inscripción entera, no solo las notas.
+    // enrollment_partials/finals/checklist tienen ON DELETE CASCADE sobre enrollment_id
+    // (ver database/schema.sql), así que se limpian solas.
+    public function delete(int $enrollmentId): void
+    {
+        $this->pdo->prepare('DELETE FROM enrollments WHERE id = :id')->execute(['id' => $enrollmentId]);
     }
 
     private function clearResults(int $enrollmentId): void
@@ -171,7 +171,8 @@ final class EnrollmentRepository
         $stmt->execute(['uid' => $userId]);
 
         $schemes = new EvaluationSchemeRepository($this->pdo);
-        return array_map(fn(array $row) => $this->hydrate($row, $schemes), $stmt->fetchAll());
+        $retakes = new SubjectRetakeRepository($this->pdo);
+        return array_map(fn(array $row) => $this->hydrate($row, $schemes, $retakes), $stmt->fetchAll());
     }
 
     public function findHydrated(int $userId, string $subjectCode): ?array
@@ -180,10 +181,10 @@ final class EnrollmentRepository
         if (!$row) {
             return null;
         }
-        return $this->hydrate($row, new EvaluationSchemeRepository($this->pdo));
+        return $this->hydrate($row, new EvaluationSchemeRepository($this->pdo), new SubjectRetakeRepository($this->pdo));
     }
 
-    private function hydrate(array $row, EvaluationSchemeRepository $schemes): array
+    private function hydrate(array $row, EvaluationSchemeRepository $schemes, SubjectRetakeRepository $retakes): array
     {
         $enrollmentId = (int) $row['id'];
         $scheme = $schemes->findById((int) $row['evaluation_scheme_id']);
@@ -205,7 +206,9 @@ final class EnrollmentRepository
             'schemeCode' => $scheme['code'] ?? null,
             'schemeConfig' => $scheme['config'] ?? null,
             'enrollmentYear' => (int) $row['enrollment_year'],
-            'recursedCount' => (int) $row['recursed_count'],
+            // Fuente de verdad: subject_retakes, no enrollments.recursed_count (ver
+            // comentario en database/schema.sql) — sobrevive a recursar/dar de baja.
+            'recursedCount' => $retakes->getCount((int) $row['user_id'], (int) $row['subject_id']),
             'statusOverride' => $row['status_override'],
             'status' => $status,
             'partials' => $partials,
@@ -278,29 +281,38 @@ final class EnrollmentRepository
             $this->clearResults($enrollmentId);
             $this->pdo->prepare(
                 'UPDATE enrollments
-                 SET evaluation_scheme_id = :scheme, enrollment_year = :year, recursed_count = :recursed, status_override = :override
+                 SET evaluation_scheme_id = :scheme, enrollment_year = :year, status_override = :override
                  WHERE id = :id'
             )->execute([
                 'scheme' => $scheme['id'],
                 'year' => (int) ($entry['enrollmentYear'] ?? date('Y')),
-                'recursed' => (int) ($entry['recursedCount'] ?? 0),
                 'override' => $entry['statusOverride'] ?? null,
                 'id' => $enrollmentId,
             ]);
         } else {
             $stmt = $this->pdo->prepare(
-                'INSERT INTO enrollments (user_id, subject_id, evaluation_scheme_id, enrollment_year, recursed_count, status_override)
-                 VALUES (:uid, :subject, :scheme, :year, :recursed, :override)'
+                'INSERT INTO enrollments (user_id, subject_id, evaluation_scheme_id, enrollment_year, status_override)
+                 VALUES (:uid, :subject, :scheme, :year, :override)'
             );
             $stmt->execute([
                 'uid' => $userId,
                 'subject' => $subjectId,
                 'scheme' => $scheme['id'],
                 'year' => (int) ($entry['enrollmentYear'] ?? date('Y')),
-                'recursed' => (int) ($entry['recursedCount'] ?? 0),
                 'override' => $entry['statusOverride'] ?? null,
             ]);
             $enrollmentId = (int) $this->pdo->lastInsertId();
+        }
+
+        // recursedCount ya no vive en `enrollments` (ver subject_retakes): al importar
+        // desde el snapshot de invitado, nunca bajar el conteo remoto que ya hubiera.
+        $localRecursedCount = (int) ($entry['recursedCount'] ?? 0);
+        if ($localRecursedCount > 0) {
+            $retakes = new SubjectRetakeRepository($this->pdo);
+            $current = $retakes->getCount($userId, $subjectId);
+            if ($localRecursedCount > $current) {
+                $retakes->setCount($userId, $subjectId, $localRecursedCount);
+            }
         }
 
         $this->saveResults(

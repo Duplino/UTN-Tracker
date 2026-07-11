@@ -44,13 +44,28 @@ export function computeStatus(config, partials, finals, checklist, override) {
     states[p] = { first: a1, second: a2, effective };
   }
 
+  // Esquemas "libre" (partials=0, solo final) no tienen parciales que marquen
+  // actividad — sin esto, anyEntered nunca pasaría a true y quedaría en
+  // "Faltan notas" para siempre, aunque ya haya un final cargado.
+  if (!anyEntered) {
+    for (const final of finals) {
+      if (final.grade !== null && final.grade !== undefined) {
+        anyEntered = true;
+        break;
+      }
+    }
+  }
+
   if (!anyEntered) {
     return 'Faltan notas';
   }
 
   const checklistOk = makeChecklistGate(config, checklist);
 
-  let allRegularizedByGrades = true;
+  // Sin parciales no hay nada que regularizar (no es "vacuously true": la
+  // regularización, como la promoción, no existe en un esquema "libre" — solo
+  // el final define el resultado).
+  let allRegularizedByGrades = partialCount > 0;
   for (const p in states) {
     const state = states[p];
     if (state.effective === null || state.effective < regularizationMinNote) {
@@ -87,8 +102,10 @@ export function computeStatus(config, partials, finals, checklist, override) {
     }
   }
 
+  // partialCount > 0: promocionar es "eximirse del final por buenos
+  // parciales" — sin parciales (esquema "libre") no hay de qué eximirse.
   const promotionEligible =
-    !hardFail && totalHigh >= requiredHighCount && remainingOk && checklistOk('promotion');
+    partialCount > 0 && !hardFail && totalHigh >= requiredHighCount && remainingOk && checklistOk('promotion');
 
   if (promotionEligible) {
     return 'Promocionada';

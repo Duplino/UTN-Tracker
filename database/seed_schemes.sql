@@ -87,6 +87,20 @@ INSERT INTO evaluation_schemes (code, name, config) VALUES
     'regularization', JSON_OBJECT('min_note', 6),
     'approve', JSON_OBJECT('min_note', 6)
   )
+),
+(
+  'libre',
+  'Libre (solo final, sin parciales)',
+  JSON_OBJECT(
+    'partials', 0,
+    'tp', 0,
+    'labs', 0,
+    'tp_required_for', JSON_ARRAY(),
+    'labs_required_for', JSON_ARRAY(),
+    'promotion', JSON_OBJECT('high_note', 8, 'high_count', 0, 'low_note', NULL, 'max_recovery', 0),
+    'regularization', JSON_OBJECT('min_note', 6),
+    'approve', JSON_OBJECT('min_note', 6)
+  )
 )
 AS new_scheme
 ON DUPLICATE KEY UPDATE
