@@ -32,7 +32,7 @@ final class StatusCalculator
         $maxRecovery = (int) ($promotion['max_recovery'] ?? 1);
 
         $states = [];
-        $anyEntered = false;
+        $allPartialSlotsEntered = $partialCount === 0;
         $hardFail = false;
 
         for ($p = 1; $p <= $partialCount; $p++) {
@@ -42,8 +42,8 @@ final class StatusCalculator
             $a3 = $attempts[3] ?? null;
 
             $entered = $a1 !== null || $a2 !== null || $a3 !== null;
-            if ($entered) {
-                $anyEntered = true;
+            if (!$entered) {
+                $allPartialSlotsEntered = false;
             }
 
             $effective = $a3 ?? $a2 ?? $a1;
@@ -54,19 +54,22 @@ final class StatusCalculator
             $states[$p] = ['first' => $a1, 'second' => $a2, 'effective' => $effective];
         }
 
-        // Esquemas "libre" (partials=0, solo final) no tienen parciales que
-        // marquen actividad — sin esto, anyEntered nunca pasaría a true y
-        // quedaría en "Faltan notas" para siempre, aunque ya haya un final cargado.
-        if (!$anyEntered) {
+        // Si hay parciales, todos tienen que tener al menos una nota cargada
+        // antes de seguir con el resto de los chequeos.
+        if ($partialCount > 0 && !$allPartialSlotsEntered) {
+            return 'Faltan notas';
+        }
+
+        if ($partialCount === 0) {
             foreach ($finals as $final) {
                 if (($final['grade'] ?? null) !== null) {
-                    $anyEntered = true;
+                    $allPartialSlotsEntered = true;
                     break;
                 }
             }
         }
 
-        if (!$anyEntered) {
+        if (!$allPartialSlotsEntered) {
             return 'Faltan notas';
         }
 

@@ -22,7 +22,7 @@ export function computeStatus(config, partials, finals, checklist, override) {
   const maxRecovery = promotion.max_recovery ?? 1;
 
   const states = {};
-  let anyEntered = false;
+  let allPartialSlotsEntered = partialCount === 0;
   let hardFail = false;
 
   for (let p = 1; p <= partialCount; p++) {
@@ -32,8 +32,8 @@ export function computeStatus(config, partials, finals, checklist, override) {
     const a3 = attempts[3] ?? null;
 
     const entered = a1 !== null || a2 !== null || a3 !== null;
-    if (entered) {
-      anyEntered = true;
+    if (!entered) {
+      allPartialSlotsEntered = false;
     }
 
     const effective = a3 ?? a2 ?? a1 ?? null;
@@ -44,19 +44,22 @@ export function computeStatus(config, partials, finals, checklist, override) {
     states[p] = { first: a1, second: a2, effective };
   }
 
-  // Esquemas "libre" (partials=0, solo final) no tienen parciales que marquen
-  // actividad — sin esto, anyEntered nunca pasaría a true y quedaría en
-  // "Faltan notas" para siempre, aunque ya haya un final cargado.
-  if (!anyEntered) {
+  // Si hay parciales, todos tienen que tener al menos una nota cargada antes
+  // de seguir con el resto de los chequeos.
+  if (partialCount > 0 && !allPartialSlotsEntered) {
+    return 'Faltan notas';
+  }
+
+  if (partialCount === 0) {
     for (const final of finals) {
       if (final.grade !== null && final.grade !== undefined) {
-        anyEntered = true;
+        allPartialSlotsEntered = true;
         break;
       }
     }
   }
 
-  if (!anyEntered) {
+  if (!allPartialSlotsEntered) {
     return 'Faltan notas';
   }
 
