@@ -22,7 +22,7 @@ export function computeStatus(config, partials, finals, checklist, override) {
   const maxRecovery = promotion.max_recovery ?? 1;
 
   const states = {};
-  let allPartialSlotsEntered = partialCount === 0;
+  let allPartialSlotsEntered = true;
   let hardFail = false;
 
   for (let p = 1; p <= partialCount; p++) {
@@ -51,6 +51,7 @@ export function computeStatus(config, partials, finals, checklist, override) {
   }
 
   if (partialCount === 0) {
+    allPartialSlotsEntered = false;
     for (const final of finals) {
       if (final.grade !== null && final.grade !== undefined) {
         allPartialSlotsEntered = true;

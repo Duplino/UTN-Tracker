@@ -32,7 +32,7 @@ final class StatusCalculator
         $maxRecovery = (int) ($promotion['max_recovery'] ?? 1);
 
         $states = [];
-        $allPartialSlotsEntered = $partialCount === 0;
+        $allPartialSlotsEntered = true;
         $hardFail = false;
 
         for ($p = 1; $p <= $partialCount; $p++) {
@@ -61,6 +61,7 @@ final class StatusCalculator
         }
 
         if ($partialCount === 0) {
+            $allPartialSlotsEntered = false;
             foreach ($finals as $final) {
                 if (($final['grade'] ?? null) !== null) {
                     $allPartialSlotsEntered = true;
