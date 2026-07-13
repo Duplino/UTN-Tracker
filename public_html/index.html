@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>UTN Tracker - Materias</title>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+		<link href="assets/css/index.css" rel="stylesheet">
+		<link rel="shortcut icon" href="assets/sello_arana.png" type="image/x-icon">
+	</head>
+	<body>
+		<div class="container-fluid">
+			<!-- Top toolbar (not a navbar) -->
+			<div class="toolbar d-flex flex-wrap justify-content-between align-items-center gap-2">
+				<div class="d-flex align-items-center gap-2" role="group" aria-label="Herramientas">
+					<select id="programSelect" class="form-select" aria-label="Carreras">
+						<!-- Opciones generadas dinámicamente por JS según las carreras en las que estás anotado -->
+					</select>
+					<div id="settings-intermediate-title-wrap" class="form-check form-switch d-none text-nowrap" title="Mostrar el mapa hasta el título intermedio">
+						<input class="form-check-input" type="checkbox" id="settings-intermediate-title" role="switch">
+						<label class="form-check-label small" for="settings-intermediate-title">Título intermedio</label>
+					</div>
+					<button class="btn btn-outline-secondary" id="btn-electivas">electivas</button>
+				</div>
+				<div class="btn-group" role="group" aria-label="Acciones">
+					<button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#helpModal" id="btn-help">
+						Ayuda
+					</button>
+					<button type="button" class="btn btn-outline-secondary" id="btn-profile" data-bs-toggle="modal" data-bs-target="#profileModal" aria-label="Perfil">
+						Perfil
+					</button>
+					<button type="button" class="btn btn-outline-secondary" id="btn-settings" data-bs-toggle="modal" data-bs-target="#settingsModal" aria-label="Configuración">
+						<i class="bi bi-gear"></i>
+					</button>
+					<button type="button" class="btn btn-outline-secondary" id="btn-stats" data-bs-toggle="modal" data-bs-target="#statsModal" aria-label="Estadísticas">
+						<i class="bi bi-bar-chart"></i>
+					</button>
+				</div>
+			</div>
+
+			<!-- Columns with subject cards -->
+			<section class="columns-grid" aria-label="Materias">
+				<!-- Columns produced dynamically by JS -->
+			</section>
+
+			<!-- Toast de requisitos faltantes (solo mobile, ver assets/js/index.js) -->
+			<div class="toast-container requirements-toast-container position-fixed bottom-0 start-50 translate-middle-x p-3">
+				<div id="requirements-toast" class="toast align-items-center text-bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+					<div class="d-flex">
+						<div class="toast-body" id="requirements-toast-body"></div>
+						<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Bottom statistics and progress -->
+			<section class="mt-3">
+				<div class="stats-row" id="stats-row-container">
+					<!-- Dynamic stat cards inserted by JS -->
+				</div>
+
+				<div class="progress-wrap">
+					<!-- Fila de etiqueta del tramo 1 (hasta el título intermedio), oculta si la
+					     carrera no tiene título intermedio. -->
+					<div id="progress-intermediate-wrap" class="d-flex justify-content-between d-none">
+						<small class="text-muted">Progreso hasta el título intermedio</small>
+						<small id="progress-label-intermediate" class="text-muted">0%</small>
+					</div>
+					<!-- Una única barra de progreso dividida en dos segmentos: el ancho de cada
+					     segmento representa su proporción sobre el total de la carrera (Tramo 1:
+					     título intermedio / Tramo 2: resto), y el relleno interno de cada segmento
+					     representa el avance dentro de ese tramo (0-100% de ese tramo nada más). -->
+					<div class="progress progress-split" aria-hidden="false">
+						<div id="progress-segment-intermediate" class="progress-segment d-none">
+							<div id="progress-bar-intermediate" class="progress-segment-fill bg-info" role="progressbar" aria-labelledby="progress-label-intermediate" aria-valuemin="0" aria-valuemax="100"></div>
+						</div>
+						<div id="progress-segment-final" class="progress-segment">
+							<div id="progress-bar-final" class="progress-segment-fill bg-success" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100"></div>
+						</div>
+					</div>
+					<div class="d-flex justify-content-between">
+						<small class="text-muted">Progreso hasta el final de la carrera</small>
+						<small id="progress-label" class="text-muted">0%</small>
+					</div>
+				</div>
+			</section>
+		</div>
+
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+		<script src="https://accounts.google.com/gsi/client" async defer></script>
+		<script type="module" src="assets/js/index.js"></script>
+
+		<!-- Help modal with accordion -->
+		<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered modal-lg">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="helpModalLabel">Ayuda</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <div class="accordion" id="helpAccordion">
+		          <!-- Flechas de correlativas -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingCorrelativas">
+		              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCorrelativas" aria-expanded="true" aria-controls="collapseCorrelativas">
+		                Flechas de correlativas
+		              </button>
+		            </h2>
+		            <div id="collapseCorrelativas" class="accordion-collapse collapse show" aria-labelledby="headingCorrelativas" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p>Las correlativas se muestran con flechas que indican dependencias entre materias:</p>
+		                <ul>
+		                  <li><strong>Flechas negras</strong>: requisito <em>para cursar</em> (asistencia/inscripción).</li>
+		                  <li><strong>Flechas verdes</strong>: requisito <em>para aprobar</em> (condición para la calificación final).</li>
+		                </ul>
+		                <p>Para los requisitos <em>para aprobar</em> hay dos estados:</p>
+		                <ul>
+		                  <li>Línea continua: la materia debe estar <strong>aprobada</strong>.</li>
+		                  <li>Línea punteada: la materia puede estar <strong>regularizada</strong> (no necesariamente aprobada).</li>
+		                </ul>
+		                <p><strong>Ejemplo:</strong></p>
+		                <div class="d-flex gap-2 align-items-center">
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" marker-end="url(#help-arrow-black)"></path></svg>
+		                  <span>Requisito para cursar - aprobado (negro, continuo)</span>
+		                </div>
+		                <div class="d-flex gap-2 align-items-center">
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-black)"></path></svg>
+		                  <span>Requisito para cursar - regularizada (negro, punteado)</span>
+		                </div>
+		                <div class="d-flex gap-2 align-items-center mt-2">
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" marker-end="url(#help-arrow-green)"></path></svg>
+		                  <span>Requisito para aprobar - aprobado (verde, continuo)</span>
+		                </div>
+		                <div class="d-flex gap-2 align-items-center mt-2">
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-green)"></path></svg>
+		                  <span>Requisito para aprobar - regularizada (verde, punteado)</span>
+		                </div>
+		              </div>
+		            </div>
+		          </div>
+		          
+		          <!-- Código de color de materias -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingColors">
+		              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseColors" aria-expanded="false" aria-controls="collapseColors">
+		                Código de color de materias
+		              </button>
+		            </h2>
+		            <div id="collapseColors" class="accordion-collapse collapse" aria-labelledby="headingColors" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p>Las materias se destacan con diferentes colores según su estado:</p>
+		                <ul>
+		                  <li><span class="badge" style="background-color: rgba(13,110,253,0.15); color: #0d6efd;">Azul</span> - <strong>Promocionada</strong>: ambos parciales con nota ≥8 en el primer intento (o con un solo recuperatorio permitido).</li>
+		                  <li><span class="badge" style="background-color: rgba(255,193,7,0.2); color: #856404;">Amarillo</span> - <strong>Regularizada</strong>: ambos parciales con nota ≥6, pero aún no aprobaste el final.</li>
+		                  <li><span class="badge" style="background-color: rgba(40,167,69,0.15); color: #28a745;">Verde</span> - <strong>Aprobada</strong>: final aprobado con nota ≥6.</li>
+		                  <li><span class="badge" style="background-color: rgba(220,53,69,0.1); color: #dc3545;">Rojo</span> - <strong>Desaprobada</strong>: agotaste las 3 oportunidades de recuperatorio con nota <6.</li>
+		                </ul>
+		              </div>
+		            </div>
+		          </div>
+		          
+		          <!-- Estados de materias -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingStates">
+		              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStates" aria-expanded="false" aria-controls="collapseStates">
+		                Estados de materias
+		              </button>
+		            </h2>
+		            <div id="collapseStates" class="accordion-collapse collapse" aria-labelledby="headingStates" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p>El sistema calcula automáticamente el estado de cada materia según las notas ingresadas:</p>
+		                <ul>
+		                  <li><strong>Promocionada</strong>: ambos parciales con nota ≥8 en el primer intento. Se permite un solo recuperatorio si uno de los parciales tiene ≥8 y el otro <8, y con el recuperatorio se alcanza ≥8.</li>
+		                  <li><strong>Regularizada</strong>: ambos parciales con promedio ≥6 (considerando hasta 2 recuperatorios por parcial). Permite rendir final.</li>
+		                  <li><strong>Aprobada</strong>: materia regularizada con final aprobado (nota ≥6). Se pueden rendir hasta 4 finales.</li>
+		                  <li><strong>Desaprobada</strong>: después de agotar las 3 oportunidades (1 parcial + 2 recuperatorios) en al menos un parcial con nota <6.</li>
+		                  <li><strong>Debe recuperar</strong>: nota <6 en un parcial pero aún quedan recuperatorios disponibles.</li>
+		                  <li><strong>En curso</strong>: faltan notas o exámenes por rendir.</li>
+		                </ul>
+		                <p class="mb-0"><small class="text-muted">El estado se actualiza automáticamente al ingresar las notas en el modal de cada materia.</small></p>
+		              </div>
+		            </div>
+		          </div>
+		          
+		          <!-- Badges -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingBadges">
+		              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBadges" aria-expanded="false" aria-controls="collapseBadges">
+		                Badges
+		              </button>
+		            </h2>
+		            <div id="collapseBadges" class="accordion-collapse collapse" aria-labelledby="headingBadges" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p>En cada tarjeta de materia se muestran badges con información adicional:</p>
+		                <ul>
+		                  <li><span class="badge bg-primary">Azul</span> - <strong>Carga horaria</strong>: indica las horas semanales de cursada de la materia.</li>
+		                  <li><span class="badge bg-success">Verde</span> - <strong>Nota final</strong>: muestra la nota final obtenida cuando la materia está aprobada.</li>
+		                </ul>
+		                <p class="mb-0"><small class="text-muted">Los badges te ayudan a identificar rápidamente la información clave de cada materia en el tablero.</small></p>
+		              </div>
+		            </div>
+		          </div>
+		        </div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- Profile / Auth modal (HTML only - JS to be implemented later) -->
+		<div class="modal fade" id="profileModal" tabindex="-1" aria-labelledby="profileModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+			  <div class="modal-header">
+				<h5 class="modal-title" id="profileModalLabel">Cuenta / Perfil</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			  </div>
+			  <div class="modal-body">
+				<!-- Note: JS will show/hide sections depending on auth state -->
+				<!-- Sign-in section -->
+				<div id="profile-signin" class="auth-section">
+				  <h6>Iniciar sesión</h6>
+				  <div class="mb-2">
+					<!-- Google Identity Services renderiza acá su botón oficial (ver assets/js/auth.js) -->
+					<div id="google-signin-btn" class="d-flex justify-content-center mb-2"></div>
+				  </div>
+				</div>
+				<!-- User info section (visible when logged in) -->
+				<div id="profile-user" class="auth-section d-none">
+				  <h6>Sesión iniciada</h6>
+				  <div class="mb-2"><strong id="profile-user-name">Nombre</strong></div>
+				  <div class="mb-2 text-muted" id="profile-user-email">email@ejemplo.com</div>
+				  <div class="d-flex gap-2">
+					<button id="profile-signout-btn" class="btn btn-outline-danger">Cerrar sesión</button>
+					<button id="profile-sync-btn" class="btn btn-outline-secondary">Sincronizar ahora</button>
+				  </div>
+				  <div class="mt-3"><small class="text-muted">Cuando inicies sesión, podrás sincronizar tu tablero entre dispositivos.</small></div>
+				</div>
+				<!-- Year started input (always visible, persisted locally) -->
+				<hr class="my-3">
+				<div class="mb-2">
+				  <label class="form-label small" for="profile-year-started">Año de ingreso</label>
+				  <input id="profile-year-started" type="number" min="1990" max="2099" step="1" class="form-control" placeholder="Ej: 2020" />
+				  <div class="form-text">Año en el que aprobó el TIVU (para calcular antigüedad).</div>
+				</div>
+				<!-- Mis carreras: anotarse/darse de baja. Darse de baja NO borra las notas ya
+				     cargadas (están linkeadas a la materia, no a la carrera). -->
+				<hr class="my-3">
+				<div class="mb-2">
+				  <label class="form-label small mb-1">Mis carreras</label>
+				  <div class="table-responsive">
+					<table class="table table-sm table-hover stats-table mb-0">
+					  <tbody id="careers-table-body">
+						<!-- Filas generadas por JS -->
+					  </tbody>
+					</table>
+				  </div>
+				</div>
+			  </div>
+			  <div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			  </div>
+			</div>
+		  </div>
+		</div>
+
+		<!-- Settings modal -->
+		<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+			  <div class="modal-header">
+				<h5 class="modal-title" id="settingsModalLabel">Configuración</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			  </div>
+			  <div class="modal-body">
+				<!-- Mostrar correlativas toggle -->
+				<div class="form-check form-switch mb-3">
+				  <input class="form-check-input" type="checkbox" id="settings-correlativas" role="switch" checked>
+				  <label class="form-check-label" for="settings-correlativas">Mostrar correlativas</label>
+				  <div class="form-text">Muestra las flechas de correlativas al pasar el cursor sobre las materias.</div>
+				</div>
+				<!-- Ver estado de materias toggle -->
+				<div class="form-check form-switch mb-3">
+				  <input class="form-check-input" type="checkbox" id="settings-show-status" role="switch">
+				  <label class="form-check-label" for="settings-show-status">Ver estado de materias</label>
+				  <div class="form-text">Muestra el estado debajo de cada materia en el tablero.</div>
+				</div>
+				<!-- Mostrar públicamente toggle (syncs with Firebase) -->
+				<div class="form-check form-switch mb-3">
+				  <input class="form-check-input" type="checkbox" id="settings-share-toggle">
+				  <label class="form-check-label" for="settings-share-toggle">Compartir públicamente</label>
+				  <div class="form-text" id="settings-share-note">Activa para compartir tu tablero públicamente. Requiere iniciar sesión.</div>
+				  <div class="mt-2 small">
+					<span id="settings-share-link-wrap" style="display:none;">
+					  Enlace público: <a href="#" id="settings-share-link" target="_blank" rel="noopener"></a>
+					</span>
+				  </div>
+				</div>
+			  </div>
+			  <div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			  </div>
+			</div>
+		  </div>
+		</div>
+
+		<!-- Stats modal -->
+		<div class="modal fade" id="statsModal" tabindex="-1" aria-labelledby="statsModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered modal-lg">
+			<div class="modal-content">
+			  <div class="modal-header">
+				<h5 class="modal-title" id="statsModalLabel">Estadísticas</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			  </div>
+			  <div class="modal-body">
+				<p class="small text-muted mb-2">Podés agregar hasta 5 estadísticas al panel inferior. Click en + para agregar o X para quitar.</p>
+				<div class="table-responsive">
+				  <table class="table table-sm table-hover stats-table">
+					<thead>
+					  <tr>
+						<th>Estadística</th>
+						<th>Valor</th>
+						<th style="width: 60px;">Acción</th>
+					  </tr>
+					</thead>
+					<tbody id="stats-table-body">
+					  <!-- Rows generated by JS -->
+					</tbody>
+				  </table>
+				</div>
+			  </div>
+			  <div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			  </div>
+			</div>
+		  </div>
+		</div>
+
+		<!-- Peso académico: detalle de la fórmula -->
+		<div class="modal fade" id="pesoAcademicoModal" tabindex="-1" aria-labelledby="pesoAcademicoModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered modal-lg">
+			<div class="modal-content">
+			  <div class="modal-header">
+				<h5 class="modal-title" id="pesoAcademicoModalLabel">Composición del peso académico</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			  </div>
+			  <div class="modal-body">
+				<p class="small text-muted mb-2">P = 11·MAp_total − 7·FAd_total − 19·FAu_ciclo − 17·MAb_ciclo + 5·MR_ciclo</p>
+				<div class="table-responsive">
+				  <table class="table table-sm">
+					<thead>
+					  <tr>
+						<th>Componente</th>
+						<th>Coeficiente</th>
+						<th>Valor</th>
+						<th class="text-end">Aporte</th>
+					  </tr>
+					</thead>
+					<tbody id="peso-academico-table-body">
+					  <!-- Filas generadas por JS -->
+					</tbody>
+					<tfoot>
+					  <tr class="fw-bold">
+						<td colspan="3">Peso académico</td>
+						<td class="text-end" id="peso-academico-total">—</td>
+					  </tr>
+					</tfoot>
+				  </table>
+				</div>
+				<p class="small text-muted mb-0">Los componentes marcados como "no disponible" todavía no se pueden calcular y no afectan el resultado.</p>
+			  </div>
+			  <div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			  </div>
+			</div>
+		  </div>
+		</div>
+
+		<!-- Small footer -->
+		<footer class="app-footer mt-3">
+			<div class="container-fluid d-flex justify-content-between align-items-center">
+				<div class="small text-muted">Hecho con amor por <a href="https://scalise.ar" target="_blank" rel="noopener">Federico Scalise Giussani</a></div>
+				<div>
+					<a class="btn btn-sm btn-outline-secondary github-btn" href="https://github.com/Duplino/UTN-Tracker" target="_blank" rel="noopener" aria-label="Ver repositorio en GitHub">
+						<!-- GitHub mark (small) -->
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2 .37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 012 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+						<span class="visually-hidden">GitHub</span>
+					</a>
+				</div>
+			</div>
+		</footer>
+
+			<!-- Electivas modal -->
+			<div class="modal fade" id="electivasModal" tabindex="-1" aria-labelledby="electivasModalLabel" aria-hidden="true">
+			  <div class="modal-dialog modal-lg modal-dialog-centered">
+			    <div class="modal-content">
+			      <div class="modal-header">
+			        <h5 class="modal-title" id="electivasModalLabel">Materias Electivas</h5>
+			        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+			      </div>
+			      <div class="modal-body">
+			        <div id="electivas-container" class="row g-2">
+			          <!-- Electivas cards injected here -->
+			        </div>
+			      </div>
+			      <div class="modal-footer">
+			        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+			      </div>
+			    </div>
+			  </div>
+			</div>
+
+		<!-- Subject modal for entering parciales and finales -->
+		<div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="subjectModalLabel">Materia</h5>
+		        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="subject-settings-toggle" title="Esquema de evaluación / año" aria-label="Configuración de la materia">
+		          <i class="bi bi-gear"></i>
+		        </button>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <!-- Panel de configuración: esquema de evaluación + año de cursada (oculto por defecto) -->
+		      <div id="subject-settings-panel" class="px-3 pt-3 d-none">
+		        <div class="mb-2">
+		          <label class="form-label small" for="subject-scheme-select">Esquema de evaluación</label>
+		          <select id="subject-scheme-select" class="form-select form-select-sm"></select>
+		        </div>
+		        <div class="mb-2">
+		          <label class="form-label small" for="subject-year-input">Año de cursada</label>
+		          <input id="subject-year-input" type="number" min="1990" max="2099" step="1" class="form-control form-control-sm" />
+		        </div>
+		        <div class="mb-2">
+		          <label class="form-label small" for="subject-cursada-input">Número de cursada</label>
+		          <input id="subject-cursada-input" type="number" min="1" max="20" step="1" class="form-control form-control-sm" />
+		        </div>
+		        <div class="d-flex gap-2 mb-2">
+		          <button type="button" class="btn btn-sm btn-outline-primary" id="subject-settings-apply">Aplicar</button>
+		          <button type="button" class="btn btn-sm btn-outline-danger" id="subject-recursar-action">Recursar</button>
+		          <button type="button" class="btn btn-sm btn-outline-secondary" id="subject-unenroll-action">Dar de baja</button>
+		        </div>
+		        <hr>
+		      </div>
+		      <div class="modal-body">
+				<form id="subject-form">
+					<!-- Parciales, finales y checklist de TP/labs generados dinámicamente en JS
+					     según el `schemeConfig` de la inscripción activa (ver index.js). -->
+					<div id="subject-dynamic-fields"></div>
+				</form>
+
+				<!-- Aviso de requisitos "para aprobar" no cumplidos (correlativas del final) -->
+				<div id="subject-aprobar-warning" class="alert alert-warning py-1 px-2 small d-none" role="alert"></div>
+
+				<!-- Dynamic status banner (updated live) - dropdown is generated dynamically by JS -->
+				<div id="subject-status" class="mt-3" aria-live="polite" aria-atomic="true">
+				</div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		        <button type="button" class="btn btn-primary" id="subject-save">Guardar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+	</body>
+</html>

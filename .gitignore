@@ -11,3 +11,5 @@ api/test-data/
 # PHP
 vendor/
 composer.lock
+
+.env
