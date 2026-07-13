@@ -2334,6 +2334,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     { id: 'materiasAprobadas', name: 'Materias aprobadas', compute: computeMateriasAprobadas },
     { id: 'finalesPendientes', name: 'Finales pendientes', compute: computeFinalesPendientes },
     { id: 'materiasCursables', name: 'Materias que pueden cursarse', compute: computeMateriasCursables },
+    { id: 'materiasEnCurso', name: 'Materias en curso', compute: computeMateriasEnCurso },
     { id: 'puedePromocionar', name: 'Materias en condición de promoción', compute: computePuedePromocionar },
     { id: 'debeRecuperar', name: 'Materias a recuperar', compute: computeDebeRecuperar },
     { id: 'desaprobadas', name: 'Cantidad de materias desaprobadas', compute: computeDesaprobadas },
@@ -2539,6 +2540,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     return String(disponibles);
   }
   
+  function computeMateriasEnCurso(){
+    // "En curso" = faltan notas o exámenes por rendir (ver getStatusDescription)
+    let count = 0;
+    for (const subj of (displayedSubjects || [])){
+      const key = (subj.code && subj.code.trim()) ? subj.code : (subj.name || '');
+      const stored = key ? loadSubjectData(key) : null;
+      const status = stored ? stored.status : null;
+      if (status === 'Faltan notas' || status === 'Faltan examenes') count++;
+    }
+    // Also count electivas
+    try{
+      getElectivesForCurrentCareer().forEach(entry => {
+        const stored = loadSubjectData(entry.subjectCode);
+        const status = stored ? stored.status : null;
+        if (status === 'Faltan notas' || status === 'Faltan examenes') count++;
+      });
+    }catch(e){}
+    return String(count);
+  }
+
   function computePuedePromocionar(){
     // Count subjects where status is Regularizada or No regularizada AND canPromote() returns true
     let count = 0;
