@@ -2958,9 +2958,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const shareToggleCtl = initShareToggleUI();
 
     let initialUser = null;
+    let mockAuthEnabled = false;
     try{
       const me = await api.get('/auth/me');
       if (me && me.authenticated) initialUser = me.user;
+      mockAuthEnabled = !!(me && me.mockAuthEnabled);
     }catch(e){
       // Sin conexión o error de red: degradar a modo invitado sin bloquear la app.
       console.warn('No se pudo verificar la sesión, se usa modo invitado', e);
@@ -3004,6 +3006,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initAuth({
       initialUser,
+      mockAuthEnabled,
       onLoginSuccess: async () => {
         await switchStoreAndReload(apiStore);
         try{ shareToggleCtl.applyState(await activeStore.getPreferences()); }catch(e){ console.error(e); }

@@ -29,6 +29,9 @@ $router->post('/api/auth/google', [$auth, 'google']);
 $router->post('/api/auth/logout', [$auth, 'logout']);
 $router->get('/api/auth/me', [$auth, 'me']);
 $router->post('/api/auth/import-local', [$auth, 'importLocal']);
+if (Env::get('MOCK_AUTH_ENABLED') === 'true') {
+    $router->post('/api/auth/mock-login', [$auth, 'mockLogin']);
+}
 
 $schemes = new EvaluationSchemeController($pdo);
 $router->get('/api/evaluation-schemes', [$schemes, 'index']);
