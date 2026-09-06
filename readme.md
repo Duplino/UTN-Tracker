@@ -71,6 +71,28 @@ Cambios de esquema de DB se siguen aplicando a mano (`docker compose exec db mys
 
 No corras `docker-compose.yml` (el de desarrollo) y `docker-compose.prod.yml` a la vez en el mismo directorio: Compose deriva el nombre del proyecto del nombre de la carpeta, así que sin `-p` distinto terminarían compartiendo red y volumen de DB.
 
+## Staging (probar antes de pushear)
+
+`docker-compose.staging.yml` es igual a `docker-compose.prod.yml` (misma imagen, sin bind mount, DB propia) salvo por el nombre del contenedor (`utntracker-app-staging`), para poder correr los dos al mismo tiempo en el mismo VPS sin que choquen.
+
+1. Clonar en otra carpeta, con `dev` en vez de `main`:
+   ```
+   git clone -b dev <repo> /opt/utn-tracker-staging
+   ```
+   Al ser una carpeta distinta (`utn-tracker-staging` vs. la de prod), Compose ya usa un nombre de proyecto distinto → red y volumen de DB quedan aislados automáticamente, sin tocar nada extra.
+2. Crear un `.env` ahí con **credenciales de DB propias** (usuario/base/password distintos a los de prod — es una instancia de MySQL separada, no la misma). `GOOGLE_CLIENT_ID` puede ser el mismo que en prod, es el mismo OAuth client.
+3. En Google Cloud Console, agregar `https://staging.utntracker.com.ar` a los orígenes de JavaScript autorizados de ese OAuth client (si no, el login real va a fallar solo en staging).
+4. `docker compose -f docker-compose.staging.yml --env-file .env up -d --build`.
+5. Sumar otro bloque al Caddyfile:
+   ```
+   staging.utntracker.com.ar {
+       reverse_proxy utntracker-app-staging:80
+   }
+   ```
+6. Redeploy de staging con cambios nuevos de `dev`: `git pull && docker compose -f docker-compose.staging.yml --env-file .env up -d --build`.
+
+Cuando `dev` está probado y se mergea a `main`, el redeploy de prod es el mismo flujo pero en la carpeta de prod (ver sección anterior).
+
 ## Uso de inteligencia artificial
 
 Este proyecto usó fuertemente inteligencia artificial en su desarrollo, con intervención humana también.

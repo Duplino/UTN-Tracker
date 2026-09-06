@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   expires_at DATETIME NOT NULL,
   UNIQUE KEY uq_user_sessions_token_hash (token_hash),
   KEY idx_user_sessions_user_id (user_id),
-  CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =====================================================
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS career_modules (
   electives_slots TINYINT UNSIGNED NOT NULL DEFAULT 0,
   UNIQUE KEY uq_career_modules (career_id, code),
   KEY idx_career_modules_career_id (career_id),
-  CONSTRAINT fk_career_modules_career FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE
+  CONSTRAINT fk_career_modules_career FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Catálogo GLOBAL de materias, compartido entre carreras (ej. Análisis Matemático I
@@ -89,9 +89,9 @@ CREATE TABLE IF NOT EXISTS career_subjects (
   display_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
   UNIQUE KEY uq_career_subjects (career_id, subject_id),
   KEY idx_career_subjects_module_id (module_id),
-  CONSTRAINT fk_career_subjects_career FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE,
-  CONSTRAINT fk_career_subjects_module FOREIGN KEY (module_id) REFERENCES career_modules(id) ON DELETE CASCADE,
-  CONSTRAINT fk_career_subjects_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)
+  CONSTRAINT fk_career_subjects_career FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_career_subjects_module FOREIGN KEY (module_id) REFERENCES career_modules(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_career_subjects_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Correlativas: career_subject_id es la materia "para la cual" es requisito;
@@ -104,8 +104,8 @@ CREATE TABLE IF NOT EXISTS subject_requirements (
   requirement_kind ENUM('cursar','aprobar') NOT NULL,
   status_type ENUM('regularizada','aprobada') NOT NULL DEFAULT 'aprobada',
   KEY idx_subject_requirements_career_subject_id (career_subject_id),
-  CONSTRAINT fk_subject_requirements_career_subject FOREIGN KEY (career_subject_id) REFERENCES career_subjects(id) ON DELETE CASCADE,
-  CONSTRAINT fk_subject_requirements_required_subject FOREIGN KEY (required_subject_id) REFERENCES subjects(id)
+  CONSTRAINT fk_subject_requirements_career_subject FOREIGN KEY (career_subject_id) REFERENCES career_subjects(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_subject_requirements_required_subject FOREIGN KEY (required_subject_id) REFERENCES subjects(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =====================================================
@@ -124,8 +124,8 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   share_token CHAR(32) NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_user_preferences_share_token (share_token),
-  CONSTRAINT fk_user_preferences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_user_preferences_career FOREIGN KEY (active_career_id) REFERENCES careers(id)
+  CONSTRAINT fk_user_preferences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_user_preferences_career FOREIGN KEY (active_career_id) REFERENCES careers(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- En qué carreras está anotado un usuario (controla qué aparece en el dropdown);
@@ -138,8 +138,8 @@ CREATE TABLE IF NOT EXISTS user_careers (
   enrolled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_user_careers (user_id, career_id),
   KEY idx_user_careers_user_id (user_id),
-  CONSTRAINT fk_user_careers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_user_careers_career FOREIGN KEY (career_id) REFERENCES careers(id)
+  CONSTRAINT fk_user_careers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_user_careers_career FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS user_electives (
@@ -150,9 +150,9 @@ CREATE TABLE IF NOT EXISTS user_electives (
   column_index TINYINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_user_electives (user_id, career_id, subject_id),
-  CONSTRAINT fk_user_electives_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_user_electives_career FOREIGN KEY (career_id) REFERENCES careers(id),
-  CONSTRAINT fk_user_electives_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)
+  CONSTRAINT fk_user_electives_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_user_electives_career FOREIGN KEY (career_id) REFERENCES careers(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_user_electives_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =====================================================
@@ -188,9 +188,9 @@ CREATE TABLE IF NOT EXISTS enrollments (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_enrollments_user_subject (user_id, subject_id),
   KEY idx_enrollments_user_id (user_id),
-  CONSTRAINT fk_enrollments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_enrollments_subject FOREIGN KEY (subject_id) REFERENCES subjects(id),
-  CONSTRAINT fk_enrollments_scheme FOREIGN KEY (evaluation_scheme_id) REFERENCES evaluation_schemes(id)
+  CONSTRAINT fk_enrollments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_enrollments_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_enrollments_scheme FOREIGN KEY (evaluation_scheme_id) REFERENCES evaluation_schemes(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Conteo de recursadas por (usuario, materia): independiente de `enrollments` a
@@ -202,8 +202,8 @@ CREATE TABLE IF NOT EXISTS subject_retakes (
   subject_id INT UNSIGNED NOT NULL,
   recursed_count INT UNSIGNED NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, subject_id),
-  CONSTRAINT fk_subject_retakes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_subject_retakes_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)
+  CONSTRAINT fk_subject_retakes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_subject_retakes_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS enrollment_partials (
@@ -216,7 +216,7 @@ CREATE TABLE IF NOT EXISTS enrollment_partials (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_enrollment_partials (enrollment_id, partial_number, attempt_number),
   KEY idx_enrollment_partials_enrollment_id (enrollment_id),
-  CONSTRAINT fk_enrollment_partials_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
+  CONSTRAINT fk_enrollment_partials_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT chk_enrollment_partials_grade CHECK (grade IS NULL OR (grade BETWEEN 1 AND 10))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS enrollment_finals (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_enrollment_finals (enrollment_id, attempt_number),
   KEY idx_enrollment_finals_enrollment_id (enrollment_id),
-  CONSTRAINT fk_enrollment_finals_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
+  CONSTRAINT fk_enrollment_finals_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT chk_enrollment_finals_grade CHECK (grade IS NULL OR (grade BETWEEN 1 AND 10))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -243,7 +243,7 @@ CREATE TABLE IF NOT EXISTS enrollment_checklist (
   completed_at DATETIME NULL,
   UNIQUE KEY uq_enrollment_checklist (enrollment_id, item_type, item_number),
   KEY idx_enrollment_checklist_enrollment_id (enrollment_id),
-  CONSTRAINT fk_enrollment_checklist_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE
+  CONSTRAINT fk_enrollment_checklist_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;
