@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
+use App\Config\Env;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Session;
+use App\Repositories\CareerRepository;
 use App\Repositories\EnrollmentRepository;
+use App\Repositories\EvaluationSchemeRepository;
+use App\Repositories\UserCareerRepository;
 use App\Repositories\UserRepository;
 use PDO;
 use Throwable;
@@ -70,11 +74,74 @@ final class AuthController
 
     public function me(Request $request): void
     {
+        $mockAuthEnabled = self::mockAuthEnabled();
         $user = Session::currentUser($this->pdo);
         if (!$user) {
-            Response::json(['authenticated' => false]);
+            Response::json(['authenticated' => false, 'mockAuthEnabled' => $mockAuthEnabled]);
         }
-        Response::json(['authenticated' => true, 'user' => $this->publicUser($user)]);
+        Response::json([
+            'authenticated' => true,
+            'user' => $this->publicUser($user),
+            'mockAuthEnabled' => $mockAuthEnabled,
+        ]);
+    }
+
+    // Login falso para desarrollo local: crea/reutiliza un usuario fijo sin pasar
+    // por Google, y si es la primera vez lo carga con datos de ejemplo para no
+    // arrancar con el tablero vacío. Gateado por MOCK_AUTH_ENABLED (además el
+    // router ni registra esta ruta si el flag está apagado).
+    public function mockLogin(Request $request): void
+    {
+        if (!self::mockAuthEnabled()) {
+            Response::error('not_found', 404);
+        }
+
+        $users = new UserRepository($this->pdo);
+        $googleSub = 'mock-dev-user';
+        $existing = $users->findByGoogleSub($googleSub);
+        $isNewUser = $existing === null;
+
+        if ($isNewUser) {
+            $userId = $users->create($googleSub, 'dev@utntracker.local', 'Usuario de prueba', null);
+            $this->seedSampleData($userId);
+        } else {
+            $userId = (int) $existing['id'];
+        }
+
+        Session::issue($this->pdo, $userId);
+        $user = $users->findById($userId);
+
+        Response::json([
+            'user' => $this->publicUser($user),
+            'isNewUser' => $isNewUser,
+        ]);
+    }
+
+    private function seedSampleData(int $userId): void
+    {
+        $careers = new CareerRepository($this->pdo);
+        $career = $careers->findByCode('sistemas');
+        if (!$career) {
+            return;
+        }
+
+        (new UserCareerRepository($this->pdo))->enroll($userId, (int) $career['id']);
+
+        $schemes = new EvaluationSchemeRepository($this->pdo);
+        $scheme = $schemes->findByCode('2-partials');
+        if (!$scheme) {
+            return;
+        }
+
+        $enrollments = new EnrollmentRepository($this->pdo);
+        foreach (['SyPdN', 'F1'] as $subjectCode) {
+            $enrollments->create($userId, $subjectCode, (int) $scheme['id']);
+        }
+    }
+
+    private static function mockAuthEnabled(): bool
+    {
+        return Env::get('MOCK_AUTH_ENABLED') === 'true';
     }
 
     public function importLocal(Request $request): void

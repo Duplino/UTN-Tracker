@@ -1,0 +1,49 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB:-utn_tracker}
+      MYSQL_USER: ${DB_USER:-utn_tracker}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-utn_tracker}
+    ports:
+      - "${HOST_MYSQL_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      # Se ejecutan una sola vez, en orden alfabético, al crear el volumen por
+      # primera vez (no en cada `up`). migrate_subject_retakes.sql queda afuera:
+      # es una migración histórica puntual para bases ya existentes, no para
+      # levantar el esquema desde cero.
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql:ro
+      - ./database/seed_schemes.sql:/docker-entrypoint-initdb.d/2_seed_schemes.sql:ro
+      - ./database/seed_mecanica.sql:/docker-entrypoint-initdb.d/3_seed_mecanica.sql:ro
+      - ./database/seed_sistemas.sql:/docker-entrypoint-initdb.d/3_seed_sistemas.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQL_IP: db
+      MYSQL_PORT: 3306
+      DB: ${DB:-utn_tracker}
+      DB_USER: ${DB_USER:-utn_tracker}
+      DB_PASSWORD: ${DB_PASSWORD:-utn_tracker}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      MOCK_AUTH_ENABLED: ${MOCK_AUTH_ENABLED:-true}
+    ports:
+      - "${HOST_APP_PORT:-8080}:80"
+    volumes:
+      - .:/var/www/html
+      - /var/www/html/vendor
+
+volumes:
+  db_data:

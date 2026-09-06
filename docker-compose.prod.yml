@@ -1,0 +1,55 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?falta MYSQL_ROOT_PASSWORD en .env}
+      MYSQL_DATABASE: ${DB:?falta DB en .env}
+      MYSQL_USER: ${DB_USER:?falta DB_USER en .env}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?falta DB_PASSWORD en .env}
+    volumes:
+      - db_data:/var/lib/mysql
+      # Solo corren la primera vez que se crea el volumen. Cambios de esquema
+      # posteriores se aplican a mano: docker compose exec db mysql ...
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql:ro
+      - ./database/seed_schemes.sql:/docker-entrypoint-initdb.d/2_seed_schemes.sql:ro
+      - ./database/seed_mecanica.sql:/docker-entrypoint-initdb.d/3_seed_mecanica.sql:ro
+      - ./database/seed_sistemas.sql:/docker-entrypoint-initdb.d/3_seed_sistemas.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    container_name: utntracker-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQL_IP: db
+      MYSQL_PORT: 3306
+      DB: ${DB:?falta DB en .env}
+      DB_USER: ${DB_USER:?falta DB_USER en .env}
+      DB_PASSWORD: ${DB_PASSWORD:?falta DB_PASSWORD en .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?falta GOOGLE_CLIENT_ID en .env}
+      # Forzado a false: en producción no debe existir el bypass de Google login,
+      # sin importar lo que diga el .env.
+      MOCK_AUTH_ENABLED: "false"
+    networks:
+      - default
+      - caddy_net
+    # No se publica ningún puerto al host: Caddy llega por la red compartida
+    # "caddy_net" usando el nombre del contenedor (utntracker-app:80).
+
+networks:
+  caddy_net:
+    external: true
+    # Reemplazar por el nombre real de la red donde corre tu Caddy
+    # (`docker network ls` en el VPS para verla).
+    name: CAMBIAR_nombre_red_de_caddy
+
+volumes:
+  db_data:

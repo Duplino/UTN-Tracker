@@ -63,7 +63,7 @@ async function buildGuestSnapshot() {
 // `initialUser`: usuario ya detectado por index.js vía GET /auth/me (o null).
 // `onLoginSuccess(user)`: index.js debe cambiar el store activo a apiStore y re-renderizar.
 // `onLogout()`: index.js debe cambiar el store activo a localGuestStore y re-renderizar.
-export function initAuth({ initialUser = null, onLoginSuccess, onLogout } = {}) {
+export function initAuth({ initialUser = null, mockAuthEnabled = false, onLoginSuccess, onLogout } = {}) {
   currentUser = initialUser || null;
 
   if (currentUser) {
@@ -74,29 +74,43 @@ export function initAuth({ initialUser = null, onLoginSuccess, onLogout } = {}) 
     if (shareToggle) shareToggle.disabled = true;
   }
 
+  // Cola común a cualquier flujo de login exitoso (Google o mock): importa
+  // progreso de invitado si había, y avisa a index.js para que recargue con apiStore.
+  async function finishLogin(user) {
+    currentUser = user || null;
+
+    const snapshot = await buildGuestSnapshot();
+    if (snapshot.length > 0) {
+      try {
+        await api.post('/auth/import-local', { enrollments: snapshot });
+      } catch (e) {
+        console.error('Error importando datos locales al backend', e);
+      }
+    }
+
+    showUserSection(currentUser);
+    if (typeof onLoginSuccess === 'function') await onLoginSuccess(currentUser);
+  }
+
   async function handleCredentialResponse(response) {
     try {
       const idToken = response && response.credential;
       if (!idToken) throw new Error('missing_credential');
       const result = await api.post('/auth/google', { id_token: idToken });
-      currentUser = result && result.user ? result.user : null;
-
-      // Si había progreso guardado como invitado, importarlo (el backend decide qué
-      // conservar: gana la versión con updatedAt más reciente, automático).
-      const snapshot = await buildGuestSnapshot();
-      if (snapshot.length > 0) {
-        try {
-          await api.post('/auth/import-local', { enrollments: snapshot });
-        } catch (e) {
-          console.error('Error importando datos locales al backend', e);
-        }
-      }
-
-      showUserSection(currentUser);
-      if (typeof onLoginSuccess === 'function') await onLoginSuccess(currentUser);
+      await finishLogin(result && result.user ? result.user : null);
     } catch (err) {
       console.error('Google sign-in error', err);
       alert('Error al iniciar sesión con Google: ' + (err && err.message ? err.message : err));
+    }
+  }
+
+  async function handleMockLogin() {
+    try {
+      const result = await api.post('/auth/mock-login');
+      await finishLogin(result && result.user ? result.user : null);
+    } catch (err) {
+      console.error('Mock sign-in error', err);
+      alert('Error al iniciar sesión con el usuario de prueba: ' + (err && err.message ? err.message : err));
     }
   }
 
@@ -121,6 +135,16 @@ export function initAuth({ initialUser = null, onLoginSuccess, onLogout } = {}) 
       .catch((err) => {
         console.error('No se pudo inicializar Google Identity Services', err);
       });
+
+    const mockSigninBtn = document.getElementById('mock-signin-btn');
+    if (mockSigninBtn) {
+      if (mockAuthEnabled) {
+        mockSigninBtn.classList.remove('d-none');
+        mockSigninBtn.addEventListener('click', handleMockLogin);
+      } else {
+        mockSigninBtn.classList.add('d-none');
+      }
+    }
 
     const signoutBtn = document.getElementById('profile-signout-btn');
     if (signoutBtn) {
