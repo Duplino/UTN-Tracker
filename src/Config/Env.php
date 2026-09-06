@@ -32,6 +32,13 @@ final class Env
 
     public static function get(string $key, ?string $default = null): ?string
     {
+        // Una variable de entorno real (p.ej. seteada por docker-compose) tiene
+        // prioridad sobre el archivo .env, igual que en cualquier lib de dotenv.
+        $fromEnv = getenv($key);
+        if ($fromEnv !== false) {
+            return $fromEnv;
+        }
+
         return self::$values[$key] ?? $default;
     }
 }
