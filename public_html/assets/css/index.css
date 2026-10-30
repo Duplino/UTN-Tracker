@@ -581,6 +581,37 @@ body{
 .planner-candidate:focus-visible{
   background: var(--utn-hover-bg);
 }
+/* Columna "En curso": cada materia es un botón que rota el resultado supuesto. */
+.planner-term-current{
+  background: var(--bs-tertiary-bg);
+}
+.planner-current{
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  border: 1px solid var(--bs-border-color);
+  border-left-width: 4px;
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-body-bg);
+  padding: 0.45rem 0.6rem;
+}
+.planner-current:hover,
+.planner-current:focus-visible{
+  background: var(--utn-hover-bg);
+}
+.planner-outcome{
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.planner-current-approved{ border-left-color: var(--bs-success); }
+.planner-current-approved .planner-outcome{ background: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
+.planner-current-regular{ border-left-color: var(--bs-warning); }
+.planner-current-regular .planner-outcome{ background: var(--bs-warning-bg-subtle); color: var(--bs-warning-text-emphasis); }
+.planner-current-failed{ border-left-color: var(--bs-danger); }
+.planner-current-failed .planner-outcome{ background: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
 .planner-add-term{
   display: flex;
   flex-direction: column;
