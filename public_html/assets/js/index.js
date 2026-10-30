@@ -1,5 +1,5 @@
 import { api } from './apiClient.js';
-import { computeStatus } from './statusEngine.js';
+import { computeStatus, promotionRecoveryCandidates } from './statusEngine.js';
 import { getEvaluationSchemes } from './evaluationSchemes.js';
 import { getCareers, getCareerCurriculum } from './careers.js';
 import { localGuestStore } from './localGuestStore.js';
@@ -545,27 +545,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Check if a subject can be promoted (both parciales >=6 but at least one <8)
-  // Heurística de UI (no autoritativa: el status real lo calcula computeStatus()) para
-  // mostrar "Puede promocionar" cuando falta un solo parcial por debajo del umbral alto
-  // y todavía queda un recuperatorio disponible para intentar alcanzarlo.
+  // "Puede promocionar": queda algún recuperatorio que, aprobado con nota alta, haría
+  // promocionar la materia (ver promotionRecoveryCandidates en statusEngine.js).
   function canPromote(stored) {
     if (!stored || !stored.schemeConfig || !stored.partials) return false;
-    const config = stored.schemeConfig;
-    const highNote = config?.promotion?.high_note ?? 8;
-    const n = config?.partials ?? 2;
-    const partials = stored.partials || {};
-    let closeCount = 0;
-    let hasOpenRecovery = false;
-    for (let p = 1; p <= n; p++) {
-      const attempts = partials[p] || {};
-      const a1 = attempts[1] ?? null;
-      const a2 = attempts[2] ?? null;
-      if (a1 !== null && a1 >= highNote) { closeCount++; continue; }
-      if (a1 !== null && a1 >= 6 && a2 === null) hasOpenRecovery = true;
-    }
-    if (closeCount >= n) return false;
-    return closeCount === n - 1 && hasOpenRecovery;
+    return promotionRecoveryCandidates(stored.schemeConfig, stored.partials).length > 0;
   }
 
   // Calculate remaining final attempts for a regularized subject (up to 4 finals total)
@@ -1143,8 +1127,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLiveInputs(schemeConfig);
     bindSubjectSettingsPanel(code, stored);
 
-    const liveStatus = updateSubjectStatusLive(schemeConfig);
-    setStatusBanner(stored.statusOverride || liveStatus);
+    updateSubjectStatusLive(schemeConfig);
+    if (stored.statusOverride) setStatusBanner(stored.statusOverride);
 
     wireSaveButton(code, schemeConfig);
     updateAprobarWarning();
@@ -1225,7 +1209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return Number.isFinite(n) ? n : NaN;
   }
 
-  function setStatusBanner(status){
+  function setStatusBanner(status, promotable = false){
     const statusContainer = document.getElementById('subject-status');
     if (!statusContainer) return;
     // Build alert element as DOM with Bootstrap dropdown inside
@@ -1246,7 +1230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     alertDiv.setAttribute('role','status');
     const left = document.createElement('div');
     left.id = 'subject-status-text';
-    left.textContent = status || '';
+    left.textContent = promotable && status ? `${status} • Puede promocionar` : (status || '');
     alertDiv.appendChild(left);
 
     // Add Bootstrap dropdown for override actions
@@ -1351,8 +1335,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         <label class="form-label small">Parcial ${p}</label>
         <div class="d-flex gap-1">
           <input type="number" min="1" max="10" step="1" class="form-control form-control-sm" id="p_${p}_1" placeholder="Nota">
-          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_2" placeholder="Debe Recuperar">
-          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_3" placeholder="Debe Recuperar">
+          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_2" placeholder="Recuperatorio">
+          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_3" placeholder="Recuperatorio">
         </div>`;
       container.appendChild(group);
     }
@@ -1498,20 +1482,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   // parciales) + cálculo del status en vivo vía statusEngine.js (mismo algoritmo que el backend).
   function updateSubjectStatusLive(schemeConfig){
     const n = schemeConfig?.partials ?? 2;
-    const highNote = schemeConfig?.promotion?.high_note ?? 8;
-    for (let p = 1; p <= n; p++) showPartialAttemptsUpTo(p, 1);
-
     const partials = readDynamicPartials(schemeConfig);
+    // Recuperatorio obligatorio si el parcial no llega a regularizar (< 6). Si
+    // regulariza pero no llega a la nota alta, el recuperatorio es opcional y solo
+    // se ofrece cuando con él todavía se puede promocionar: con un 6 en el primer
+    // parcial no se sugiere nada hasta que el resto de los parciales lo habiliten.
+    const promoCandidates = new Set(promotionRecoveryCandidates(schemeConfig, partials));
     for (let p = 1; p <= n; p++){
       const a1 = partials[p][1];
       const a2 = partials[p][2];
+      const a3 = partials[p][3];
+      const second = document.getElementById(`p_${p}_2`);
+      let shown = 1;
       if (a1 !== null && a1 < 6){
-        showPartialAttemptsUpTo(p, 2);
-        if (a2 !== null && a2 < 6) showPartialAttemptsUpTo(p, 3);
-      } else if (a1 !== null && a1 < highNote){
-        // regularizado pero por debajo del umbral de promoción: dejar intentar un recuperatorio
-        showPartialAttemptsUpTo(p, 2);
+        shown = (a2 !== null && a2 < 6) ? 3 : 2;
+        if (second) second.placeholder = 'Debe recuperar';
+      } else if (promoCandidates.has(p)){
+        shown = 2;
+        if (second) second.placeholder = 'Puede promocionar';
       }
+      // Nunca esconder un intento que ya tiene nota: se seguiría contando sin verse.
+      if (a2 !== null) shown = Math.max(shown, a2 < 6 ? 3 : 2);
+      if (a3 !== null) shown = 3;
+      showPartialAttemptsUpTo(p, shown);
     }
 
     const finalsRaw = readDynamicFinals();
@@ -1534,7 +1527,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showFinalsUpTo(0);
     }
 
-    setStatusBanner(status);
+    setStatusBanner(status, promoCandidates.size > 0);
     return status;
   }
 

@@ -1,6 +1,7 @@
 // Share page JavaScript - Read-only public profile view. Consume GET /api/public/{id}
 // (mismo shape que usa index.js: enrollments ya vienen con `status` calculado server-side).
 import { api } from './apiClient.js';
+import { promotionRecoveryCandidates } from './statusEngine.js';
 import { getCareers, getCareerCurriculum } from './careers.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -86,24 +87,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Heurística de UI (no autoritativa) igual que en index.js.
+  // Igual que en index.js: queda un recuperatorio con el que todavía se puede promocionar.
   function canPromote(stored) {
     if (!stored || !stored.schemeConfig || !stored.partials) return false;
-    const config = stored.schemeConfig;
-    const highNote = config?.promotion?.high_note ?? 8;
-    const n = config?.partials ?? 2;
-    const partials = stored.partials || {};
-    let closeCount = 0;
-    let hasOpenRecovery = false;
-    for (let p = 1; p <= n; p++) {
-      const attempts = partials[p] || {};
-      const a1 = attempts[1] ?? null;
-      const a2 = attempts[2] ?? null;
-      if (a1 !== null && a1 >= highNote) { closeCount++; continue; }
-      if (a1 !== null && a1 >= 6 && a2 === null) hasOpenRecovery = true;
-    }
-    if (closeCount >= n) return false;
-    return closeCount === n - 1 && hasOpenRecovery;
+    return promotionRecoveryCandidates(stored.schemeConfig, stored.partials).length > 0;
   }
 
   function applyCardStatusStyle(card, status) {

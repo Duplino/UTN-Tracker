@@ -203,6 +203,150 @@
     "expected": "Regularizada"
   },
   {
+    "name": "6 y 8 sin recuperar regulariza",
+    "scheme": "2-partials",
+    "config": {
+      "partials": 2,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 2,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 6
+      },
+      "2": {
+        "1": 8
+      }
+    },
+    "finals": [],
+    "checklist": {},
+    "override": null,
+    "expected": "Regularizada"
+  },
+  {
+    "name": "recupera el 6 con 8 y promociona",
+    "scheme": "2-partials",
+    "config": {
+      "partials": 2,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 2,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 6,
+        "2": 8
+      },
+      "2": {
+        "1": 8
+      }
+    },
+    "finals": [],
+    "checklist": {},
+    "override": null,
+    "expected": "Promocionada"
+  },
+  {
+    "name": "recupera el 6 con 7 no promociona",
+    "scheme": "2-partials",
+    "config": {
+      "partials": 2,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 2,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 6,
+        "2": 7
+      },
+      "2": {
+        "1": 8
+      }
+    },
+    "finals": [],
+    "checklist": {},
+    "override": null,
+    "expected": "Regularizada"
+  },
+  {
+    "name": "8 en el segundo recuperatorio no promociona",
+    "scheme": "2-partials",
+    "config": {
+      "partials": 2,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 2,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 4,
+        "2": 5,
+        "3": 8
+      },
+      "2": {
+        "1": 8
+      }
+    },
+    "finals": [],
+    "checklist": {},
+    "override": null,
+    "expected": "Regularizada"
+  },
+  {
     "name": "6 y 6 regulariza",
     "scheme": "2-partials",
     "config": {
@@ -1156,6 +1300,324 @@
       }
     ],
     "checklist": {},
+    "override": null,
+    "expected": "Aprobada"
+  },
+  {
+    "name": "sin nota del parcial",
+    "scheme": "1-partial-tp",
+    "config": {
+      "partials": 1,
+      "tp": 1,
+      "labs": 0,
+      "tp_required_for": [
+        "regularization",
+        "promotion"
+      ],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 1,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {},
+    "finals": [],
+    "checklist": {
+      "tp": {
+        "1": true
+      }
+    },
+    "override": null,
+    "expected": "Faltan notas"
+  },
+  {
+    "name": "9 con TP promociona",
+    "scheme": "1-partial-tp",
+    "config": {
+      "partials": 1,
+      "tp": 1,
+      "labs": 0,
+      "tp_required_for": [
+        "regularization",
+        "promotion"
+      ],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 1,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 9
+      }
+    },
+    "finals": [],
+    "checklist": {
+      "tp": {
+        "1": true
+      }
+    },
+    "override": null,
+    "expected": "Promocionada"
+  },
+  {
+    "name": "9 sin TP no regulariza",
+    "scheme": "1-partial-tp",
+    "config": {
+      "partials": 1,
+      "tp": 1,
+      "labs": 0,
+      "tp_required_for": [
+        "regularization",
+        "promotion"
+      ],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 1,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 9
+      }
+    },
+    "finals": [],
+    "checklist": {
+      "tp": {
+        "1": false
+      }
+    },
+    "override": null,
+    "expected": "No regularizada"
+  },
+  {
+    "name": "7 con TP regulariza",
+    "scheme": "1-partial-tp",
+    "config": {
+      "partials": 1,
+      "tp": 1,
+      "labs": 0,
+      "tp_required_for": [
+        "regularization",
+        "promotion"
+      ],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 1,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 7
+      }
+    },
+    "finals": [],
+    "checklist": {
+      "tp": {
+        "1": true
+      }
+    },
+    "override": null,
+    "expected": "Regularizada"
+  },
+  {
+    "name": "7 y 8 en el recuperatorio con TP promociona",
+    "scheme": "1-partial-tp",
+    "config": {
+      "partials": 1,
+      "tp": 1,
+      "labs": 0,
+      "tp_required_for": [
+        "regularization",
+        "promotion"
+      ],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 1,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 7,
+        "2": 8
+      }
+    },
+    "finals": [],
+    "checklist": {
+      "tp": {
+        "1": true
+      }
+    },
+    "override": null,
+    "expected": "Promocionada"
+  },
+  {
+    "name": "4 y 6 en el recuperatorio con TP regulariza",
+    "scheme": "1-partial-tp",
+    "config": {
+      "partials": 1,
+      "tp": 1,
+      "labs": 0,
+      "tp_required_for": [
+        "regularization",
+        "promotion"
+      ],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 1,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 4,
+        "2": 6
+      }
+    },
+    "finals": [],
+    "checklist": {
+      "tp": {
+        "1": true
+      }
+    },
+    "override": null,
+    "expected": "Regularizada"
+  },
+  {
+    "name": "tres aplazos desaprueba",
+    "scheme": "1-partial-tp",
+    "config": {
+      "partials": 1,
+      "tp": 1,
+      "labs": 0,
+      "tp_required_for": [
+        "regularization",
+        "promotion"
+      ],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 1,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 2,
+        "2": 3,
+        "3": 4
+      }
+    },
+    "finals": [],
+    "checklist": {
+      "tp": {
+        "1": true
+      }
+    },
+    "override": null,
+    "expected": "Desaprobada"
+  },
+  {
+    "name": "regularizada y final aprobado",
+    "scheme": "1-partial-tp",
+    "config": {
+      "partials": 1,
+      "tp": 1,
+      "labs": 0,
+      "tp_required_for": [
+        "regularization",
+        "promotion"
+      ],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 1,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 6
+      }
+    },
+    "finals": [
+      {
+        "attemptNumber": 1,
+        "grade": 7,
+        "examDate": null
+      }
+    ],
+    "checklist": {
+      "tp": {
+        "1": true
+      }
+    },
     "override": null,
     "expected": "Aprobada"
   }
