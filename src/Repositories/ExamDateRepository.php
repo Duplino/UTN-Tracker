@@ -7,7 +7,7 @@ namespace App\Repositories;
 use PDO;
 
 // Fechas de la agenda (parciales y finales) por (usuario, materia). Ver
-// database/migrations/0008_exam_dates.sql para el significado de cada columna.
+// database/migrations/0009_exam_dates.sql para el significado de cada columna.
 final class ExamDateRepository
 {
     public const MAX_PARTIALS = 10;
