@@ -168,4 +168,47 @@ final class ApiTest extends TestCase
         $this->assertGreaterThanOrEqual(400, $res['status']);
         $this->assertLessThan(500, $res['status']);
     }
+
+    // Volver a privado tiene que cortar el acceso al perfil público (y a su progreso)
+    // y revocar el link: antes, isPublic=false tiraba un 500 y el perfil seguía público.
+    public function testMakingProfilePrivateRevokesPublicAccess(): void
+    {
+        $this->login();
+
+        $public = $this->request('PATCH', '/api/preferences', ['isPublic' => true]);
+        $this->assertSame(200, $public['status']);
+        $token = $public['body']['shareToken'];
+        $this->assertNotEmpty($token);
+        $this->assertSame(200, $this->request('GET', "/api/public/{$token}", null, false)['status']);
+
+        $private = $this->request('PATCH', '/api/preferences', ['isPublic' => false]);
+        $this->assertSame(200, $private['status']);
+        $this->assertFalse($private['body']['isPublic']);
+        $this->assertNull($private['body']['shareToken']);
+
+        $this->assertSame(404, $this->request('GET', "/api/public/{$token}", null, false)['status']);
+        $this->assertSame(404, $this->request('GET', "/api/public/{$token}/progress/sistemas", null, false)['status']);
+
+        // Volver a hacerlo público da un link nuevo; el viejo sigue muerto.
+        $again = $this->request('PATCH', '/api/preferences', ['isPublic' => true]);
+        $this->assertNotSame($token, $again['body']['shareToken']);
+        $this->assertSame(404, $this->request('GET', "/api/public/{$token}", null, false)['status']);
+        $this->assertSame(200, $this->request('GET', "/api/public/{$again['body']['shareToken']}", null, false)['status']);
+
+        $this->request('PATCH', '/api/preferences', ['isPublic' => false]);
+    }
+
+    public function testBooleanPreferencesCanBeTurnedOff(): void
+    {
+        $this->login();
+        $res = $this->request('PATCH', '/api/preferences', ['showCorrelativas' => false, 'showStatus' => false]);
+        $this->assertSame(200, $res['status']);
+        $this->assertFalse($res['body']['showCorrelativas']);
+        $this->assertFalse($res['body']['showStatus']);
+
+        $invalid = $this->request('PATCH', '/api/preferences', ['isPublic' => 'false']);
+        $this->assertSame(422, $invalid['status']);
+
+        $this->request('PATCH', '/api/preferences', ['showCorrelativas' => true, 'showStatus' => true]);
+    }
 }
