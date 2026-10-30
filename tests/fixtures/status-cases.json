@@ -203,6 +203,150 @@
     "expected": "Regularizada"
   },
   {
+    "name": "6 y 8 sin recuperar regulariza",
+    "scheme": "2-partials",
+    "config": {
+      "partials": 2,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 2,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 6
+      },
+      "2": {
+        "1": 8
+      }
+    },
+    "finals": [],
+    "checklist": {},
+    "override": null,
+    "expected": "Regularizada"
+  },
+  {
+    "name": "recupera el 6 con 8 y promociona",
+    "scheme": "2-partials",
+    "config": {
+      "partials": 2,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 2,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 6,
+        "2": 8
+      },
+      "2": {
+        "1": 8
+      }
+    },
+    "finals": [],
+    "checklist": {},
+    "override": null,
+    "expected": "Promocionada"
+  },
+  {
+    "name": "recupera el 6 con 7 no promociona",
+    "scheme": "2-partials",
+    "config": {
+      "partials": 2,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 2,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 6,
+        "2": 7
+      },
+      "2": {
+        "1": 8
+      }
+    },
+    "finals": [],
+    "checklist": {},
+    "override": null,
+    "expected": "Regularizada"
+  },
+  {
+    "name": "8 en el segundo recuperatorio no promociona",
+    "scheme": "2-partials",
+    "config": {
+      "partials": 2,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 2,
+        "low_note": null,
+        "max_recovery": 1
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {
+      "1": {
+        "1": 4,
+        "2": 5,
+        "3": 8
+      },
+      "2": {
+        "1": 8
+      }
+    },
+    "finals": [],
+    "checklist": {},
+    "override": null,
+    "expected": "Regularizada"
+  },
+  {
     "name": "6 y 6 regulariza",
     "scheme": "2-partials",
     "config": {
