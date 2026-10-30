@@ -18,6 +18,7 @@ final class EvaluationSchemeController
     public function index(Request $request): void
     {
         $repo = new EvaluationSchemeRepository($this->pdo);
+        Response::publicCache();
         Response::json(['schemes' => $repo->all()]);
     }
 }

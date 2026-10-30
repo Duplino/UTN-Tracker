@@ -32,17 +32,52 @@ export function findCareerByCode(careers, code) {
   return careers.find((c) => c.code === code) || null;
 }
 
-export async function getCareerCurriculum(code) {
-  if (!code) return null;
-  if (curriculumCache.has(code)) return curriculumCache.get(code);
+// El curriculum casi nunca cambia: se guarda también en localStorage para poder
+// dibujar el tablero sin esperar a la red (stale-while-revalidate: se devuelve la
+// copia local y se refresca en segundo plano para la próxima vez). Se cachea la
+// Promise, no el resultado, para que dos llamadas simultáneas compartan el fetch.
+const CURRICULUM_STORAGE_PREFIX = 'utn.curriculum.v1.';
+
+function readStoredCurriculum(code) {
   try {
-    const curriculum = await api.get(`/careers/${encodeURIComponent(code)}/curriculum`);
-    curriculumCache.set(code, curriculum);
-    return curriculum;
-  } catch (err) {
-    console.error(`No se pudo cargar el curriculum de la carrera '${code}'`, err);
+    const raw = localStorage.getItem(CURRICULUM_STORAGE_PREFIX + code);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
     return null;
   }
+}
+
+function storeCurriculum(code, curriculum) {
+  try { localStorage.setItem(CURRICULUM_STORAGE_PREFIX + code, JSON.stringify(curriculum)); } catch (e) { /* ignore */ }
+}
+
+function fetchCurriculum(code) {
+  return api.get(`/careers/${encodeURIComponent(code)}/curriculum`).then((curriculum) => {
+    storeCurriculum(code, curriculum);
+    return curriculum;
+  });
+}
+
+export function getCareerCurriculum(code) {
+  if (!code) return Promise.resolve(null);
+  if (curriculumCache.has(code)) return curriculumCache.get(code);
+
+  const stored = readStoredCurriculum(code);
+  let promise;
+  if (stored) {
+    promise = Promise.resolve(stored);
+    fetchCurriculum(code)
+      .then((fresh) => { curriculumCache.set(code, Promise.resolve(fresh)); })
+      .catch(() => { /* se sigue usando la copia local */ });
+  } else {
+    promise = fetchCurriculum(code).catch((err) => {
+      console.error(`No se pudo cargar el curriculum de la carrera '${code}'`, err);
+      curriculumCache.delete(code);
+      return null;
+    });
+  }
+  curriculumCache.set(code, promise);
+  return promise;
 }
 
 export function invalidateCareersCache() {

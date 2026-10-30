@@ -4,6 +4,7 @@
 
 import { api, ApiError } from './apiClient.js';
 import { localGuestStore } from './localGuestStore.js';
+import { toast, toastError, setBusy } from './ui.js';
 
 // TODO(usuario): completar con el Client ID real de Google Cloud Console
 // (APIs & Services -> Credentials -> OAuth 2.0 Client IDs -> tipo "Web application").
@@ -30,7 +31,30 @@ function waitForGoogleIdentity(timeoutMs = 8000) {
   });
 }
 
+// Menú de usuario de la barra superior: avatar + nombre con sesión, "Invitado" sin.
+function renderUserMenu(user) {
+  const avatar = document.getElementById('user-menu-avatar');
+  const icon = document.getElementById('user-menu-icon');
+  const label = document.getElementById('user-menu-label');
+  const name = document.getElementById('user-menu-name');
+  const email = document.getElementById('user-menu-email');
+  const signin = document.getElementById('menu-signin');
+
+  const hasAvatar = !!(user && user.avatar);
+  if (avatar) {
+    if (hasAvatar) avatar.src = user.avatar;
+    avatar.classList.toggle('d-none', !hasAvatar);
+  }
+  if (icon) icon.classList.toggle('d-none', hasAvatar);
+  if (label) label.textContent = user ? ((user.name || '').split(' ')[0] || 'Mi cuenta') : 'Invitado';
+  if (name) name.textContent = user ? (user.name || 'Usuario') : 'Modo invitado';
+  if (email) email.textContent = user ? (user.email || '') : 'Tu progreso se guarda solo en este navegador.';
+  if (signin) signin.closest('li').classList.toggle('d-none', !!user);
+  document.querySelectorAll('.menu-signed-in').forEach((el) => el.classList.toggle('d-none', !user));
+}
+
 function showSigninSection() {
+  renderUserMenu(null);
   const signin = document.getElementById('profile-signin');
   const user = document.getElementById('profile-user');
   if (signin) signin.classList.remove('d-none');
@@ -38,6 +62,7 @@ function showSigninSection() {
 }
 
 function showUserSection(user) {
+  renderUserMenu(user);
   const signin = document.getElementById('profile-signin');
   const userSection = document.getElementById('profile-user');
   const nameEl = document.getElementById('profile-user-name');
@@ -89,7 +114,11 @@ export function initAuth({ initialUser = null, mockAuthEnabled = false, onLoginS
     }
 
     showUserSection(currentUser);
+    const profileModal = document.getElementById('profileModal');
+    const profileInstance = profileModal && window.bootstrap ? bootstrap.Modal.getInstance(profileModal) : null;
+    if (profileInstance) profileInstance.hide();
     if (typeof onLoginSuccess === 'function') await onLoginSuccess(currentUser);
+    toast(`Sesión iniciada${currentUser && currentUser.name ? ` como ${currentUser.name}` : ''}.`, { variant: 'success' });
   }
 
   async function handleCredentialResponse(response) {
@@ -100,7 +129,7 @@ export function initAuth({ initialUser = null, mockAuthEnabled = false, onLoginS
       await finishLogin(result && result.user ? result.user : null);
     } catch (err) {
       console.error('Google sign-in error', err);
-      alert('Error al iniciar sesión con Google: ' + (err && err.message ? err.message : err));
+      toastError('No se pudo iniciar sesión con Google', err);
     }
   }
 
@@ -110,7 +139,7 @@ export function initAuth({ initialUser = null, mockAuthEnabled = false, onLoginS
       await finishLogin(result && result.user ? result.user : null);
     } catch (err) {
       console.error('Mock sign-in error', err);
-      alert('Error al iniciar sesión con el usuario de prueba: ' + (err && err.message ? err.message : err));
+      toastError('No se pudo iniciar sesión con el usuario de prueba', err);
     }
   }
 
@@ -146,30 +175,37 @@ export function initAuth({ initialUser = null, mockAuthEnabled = false, onLoginS
       }
     }
 
-    const signoutBtn = document.getElementById('profile-signout-btn');
-    if (signoutBtn) {
-      signoutBtn.addEventListener('click', async () => {
-        try {
-          await api.post('/auth/logout');
-        } catch (e) {
-          if (!(e instanceof ApiError)) console.error('Error cerrando sesión', e);
-        }
-        currentUser = null;
-        showSigninSection();
-        const shareToggle = document.getElementById('settings-share-toggle');
-        if (shareToggle) { shareToggle.checked = false; shareToggle.disabled = true; }
-        if (typeof onLogout === 'function') await onLogout();
-      });
+    async function signOut() {
+      try {
+        await api.post('/auth/logout');
+      } catch (e) {
+        if (!(e instanceof ApiError)) console.error('Error cerrando sesión', e);
+      }
+      currentUser = null;
+      showSigninSection();
+      const shareToggle = document.getElementById('settings-share-toggle');
+      if (shareToggle) { shareToggle.checked = false; shareToggle.disabled = true; }
+      if (typeof onLogout === 'function') await onLogout();
+      toast('Cerraste sesión. Ahora estás en modo invitado.', { variant: 'info' });
     }
+    ['profile-signout-btn', 'menu-signout'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.addEventListener('click', signOut);
+    });
 
     const syncBtn = document.getElementById('profile-sync-btn');
     if (syncBtn) {
       syncBtn.addEventListener('click', async () => {
         if (!currentUser) return;
+        setBusy(syncBtn, true);
         try {
           if (typeof onLoginSuccess === 'function') await onLoginSuccess(currentUser);
+          toast('Tablero sincronizado.', { variant: 'success' });
         } catch (e) {
           console.error('Error sincronizando', e);
+          toastError('No se pudo sincronizar', e);
+        } finally {
+          setBusy(syncBtn, false);
         }
       });
     }

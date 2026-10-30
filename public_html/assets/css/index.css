@@ -1,15 +1,145 @@
 /* Custom styles for 5-column layout and cards */
+/* Colores propios de la app como variables, con override para modo oscuro
+   ([data-bs-theme="dark"], lo setea el script inline del <head> / theme.js). */
 :root{
   --gap: 0.5rem;
+  --utn-page-bg: #f8f9fa;
+  --utn-arrow-cursar: #000;
+  --utn-arrow-aprobar: #28a745;
+  --utn-dashed: rgba(0,0,0,0.08);
+  --utn-muted-symbol: rgba(0,0,0,0.45);
+  --utn-hover-bg: rgba(0,0,0,0.03);
+  --utn-shadow: rgba(0,0,0,0.12);
+  --utn-status-aprobada: rgba(40,167,69,0.06);
+  --utn-status-desaprobada: rgba(220,53,69,0.05);
+  --utn-status-promocionada: rgba(13,110,253,0.04);
+  --utn-status-regularizada: rgba(255,193,7,0.04);
+}
+[data-bs-theme="dark"]{
+  --utn-page-bg: #16191d;
+  --utn-arrow-cursar: #dee2e6;
+  --utn-arrow-aprobar: #48c774;
+  --utn-dashed: rgba(255,255,255,0.14);
+  --utn-muted-symbol: rgba(255,255,255,0.5);
+  --utn-hover-bg: rgba(255,255,255,0.05);
+  --utn-shadow: rgba(0,0,0,0.5);
+  --utn-status-aprobada: rgba(72,199,116,0.14);
+  --utn-status-desaprobada: rgba(234,88,104,0.14);
+  --utn-status-promocionada: rgba(77,148,255,0.14);
+  --utn-status-regularizada: rgba(255,205,57,0.11);
 }
 body{
   padding:1.5rem;
-  background:#f8f9fa;
+  background: var(--utn-page-bg);
 }
 .toolbar{
   display:flex;
   gap:0.5rem;
   margin-bottom:1rem;
+}
+
+/* Barra superior */
+.app-brand{
+  color: var(--bs-body-color);
+  margin-right: 0.25rem;
+}
+.app-brand img{
+  border-radius: 50%;
+}
+[data-bs-theme="dark"] .app-brand img{
+  background: #fff;
+}
+.program-select{
+  width: auto;
+  max-width: 22rem;
+}
+.btn-icon{
+  --bs-btn-padding-x: 0.55rem;
+  --bs-btn-padding-y: 0.35rem;
+  --bs-btn-color: var(--bs-secondary-color);
+  --bs-btn-hover-color: var(--bs-body-color);
+  --bs-btn-hover-bg: var(--bs-tertiary-bg);
+  --bs-btn-active-bg: var(--bs-secondary-bg);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.user-menu-btn{
+  --bs-btn-padding-x: 0.5rem;
+  --bs-btn-padding-y: 0.25rem;
+  --bs-btn-hover-bg: var(--bs-tertiary-bg);
+  --bs-btn-active-bg: var(--bs-secondary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 2rem;
+}
+.user-avatar{
+  border-radius: 50%;
+  object-fit: cover;
+}
+.user-menu{
+  min-width: 15rem;
+}
+.dropdown-item.active,
+.dropdown-item:active{
+  color: var(--bs-body-color);
+  background-color: var(--bs-secondary-bg);
+}
+.sync-indicator{
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.25rem;
+}
+
+/* Skeleton de carga (tablero y estadísticas) */
+@keyframes skeletonPulse{
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.skeleton-col .placeholder{
+  display: block;
+  height: 1rem;
+  border-radius: 0.25rem;
+  animation: skeletonPulse 1.6s ease-in-out infinite;
+}
+.skeleton-card,
+.skeleton-stat{
+  background: var(--bs-secondary-bg);
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: var(--bs-border-radius);
+  animation: skeletonPulse 1.6s ease-in-out infinite;
+}
+.skeleton-card{
+  height: 3.6rem;
+  margin-bottom: 0.35rem;
+}
+.skeleton-stat{
+  height: 3.75rem;
+}
+
+/* Toasts de feedback (ui.js) */
+.app-toasts{
+  z-index: 1090;
+}
+.app-toast{
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  border-left: 4px solid var(--bs-info) !important;
+  box-shadow: 0 6px 24px var(--utn-shadow);
+}
+.app-toast-danger{ border-left-color: var(--bs-danger) !important; }
+.app-toast-success{ border-left-color: var(--bs-success) !important; }
+.app-toast-warning{ border-left-color: var(--bs-warning) !important; }
+.app-toast-icon{ margin-top: 0.1rem; }
+.app-toast-danger .app-toast-icon{ color: var(--bs-danger); }
+.app-toast-success .app-toast-icon{ color: var(--bs-success); }
+.app-toast-warning .app-toast-icon{ color: var(--bs-warning); }
+.app-toast-info .app-toast-icon{ color: var(--bs-info); }
+
+/* Diálogo de confirmación (ui.js): puede abrirse arriba de otro modal */
+.confirm-modal{
+  z-index: 1075;
+}
+.modal-backdrop + .modal-backdrop{
+  z-index: 1070;
 }
 .columns-grid{
   display:grid;
@@ -95,7 +225,7 @@ body{
   transition: width .3s ease;
 }
 .progress-segment + .progress-segment{
-  border-left: 2px solid var(--bs-body-bg, #fff);
+  border-left: 2px solid var(--bs-body-bg);
 }
 .progress-segment-fill{
   height:100%;
@@ -130,10 +260,10 @@ body{
 
 /* optional helper classes (JS sets stroke colors inline) */
 .arrow-aprobar{
-  stroke: #28a745;
+  stroke: var(--utn-arrow-aprobar);
 }
 .arrow-cursar{
-  stroke: #000;
+  stroke: var(--utn-arrow-cursar);
 }
 
 /* Dim non-involved cards and highlight involved ones */
@@ -144,23 +274,23 @@ body{
 }
 
 .card-highlight{
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  box-shadow: 0 6px 18px var(--utn-shadow);
   transform: translateY(-2px);
   transition: box-shadow 180ms ease, transform 180ms ease;
 }
 
 /* Very light status backgrounds for subject cards */
 .card-status-aprobada{
-  background-color: rgba(40,167,69,0.06); /* very light green */
+  background-color: var(--utn-status-aprobada); /* very light green */
 }
 .card-status-desaprobada{
-  background-color: rgba(220,53,69,0.05); /* very light red */
+  background-color: var(--utn-status-desaprobada); /* very light red */
 }
 .card-status-promocionada{
-  background-color: rgba(13,110,253,0.04); /* very light blue */
+  background-color: var(--utn-status-promocionada); /* very light blue */
 }
 .card-status-regularizada{
-  background-color: rgba(255,193,7,0.04); /* very light yellow */
+  background-color: var(--utn-status-regularizada); /* very light yellow */
 }
 
 /* Disabled look when a subject doesn't meet 'cursar' requirements */
@@ -174,17 +304,17 @@ body{
 .card-disabled:hover{
   opacity: 1;
   filter: none;
-  background-color: #ffffff;
+  background-color: var(--bs-body-bg);
 }
 
 /* Available to start (meets cursar requirements but not in course) */
 .card-available{
-  border: 2px dashed rgba(0,0,0,0.08);
+  border: 2px dashed var(--utn-dashed);
 }
 
 /* Placeholder card for adding electivas: match light dashed border and sizing of other cards */
 .card-electiva-add{
-  border: 2px dashed rgba(0,0,0,0.08);
+  border: 2px dashed var(--utn-dashed);
   background: transparent;
   min-height: 56px; /* similar visual height to compact subject cards */
   display: flex;
@@ -196,14 +326,14 @@ body{
 
 .card-electiva-add > div{ /* the + symbol */
   font-size: 28px;
-  color: rgba(0,0,0,0.45);
+  color: var(--utn-muted-symbol);
   line-height: 1;
 }
 
 /* Hover style for electiva placeholder: subtle background highlight without dimming others */
 .card-electiva-hover{
-  background-color: rgba(0,0,0,0.03);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  background-color: var(--utn-hover-bg);
+  box-shadow: 0 6px 18px var(--utn-shadow);
   transform: translateY(-2px);
   transition: box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
 }
@@ -234,7 +364,7 @@ body{
 .recursed-numeral{
   font-size: 0.65rem;
   font-weight: 600;
-  color: #6c757d;
+  color: var(--bs-secondary-color);
   margin-left: 0.35rem;
   vertical-align: super;
   opacity: 0.85;
@@ -243,7 +373,7 @@ body{
 /* Footer styles */
 .app-footer{
   font-size: 0.75rem;
-  color: #6c757d;
+  color: var(--bs-secondary-color);
   padding: 0.25rem 0.5rem;
 }
 .app-footer .github-btn{
@@ -300,7 +430,7 @@ body{
 }
 .stats-row:empty::before{
   content: "No hay estadísticas seleccionadas. Abrí el panel de estadísticas para agregar.";
-  color: #6c757d;
+  color: var(--bs-secondary-color);
   font-size: 0.85rem;
   display: block;
   text-align: center;
@@ -311,4 +441,19 @@ body{
 /* Toast de requisitos faltantes (mobile) */
 .requirements-toast-container{
   z-index: 1080;
+}
+
+/* En mobile el tablero es una sola columna: alcanza con una columna de skeleton. */
+@media (max-width: 768px){
+  .skeleton-col + .skeleton-col{
+    display: none;
+  }
+  .toolbar > [aria-label="Tablero"]{
+    width: 100%;
+  }
+  .program-select{
+    flex: 1 1 calc(100% - 3rem);
+    min-width: 0;
+    max-width: none;
+  }
 }

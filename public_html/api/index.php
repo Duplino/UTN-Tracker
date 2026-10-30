@@ -7,6 +7,7 @@ require __DIR__ . '/../../vendor/autoload.php';
 use App\Auth\AuthController;
 use App\Config\Database;
 use App\Config\Env;
+use App\Controllers\BootstrapController;
 use App\Controllers\CareerController;
 use App\Controllers\ElectivesController;
 use App\Controllers\EnrollmentController;
@@ -32,6 +33,9 @@ $router->post('/api/auth/import-local', [$auth, 'importLocal']);
 if (Env::get('MOCK_AUTH_ENABLED') === 'true') {
     $router->post('/api/auth/mock-login', [$auth, 'mockLogin']);
 }
+
+$bootstrap = new BootstrapController($pdo);
+$router->get('/api/bootstrap', [$bootstrap, 'show']);
 
 $schemes = new EvaluationSchemeController($pdo);
 $router->get('/api/evaluation-schemes', [$schemes, 'index']);
