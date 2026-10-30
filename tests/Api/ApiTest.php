@@ -161,6 +161,48 @@ final class ApiTest extends TestCase
         $this->assertSame(0, $reset['body']['recursedCount']);
     }
 
+    public function testExamDatesLifecycle(): void
+    {
+        $this->login();
+        foreach ($this->request('GET', '/api/exam-dates')['body']['examDates'] as $entry) {
+            if ($entry['subjectCode'] === 'AM2') {
+                $this->request('DELETE', '/api/exam-dates/' . $entry['id']);
+            }
+        }
+
+        $first = $this->request('POST', '/api/exam-dates', [
+            'subjectCode' => 'AM2', 'kind' => 'parcial', 'partialNumber' => 1, 'attemptNumber' => 2, 'date' => '2027-05-10',
+        ]);
+        $this->assertSame(201, $first['status']);
+        $this->assertSame('parcial', $first['body']['kind']);
+        $this->assertSame('2027-05-10', $first['body']['date']);
+
+        // La misma instancia de parcial se pisa, no se duplica.
+        $moved = $this->request('POST', '/api/exam-dates', [
+            'subjectCode' => 'AM2', 'kind' => 'parcial', 'partialNumber' => 1, 'attemptNumber' => 2, 'date' => '2027-05-17',
+        ]);
+        $this->assertSame($first['body']['id'], $moved['body']['id']);
+        $this->assertSame('2027-05-17', $moved['body']['date']);
+
+        $final = $this->request('POST', '/api/exam-dates', ['subjectCode' => 'AM2', 'kind' => 'final', 'date' => '2027-07-20']);
+        $this->assertSame(201, $final['status']);
+        $this->assertNull($final['body']['partialNumber']);
+
+        $list = $this->request('GET', '/api/exam-dates');
+        $mine = array_values(array_filter($list['body']['examDates'], fn ($e) => $e['subjectCode'] === 'AM2'));
+        $this->assertSame(['2027-05-17', '2027-07-20'], array_column($mine, 'date'));
+
+        $bad = $this->request('POST', '/api/exam-dates', ['subjectCode' => 'AM2', 'kind' => 'parcial', 'partialNumber' => 1, 'attemptNumber' => 4, 'date' => '2027-05-10']);
+        $this->assertSame(422, $bad['status']);
+        $bad = $this->request('POST', '/api/exam-dates', ['subjectCode' => 'AM2', 'kind' => 'final', 'date' => '2027-02-30']);
+        $this->assertSame(422, $bad['status']);
+
+        $this->assertSame(204, $this->request('DELETE', '/api/exam-dates/' . $first['body']['id'])['status']);
+        $this->assertSame(204, $this->request('DELETE', '/api/exam-dates/' . $final['body']['id'])['status']);
+        $this->assertSame(404, $this->request('DELETE', '/api/exam-dates/' . $final['body']['id'])['status']);
+        $this->assertSame(401, $this->request('GET', '/api/exam-dates', null, false)['status']);
+    }
+
     public function testRejectsUnknownSubject(): void
     {
         $this->login();

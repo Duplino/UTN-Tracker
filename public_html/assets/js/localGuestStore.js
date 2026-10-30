@@ -15,6 +15,7 @@
 //  - `electives` -> array JSON [{careerCode, subjectCode, columnIndex}, ...]
 //  - `enrolledCareers` -> array JSON [{careerCode, showIntermediateTitle}, ...]
 //  - `preferences` -> objeto JSON (mismo shape que GET /api/preferences)
+//  - `examDates` -> array JSON con la agenda (mismo shape que GET /api/exam-dates)
 
 import { computeStatus } from './statusEngine.js';
 import { getEvaluationSchemes, findSchemeByCode } from './evaluationSchemes.js';
@@ -25,6 +26,7 @@ const RETAKES_KEY = 'subjectRetakes';
 const ELECTIVES_KEY = 'electives';
 const ENROLLED_CAREERS_KEY = 'enrolledCareers';
 const PREFERENCES_KEY = 'preferences';
+const EXAM_DATES_KEY = 'examDates';
 
 const DEFAULT_SELECTED_STATS = ['horasSemanales', 'promedio', 'materiasAprobadas', 'finalesPendientes', 'materiasCursables'];
 
@@ -305,6 +307,43 @@ export const localGuestStore = {
       list[idx].showIntermediateTitle = !!value;
       writeJson(ENROLLED_CAREERS_KEY, list);
     }
+  },
+
+  // --- Agenda (fechas de parciales y finales). Mismas reglas que el backend (ver
+  // ExamDateRepository::save): un parcial tiene una sola fecha por instancia y se
+  // pisa; un final con la misma fecha que otro de la materia no se duplica. ---
+  async getExamDates() {
+    const arr = readJson(EXAM_DATES_KEY, []);
+    return Array.isArray(arr) ? arr : [];
+  },
+
+  async saveExamDate({ subjectCode, kind, partialNumber, attemptNumber, date }) {
+    const arr = await this.getExamDates();
+    const isFinal = kind === 'final';
+    const entry = {
+      subjectCode,
+      kind: isFinal ? 'final' : 'parcial',
+      partialNumber: isFinal ? null : partialNumber,
+      attemptNumber: isFinal ? null : attemptNumber,
+      date,
+    };
+    const existing = arr.find((e) => e.subjectCode === subjectCode && e.kind === entry.kind && (isFinal
+      ? e.date === date
+      : e.partialNumber === partialNumber && e.attemptNumber === attemptNumber));
+    if (existing) {
+      existing.date = date;
+      writeJson(EXAM_DATES_KEY, arr);
+      return { ...existing };
+    }
+    entry.id = arr.reduce((max, e) => Math.max(max, Number(e.id) || 0), 0) + 1;
+    arr.push(entry);
+    writeJson(EXAM_DATES_KEY, arr);
+    return { ...entry };
+  },
+
+  async deleteExamDate(id) {
+    const arr = await this.getExamDates();
+    writeJson(EXAM_DATES_KEY, arr.filter((e) => e.id !== id));
   },
 
   // --- Preferencias ---
