@@ -1,7 +1,7 @@
 // Tests de la simulación del planificador de cuatrimestres (assets/js/planner.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { curriculumUniverse, normalizePlan, simulate, termNumber } from '../../public_html/assets/js/planner.js';
+import { curriculumUniverse, normalizePlan, paceEstimate, simulate, termNumber } from '../../public_html/assets/js/planner.js';
 
 const curriculum = {
   modules: [
@@ -53,4 +53,25 @@ test('una anual planificada habilita recién dos cuatrimestres después', () => 
 
 test('normalizePlan descarta resultados inválidos y el valor por defecto', () => {
   assert.deepEqual(normalizePlan({ current: { A: 'approved', B: 'regular', C: 'x' } }).current, { A: 'approved' });
+});
+
+test('el ritmo cuenta solo años lectivos completos', () => {
+  const enr = {
+    A: { status: 'Aprobada', enrollmentYear: 2025 },
+    B: { status: 'Aprobada', enrollmentYear: 2025 },
+    C: { status: 'Aprobada', enrollmentYear: 2026 },
+  };
+  const est = paceEstimate({ universe, getEnrollment: c => enr[c] || null, yearStarted: 2025, now: new Date(2026, 9, 30) });
+  // 2 aprobadas en 2025 (1 año completo) → 2 por año. Faltan D y E, más C que
+  // se aprobó en 2026: (2 + 1) / 2 = 1,5 años desde marzo de 2026, o sea al
+  // terminar el primer cuatrimestre de 2027.
+  assert.equal(est.years, 1);
+  assert.equal(est.pace, 2);
+  assert.equal(est.term, termNumber(2027, 1));
+});
+
+test('en el primer año no se estima el ritmo', () => {
+  const enr = { A: { status: 'Aprobada', enrollmentYear: 2026 } };
+  const est = paceEstimate({ universe, getEnrollment: c => enr[c] || null, yearStarted: 2026, now: new Date(2026, 9, 30) });
+  assert.equal(est.reason, 'first-year');
 });
