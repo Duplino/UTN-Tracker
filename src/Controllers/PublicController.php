@@ -30,6 +30,8 @@ final class PublicController
         if (!$preferences['isPublic']) {
             Response::error('private_profile', 403);
         }
+        // El planificador de cuatrimestres es privado aunque el perfil sea público.
+        unset($preferences['semesterPlans']);
 
         Response::json([
             'preferences' => $preferences,
