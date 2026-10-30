@@ -108,6 +108,20 @@ export const apiStore = {
     await api.patch(`/user-careers/${enc(careerCode)}`, { showIntermediateTitle: !!value });
   },
 
+  // --- Agenda (fechas de parciales y finales) ---
+  async getExamDates() {
+    const res = await api.get('/exam-dates');
+    return Array.isArray(res?.examDates) ? res.examDates : [];
+  },
+
+  async saveExamDate(entry) {
+    return api.post('/exam-dates', entry);
+  },
+
+  async deleteExamDate(id) {
+    await api.delete(`/exam-dates/${enc(id)}`);
+  },
+
   // --- Preferencias ---
   async getPreferences() {
     return api.get('/preferences');

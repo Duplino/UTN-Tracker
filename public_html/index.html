@@ -26,6 +26,7 @@
 		<link rel="modulepreload" href="assets/js/evaluationSchemes.js">
 		<link rel="modulepreload" href="assets/js/localGuestStore.js">
 		<link rel="modulepreload" href="assets/js/planner.js">
+		<link rel="modulepreload" href="assets/js/agenda.js">
 		<link rel="modulepreload" href="assets/js/statusEngine.js">
 		<link rel="modulepreload" href="assets/js/theme.js">
 		<link rel="modulepreload" href="assets/js/ui.js">
@@ -49,6 +50,9 @@
 					</div>
 					<button type="button" class="btn btn-outline-secondary" id="btn-electivas">
 						<i class="bi bi-plus-square me-1" aria-hidden="true"></i>Electivas
+					</button>
+					<button type="button" class="btn btn-outline-secondary" id="btn-agenda" data-bs-toggle="modal" data-bs-target="#agendaModal">
+						<i class="bi bi-calendar-event me-1" aria-hidden="true"></i>Agenda
 					</button>
 					<button type="button" class="btn btn-outline-secondary" id="btn-planner" data-bs-toggle="modal" data-bs-target="#plannerModal">
 						<i class="bi bi-calendar-week me-1" aria-hidden="true"></i>Planificar
@@ -518,6 +522,48 @@
 		          <small class="text-body-secondary" id="planner-save-state" role="status"></small>
 		          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
 		        </div>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- Agenda: fechas de parciales y finales (assets/js/agenda.js) -->
+		<div class="modal fade" id="agendaModal" tabindex="-1" aria-labelledby="agendaModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-md-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="agendaModalLabel">Agenda</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <form id="agenda-form" class="agenda-form row g-2 align-items-end" novalidate>
+		          <div class="col-12 col-md-3">
+		            <label class="form-label small mb-1" for="agenda-subject">Materia</label>
+		            <select id="agenda-subject" class="form-select form-select-sm"></select>
+		          </div>
+		          <div class="col-6 col-md-2">
+		            <label class="form-label small mb-1" for="agenda-exam">Examen</label>
+		            <select id="agenda-exam" class="form-select form-select-sm"></select>
+		          </div>
+		          <div class="col-6 col-md-3" id="agenda-attempt-wrap">
+		            <label class="form-label small mb-1" for="agenda-attempt">Instancia</label>
+		            <select id="agenda-attempt" class="form-select form-select-sm"></select>
+		          </div>
+		          <div class="col col-md">
+		            <label class="form-label small mb-1" for="agenda-date">Fecha</label>
+		            <input type="date" id="agenda-date" class="form-control form-control-sm" required>
+		          </div>
+		          <div class="col-auto">
+		            <button type="submit" class="btn btn-sm btn-primary" id="agenda-submit">
+		              <i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Agregar</span>
+		            </button>
+		          </div>
+		        </form>
+		        <p id="agenda-no-subjects" class="small text-body-secondary d-none mb-0">Para agregar fechas, empezá a cursar alguna materia desde el tablero.</p>
+		        <div id="agenda-list"></div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
 		      </div>
 		    </div>
 		  </div>

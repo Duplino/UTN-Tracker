@@ -9,6 +9,7 @@ import { toast, toastError, setBusy, confirmDialog } from './ui.js';
 import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
 import { initPlanner } from './planner.js';
+import { initAgenda } from './agenda.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
@@ -3190,6 +3191,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       await activeStore.updatePreferences({ semesterPlans });
       if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
     },
+  });
+
+  // Agenda de parciales y finales (assets/js/agenda.js): las fechas las guarda el
+  // store activo; las materias y notas salen del mismo cache que el tablero.
+  initAgenda({
+    getStore: () => activeStore,
+    getEnrollments: () => Object.values(enrollmentCache),
+    getEnrollment: code => loadSubjectData(code),
+    getSubjectName: code => getSubjectNameByCode(code),
   });
 
   initApp();
