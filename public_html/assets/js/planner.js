@@ -19,6 +19,11 @@ import { toastError, confirmDialog } from './ui.js';
 const APPROVED = ['Aprobada', 'Promocionada'];
 const NEVER = Infinity;
 const DEFAULT_LAG = 1;
+// Resultado supuesto de una materia que se está cursando ahora. Al hacer click se
+// pasa al siguiente; 'regular' es el valor por defecto (no se guarda).
+const OUTCOMES = ['approved', 'regular', 'failed'];
+const DEFAULT_OUTCOME = 'regular';
+const OUTCOME_LABELS = { approved: 'Aprobada', regular: 'Regularizada', failed: 'Desaprobada' };
 const LAG_OPTIONS = [
   { value: 0, label: 'al terminar de cursarlas' },
   { value: 1, label: 'un cuatrimestre después' },
@@ -54,6 +59,7 @@ export function nextTerm(date = new Date()) {
 }
 
 // --- Plan guardado ---
+// { lag, terms: [{ year, half, subjects }], current: { codigo: 'approved' | 'failed' } }
 
 export function normalizePlan(raw) {
   const plan = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -69,7 +75,13 @@ export function normalizePlan(raw) {
       return true;
     })
     .sort((a, b) => termNumber(a.year, a.half) - termNumber(b.year, b.half));
-  return { lag, terms };
+  const current = {};
+  if (plan.current && typeof plan.current === 'object' && !Array.isArray(plan.current)) {
+    Object.entries(plan.current).forEach(([code, outcome]) => {
+      if (OUTCOMES.includes(outcome) && outcome !== DEFAULT_OUTCOME) current[code] = outcome;
+    });
+  }
+  return { lag, terms, current };
 }
 
 // --- Simulación ---
@@ -124,14 +136,24 @@ export function simulate({ universe, plan, getEnrollment, start }) {
   const aprobAt = {};
   const real = {};
   const plannedAt = {};
+  const inProgress = [];
+  const current = plan.current || {};
 
   Object.keys(byCode).forEach(code => {
-    const state = realState(getEnrollment(code));
+    let state = realState(getEnrollment(code));
+    if (state === 'inProgress') {
+      inProgress.push(code);
+      // Lo que se está cursando ahora termina antes del primer cuatrimestre a
+      // planificar, con el resultado que se eligió en la columna "En curso".
+      const outcome = current[code] || DEFAULT_OUTCOME;
+      if (outcome === 'approved') { regAt[code] = start; aprobAt[code] = start; }
+      else if (outcome === 'regular') { regAt[code] = start; aprobAt[code] = start + plan.lag; }
+      else state = 'none';
+    }
     real[code] = state;
     if (state === 'approved') { regAt[code] = -NEVER; aprobAt[code] = -NEVER; }
     else if (state === 'regular') { regAt[code] = -NEVER; aprobAt[code] = start + plan.lag; }
-    else if (state === 'inProgress') { regAt[code] = start; aprobAt[code] = start + plan.lag; }
-    else { regAt[code] = NEVER; aprobAt[code] = NEVER; }
+    else if (state === 'none') { regAt[code] = NEVER; aprobAt[code] = NEVER; }
   });
 
   plan.terms.forEach(term => {
@@ -190,7 +212,7 @@ export function simulate({ universe, plan, getEnrollment, start }) {
     ...universe.electives.map(s => aprobAt[s.code]).filter(Number.isFinite));
 
   return {
-    real, plannedAt, regAt, aprobAt, missingAt, candidatesAt,
+    real, plannedAt, regAt, aprobAt, missingAt, candidatesAt, inProgress,
     pendingToPlan: requiredOpen + electivesOpen,
     requiredOpen, electivesOpen,
     // regAt/aprobAt marcan el inicio del cuatrimestre siguiente al que se termina.
@@ -298,7 +320,7 @@ export function initPlanner(ctx) {
   function renderSummary(universe, sim, start) {
     const pace = paceEstimate({ universe, getEnrollment: ctx.getEnrollment, yearStarted: ctx.getYearStarted() });
     // Lo que se puede cursar en el próximo cuatrimestre sin contar lo ya planificado.
-    const unplanned = simulate({ universe, plan: { lag: plan.lag, terms: [] }, getEnrollment: ctx.getEnrollment, start });
+    const unplanned = simulate({ universe, plan: { ...plan, terms: [] }, getEnrollment: ctx.getEnrollment, start });
     const nowCandidates = unplanned.candidatesAt(start).filter(c => !c.elective).length;
 
     let paceText;
@@ -325,7 +347,7 @@ export function initPlanner(ctx) {
         <div class="planner-stat">
           <div class="planner-stat-label">Podés cursar en ${termLabel(start)}</div>
           <div class="planner-stat-value">${nowCandidates} ${nowCandidates === 1 ? 'materia' : 'materias'}</div>
-          <div class="planner-stat-note">Según tus correlativas, contando lo que estás cursando ahora como regularizado.</div>
+          <div class="planner-stat-note">Según tus correlativas y el resultado que supusiste para lo que estás cursando.</div>
         </div>
         <div class="planner-stat">
           <div class="planner-stat-label">Egreso al ritmo actual</div>
@@ -459,6 +481,50 @@ export function initPlanner(ctx) {
       </section>`;
   }
 
+  // Columna "En curso": lo que se está cursando ahora, con un resultado supuesto
+  // que se cambia con un click (aprobada → regularizada → desaprobada) para ver
+  // qué destraba cada uno en el primer cuatrimestre del plan.
+  function renderCurrent(universe, sim, start) {
+    if (!sim.inProgress.length) return '';
+    const base = { ...plan, terms: [] };
+    const cursableWith = current => new Set(simulate({ universe, plan: { ...base, current }, getEnrollment: ctx.getEnrollment, start })
+      .candidatesAt(start).filter(c => !c.elective).map(c => c.subject.code));
+    const now = cursableWith(plan.current);
+    const items = sim.inProgress.map(code => {
+      const subject = universe.byCode[code];
+      const outcome = plan.current[code] || DEFAULT_OUTCOME;
+      const withoutIt = cursableWith({ ...plan.current, [code]: 'failed' });
+      const unlocks = [...now].filter(c => !withoutIt.has(c)).map(c => nameOf(c, universe));
+      let note;
+      if (outcome === 'failed') note = 'La tenés que volver a cursar: aparece entre las materias para agregar.';
+      else if (unlocks.length) note = `Destraba ${formatList(unlocks)}`;
+      else note = `No destraba nada nuevo en ${termLabel(start)}.`;
+      return `
+        <li>
+          <button type="button" class="planner-current planner-current-${outcome}" data-action="cycle-outcome" data-code="${escapeHtml(code)}"
+            aria-label="${escapeHtml(subject.name)}: ${OUTCOME_LABELS[outcome]}. Cambiar resultado supuesto">
+            <span class="d-flex justify-content-between align-items-start gap-2">
+              <span class="planner-item-name">${escapeHtml(subject.name)}</span>
+              <span class="badge planner-outcome">${OUTCOME_LABELS[outcome]}</span>
+            </span>
+            <span class="planner-item-note ${outcome !== 'failed' && unlocks.length ? 'planner-unlocks' : ''}">
+              ${outcome !== 'failed' && unlocks.length ? '<i class="bi bi-unlock me-1" aria-hidden="true"></i>' : ''}${escapeHtml(note)}
+            </span>
+          </button>
+        </li>`;
+    }).join('');
+    return `
+      <section class="planner-term planner-term-current" aria-label="Materias en curso">
+        <header class="planner-term-header">
+          <div>
+            <div class="fw-semibold">En curso</div>
+            <div class="small text-body-secondary">Tocá una para cambiar cómo suponés que termina.</div>
+          </div>
+        </header>
+        <ul class="list-unstyled mb-0 d-flex flex-column gap-2">${items}</ul>
+      </section>`;
+  }
+
   function render() {
     const curriculum = ctx.getCurriculum();
     if (!careerCode || !curriculum) {
@@ -474,6 +540,7 @@ export function initPlanner(ctx) {
     bodyEl.innerHTML = `
       ${renderSummary(universe, sim, start)}
       <div class="planner-terms">
+        ${renderCurrent(universe, sim, start)}
         ${plan.terms.map(term => renderTerm(term, universe, sim, start)).join('')}
         <button type="button" class="planner-add-term" data-action="add-term" data-term="${addTerm}">
           <i class="bi bi-plus-lg" aria-hidden="true"></i>
@@ -514,6 +581,12 @@ export function initPlanner(ctx) {
         update(() => { plan.terms = plan.terms.filter(x => x !== term); });
         break;
       }
+      case 'cycle-outcome':
+        update(() => {
+          const next = OUTCOMES[(OUTCOMES.indexOf(plan.current[code] || DEFAULT_OUTCOME) + 1) % OUTCOMES.length];
+          plan.current = { ...plan.current, [code]: next };
+        });
+        break;
       case 'toggle-picker':
         if (openPickers.has(t)) openPickers.delete(t); else openPickers.add(t);
         render();
@@ -527,13 +600,13 @@ export function initPlanner(ctx) {
       case 'clear': {
         const ok = await confirmDialog({
           title: '¿Vaciar el plan?',
-          message: 'Se borran todos los cuatrimestres planificados de esta carrera. Tus notas e inscripciones no se tocan.',
+          message: 'Se borran todos los cuatrimestres planificados de esta carrera y los resultados supuestos de lo que estás cursando. Tus notas e inscripciones no se tocan.',
           confirmText: 'Vaciar',
           danger: true,
         });
         if (!ok) return;
         openPickers = new Set([nextTerm()]);
-        update(() => { plan.terms = [{ year: termYear(nextTerm()), half: termHalf(nextTerm()), subjects: [] }]; });
+        update(() => { plan.terms = [{ year: termYear(nextTerm()), half: termHalf(nextTerm()), subjects: [] }]; plan.current = {}; });
         break;
       }
       default:
