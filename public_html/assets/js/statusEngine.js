@@ -152,3 +152,43 @@ function makeChecklistGate(config, checklist) {
     return true;
   };
 }
+
+// Parciales cuyo primer recuperatorio todavía puede llevar a la promoción, dadas
+// las notas cargadas hasta ahora. Es lo que la UI usa para ofrecer el recuperatorio
+// opcional ("Puede promocionar") y para la etiqueta de las tarjetas: en vez de una
+// heurística propia, simula sacarse un 10 en ese recuperatorio y le pregunta a
+// computeStatus() si con eso promociona. Así respeta high_count/max_recovery/low_note
+// de cada esquema. Los TP/labs se dan por cumplidos (todavía se pueden entregar).
+// Solo del lado JS: el backend no calcula sugerencias.
+export function promotionRecoveryCandidates(config, partials) {
+  const partialCount = config.partials ?? 2;
+  const highNote = config.promotion?.high_note ?? 8;
+  const out = [];
+  if (partialCount === 0) return out;
+
+  const current = computeStatus(config, partials, [], fullChecklist(config), null);
+  if (current === 'Promocionada' || current === 'Faltan notas') return out;
+
+  for (let p = 1; p <= partialCount; p++) {
+    const attempts = partials[p] ?? {};
+    const a1 = attempts[1] ?? null;
+    const a2 = attempts[2] ?? null;
+    if (a1 === null || a1 >= highNote || a2 !== null) continue;
+    const hypothetical = { ...partials, [p]: { 1: a1, 2: 10 } };
+    if (computeStatus(config, hypothetical, [], fullChecklist(config), null) === 'Promocionada') {
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+function fullChecklist(config) {
+  const checklist = {};
+  for (const [type, countKey] of [['tp', 'tp'], ['lab', 'labs']]) {
+    const count = config[countKey] ?? 0;
+    if (count === 0) continue;
+    checklist[type] = {};
+    for (let i = 1; i <= count; i++) checklist[type][i] = true;
+  }
+  return checklist;
+}
