@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Http\Response;
 use PDO;
 
 final class PreferencesRepository
@@ -13,9 +14,12 @@ final class PreferencesRepository
         'showStatus' => 'show_status',
         'viewMode' => 'view_mode',
         'selectedStats' => 'selected_stats',
+        'semesterPlans' => 'semester_plans',
         'yearStarted' => 'year_started',
         'isPublic' => 'is_public',
     ];
+
+    private const MAX_SEMESTER_PLANS_BYTES = 65535;
 
     public function __construct(private PDO $pdo)
     {
@@ -48,6 +52,9 @@ final class PreferencesRepository
             $value = $fields[$inputKey];
             if ($inputKey === 'selectedStats') {
                 $value = json_encode($value);
+            }
+            if ($inputKey === 'semesterPlans') {
+                $value = self::encodeSemesterPlans($value);
             }
             $sets[] = "{$column} = :{$column}";
             $params[$column] = $value;
@@ -99,9 +106,28 @@ final class PreferencesRepository
             'showStatus' => (bool) $row['show_status'],
             'viewMode' => $row['view_mode'],
             'selectedStats' => $row['selected_stats'] ? json_decode((string) $row['selected_stats'], true) : [],
+            // Se decodifica a objetos (no arrays asociativos) para que un mapa vacío
+            // vuelva a salir como {} y no como []. `?? null` por si la base todavía no
+            // tiene la columna (ver database/migrate_semester_plans.sql).
+            'semesterPlans' => ($row['semester_plans'] ?? null) ? json_decode((string) $row['semester_plans']) : new \stdClass(),
             'yearStarted' => $row['year_started'] !== null ? (int) $row['year_started'] : null,
             'isPublic' => (bool) $row['is_public'],
             'shareToken' => $row['share_token'],
         ];
+    }
+
+    // Planificador de cuatrimestres: un mapa { codigoCarrera: plan } que arma y lee
+    // el front (ver assets/js/planner.js). El backend no interpreta el contenido,
+    // solo controla que sea un objeto JSON de tamaño razonable.
+    private static function encodeSemesterPlans(mixed $value): string
+    {
+        if (!is_array($value)) {
+            Response::error('invalid_semester_plans', 422);
+        }
+        $json = json_encode($value === [] ? new \stdClass() : $value, JSON_UNESCAPED_UNICODE);
+        if ($json === false || strlen($json) > self::MAX_SEMESTER_PLANS_BYTES) {
+            Response::error('semester_plans_too_large', 422);
+        }
+        return $json;
     }
 }

@@ -13,6 +13,7 @@ La aplicación está disponible en **[utntracker.com.ar](https://utntracker.com.
 - Cálculo automático del estado de cada materia, con opción de forzarlo manualmente.
 - Soporte para electivas y para carreras con título intermedio.
 - Estadísticas de progreso (materias aprobadas, promedio, horas semanales en curso).
+- Planificador de cuatrimestres: qué podés cursar el próximo cuatrimestre según tus correlativas, simulación de los cuatrimestres siguientes (qué destraba cada materia) y fecha estimada de egreso, al ritmo actual y con el plan armado.
 - Perfil público opcional, para compartir el progreso propio (ver [API.md](API.md) para consumirlo programáticamente).
 
 ## Stack
@@ -67,7 +68,11 @@ git pull
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
-Cambios de esquema de DB se siguen aplicando a mano (`docker compose exec db mysql ...`), igual que ya se hacía sin Docker — `schema.sql`/seeds solo corren la primera vez que se crea el volumen.
+Cambios de esquema de DB se siguen aplicando a mano (`docker compose exec db mysql ...`), igual que ya se hacía sin Docker — `schema.sql`/seeds solo corren la primera vez que se crea el volumen. Las migraciones puntuales están en `database/migrate_*.sql`, por ejemplo:
+
+```
+docker compose -f docker-compose.prod.yml --env-file .env exec -T db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < database/migrate_semester_plans.sql
+```
 
 No corras `docker-compose.yml` (el de desarrollo) y `docker-compose.prod.yml` a la vez en el mismo directorio: Compose deriva el nombre del proyecto del nombre de la carpeta, así que sin `-p` distinto terminarían compartiendo red y volumen de DB.
 

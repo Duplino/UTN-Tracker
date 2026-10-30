@@ -457,3 +457,151 @@ body{
     max-width: none;
   }
 }
+
+/* Planificador de cuatrimestres (assets/js/planner.js) */
+.planner-summary{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.planner-stat{
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--bs-tertiary-bg);
+  padding: 0.75rem 1rem;
+}
+.planner-stat-label{
+  font-size: 0.8rem;
+  color: var(--bs-secondary-color);
+}
+.planner-stat-value{
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.planner-stat-note{
+  font-size: 0.8rem;
+  color: var(--bs-secondary-color);
+}
+/* Cuatrimestres lado a lado con scroll horizontal, como las columnas del tablero. */
+.planner-terms{
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(16rem, 1fr);
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  align-items: start;
+}
+.planner-term{
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--bs-body-bg);
+  padding: 0.75rem;
+}
+.planner-term-past{
+  opacity: 0.7;
+}
+.planner-term-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+.planner-item{
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  padding: 0.4rem 0.25rem 0.4rem 0.6rem;
+  background: var(--bs-body-bg);
+}
+.planner-item-muted{
+  border-style: dashed;
+  color: var(--bs-secondary-color);
+}
+.planner-item-warning{
+  border-color: var(--bs-warning-border-subtle);
+  background: var(--bs-warning-bg-subtle);
+}
+.planner-item-name{
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+.planner-item-note{
+  display: block;
+  font-size: 0.78rem;
+  color: var(--bs-secondary-color);
+  margin-top: 0.15rem;
+}
+.planner-item-warning .planner-item-note{
+  color: var(--bs-warning-text-emphasis);
+}
+.planner-unlocks{
+  color: var(--bs-success-text-emphasis);
+}
+.planner-badge{
+  font-weight: 500;
+  color: var(--bs-secondary-color);
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+}
+.planner-picker{
+  margin-top: 0.5rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.planner-picker-heading{
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--bs-secondary-color);
+  padding: 0.5rem 0.6rem 0.25rem;
+  border-top: 1px solid var(--bs-border-color);
+}
+.planner-candidate{
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--bs-border-color-translucent);
+  background: transparent;
+  color: inherit;
+  padding: 0.5rem 0.6rem;
+}
+.planner-candidate:hover,
+.planner-candidate:focus-visible{
+  background: var(--utn-hover-bg);
+}
+.planner-add-term{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 8rem;
+  border: 2px dashed var(--utn-dashed);
+  border-radius: var(--bs-border-radius-lg);
+  background: transparent;
+  color: var(--bs-secondary-color);
+}
+.planner-add-term:hover{
+  color: var(--bs-body-color);
+  background: var(--utn-hover-bg);
+}
+/* En pantallas angostas los cuatrimestres van uno debajo del otro. */
+@media (max-width: 768px){
+  .planner-terms{
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow-x: visible;
+  }
+}

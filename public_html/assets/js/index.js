@@ -8,6 +8,7 @@ import { initAuth } from './auth.js';
 import { toast, toastError, setBusy, confirmDialog } from './ui.js';
 import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
+import { initPlanner } from './planner.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
@@ -3170,6 +3171,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       },
     });
   }
+
+  // Planificador de cuatrimestres (assets/js/planner.js). El plan se guarda por
+  // carrera en las preferencias (`semesterPlans`): con sesión, en el servidor y
+  // en lastPreferences (así entra en la copia local del arranque); como invitado,
+  // en localStorage.
+  initPlanner({
+    getCurriculum: () => planData,
+    getCareerCode: () => currentCareer,
+    getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
+    getEnrollment: code => loadSubjectData(code),
+    getYearStarted: () => getYearStarted(),
+    loadPlans: async () => {
+      const prefs = activeStore === apiStore ? lastPreferences : await activeStore.getPreferences();
+      return (prefs && prefs.semesterPlans) || {};
+    },
+    savePlans: async (semesterPlans) => {
+      await activeStore.updatePreferences({ semesterPlans });
+      if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
+    },
+  });
 
   initApp();
 });
