@@ -169,10 +169,7 @@ final class EnrollmentRepository
              WHERE e.user_id = :uid'
         );
         $stmt->execute(['uid' => $userId]);
-
-        $schemes = new EvaluationSchemeRepository($this->pdo);
-        $retakes = new SubjectRetakeRepository($this->pdo);
-        return array_map(fn(array $row) => $this->hydrate($row, $schemes, $retakes), $stmt->fetchAll());
+        return $this->hydrateMany($userId, $stmt->fetchAll());
     }
 
     public function findHydrated(int $userId, string $subjectCode): ?array
@@ -181,85 +178,96 @@ final class EnrollmentRepository
         if (!$row) {
             return null;
         }
-        return $this->hydrate($row, new EvaluationSchemeRepository($this->pdo), new SubjectRetakeRepository($this->pdo));
+        return $this->hydrateMany($userId, [$row])[0];
     }
 
-    private function hydrate(array $row, EvaluationSchemeRepository $schemes, SubjectRetakeRepository $retakes): array
+    // Hidrata N inscripciones con una cantidad fija de queries (esquemas, parciales,
+    // finales, checklist y recursadas, cada uno en un solo SELECT ... IN), en vez de
+    // 5 queries por inscripción. Importa poco con la base en la misma máquina, pero
+    // mucho en cuanto haya latencia entre la app y MySQL.
+    private function hydrateMany(int $userId, array $rows): array
     {
-        $enrollmentId = (int) $row['id'];
-        $scheme = $schemes->findById((int) $row['evaluation_scheme_id']);
+        if ($rows === []) {
+            return [];
+        }
 
-        $partials = $this->fetchPartials($enrollmentId);
-        $finals = $this->fetchFinals($enrollmentId);
-        $checklist = $this->fetchChecklist($enrollmentId);
+        $ids = array_map(static fn(array $row) => (int) $row['id'], $rows);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
-        $status = StatusCalculator::compute(
-            $scheme['config'] ?? [],
-            $partials,
-            $finals,
-            $checklist,
-            $row['status_override'] ?: null
-        );
+        $schemesById = [];
+        foreach ((new EvaluationSchemeRepository($this->pdo))->all() as $scheme) {
+            $schemesById[$scheme['id']] = $scheme;
+        }
+        $retakes = (new SubjectRetakeRepository($this->pdo))->allForUser($userId);
 
-        return [
-            'subjectCode' => $row['subject_code'],
-            'schemeCode' => $scheme['code'] ?? null,
-            'schemeConfig' => $scheme['config'] ?? null,
-            'enrollmentYear' => (int) $row['enrollment_year'],
-            // Fuente de verdad: subject_retakes, no enrollments.recursed_count (ver
-            // comentario en database/schema.sql) — sobrevive a recursar/dar de baja.
-            'recursedCount' => $retakes->getCount((int) $row['user_id'], (int) $row['subject_id']),
-            'statusOverride' => $row['status_override'],
-            'status' => $status,
-            'partials' => $partials,
-            'finals' => array_values($finals),
-            'checklist' => $checklist,
-            'updatedAt' => $row['updated_at'],
-        ];
-    }
-
-    private function fetchPartials(int $enrollmentId): array
-    {
+        $partialsByEnrollment = [];
         $stmt = $this->pdo->prepare(
-            'SELECT partial_number, attempt_number, grade FROM enrollment_partials WHERE enrollment_id = :id'
+            "SELECT enrollment_id, partial_number, attempt_number, grade FROM enrollment_partials
+             WHERE enrollment_id IN ($placeholders)"
         );
-        $stmt->execute(['id' => $enrollmentId]);
-        $partials = [];
+        $stmt->execute($ids);
         foreach ($stmt->fetchAll() as $row) {
-            $partials[(int) $row['partial_number']][(int) $row['attempt_number']] =
+            $partialsByEnrollment[(int) $row['enrollment_id']][(int) $row['partial_number']][(int) $row['attempt_number']] =
                 $row['grade'] !== null ? (int) $row['grade'] : null;
         }
-        return $partials;
-    }
 
-    private function fetchFinals(int $enrollmentId): array
-    {
+        $finalsByEnrollment = [];
         $stmt = $this->pdo->prepare(
-            'SELECT attempt_number, grade, exam_date FROM enrollment_finals WHERE enrollment_id = :id ORDER BY attempt_number'
+            "SELECT enrollment_id, attempt_number, grade, exam_date FROM enrollment_finals
+             WHERE enrollment_id IN ($placeholders) ORDER BY attempt_number"
         );
-        $stmt->execute(['id' => $enrollmentId]);
-        $finals = [];
+        $stmt->execute($ids);
         foreach ($stmt->fetchAll() as $row) {
-            $finals[(int) $row['attempt_number']] = [
+            $finalsByEnrollment[(int) $row['enrollment_id']][(int) $row['attempt_number']] = [
                 'attemptNumber' => (int) $row['attempt_number'],
                 'grade' => $row['grade'] !== null ? (int) $row['grade'] : null,
                 'examDate' => $row['exam_date'],
             ];
         }
-        return $finals;
-    }
 
-    private function fetchChecklist(int $enrollmentId): array
-    {
+        $checklistByEnrollment = [];
         $stmt = $this->pdo->prepare(
-            'SELECT item_type, item_number, completed FROM enrollment_checklist WHERE enrollment_id = :id'
+            "SELECT enrollment_id, item_type, item_number, completed FROM enrollment_checklist
+             WHERE enrollment_id IN ($placeholders)"
         );
-        $stmt->execute(['id' => $enrollmentId]);
-        $checklist = [];
+        $stmt->execute($ids);
         foreach ($stmt->fetchAll() as $row) {
-            $checklist[$row['item_type']][(int) $row['item_number']] = (bool) $row['completed'];
+            $checklistByEnrollment[(int) $row['enrollment_id']][$row['item_type']][(int) $row['item_number']] = (bool) $row['completed'];
         }
-        return $checklist;
+
+        $out = [];
+        foreach ($rows as $row) {
+            $enrollmentId = (int) $row['id'];
+            $scheme = $schemesById[(int) $row['evaluation_scheme_id']] ?? null;
+            $partials = $partialsByEnrollment[$enrollmentId] ?? [];
+            $finals = $finalsByEnrollment[$enrollmentId] ?? [];
+            $checklist = $checklistByEnrollment[$enrollmentId] ?? [];
+
+            $status = StatusCalculator::compute(
+                $scheme['config'] ?? [],
+                $partials,
+                $finals,
+                $checklist,
+                $row['status_override'] ?: null
+            );
+
+            $out[] = [
+                'subjectCode' => $row['subject_code'],
+                'schemeCode' => $scheme['code'] ?? null,
+                'schemeConfig' => $scheme['config'] ?? null,
+                'enrollmentYear' => (int) $row['enrollment_year'],
+                // Fuente de verdad: subject_retakes, no enrollments.recursed_count (ver
+                // comentario en database/schema.sql) — sobrevive a recursar/dar de baja.
+                'recursedCount' => $retakes[$row['subject_code']] ?? 0,
+                'statusOverride' => $row['status_override'],
+                'status' => $status,
+                'partials' => $partials,
+                'finals' => array_values($finals),
+                'checklist' => $checklist,
+                'updatedAt' => $row['updated_at'],
+            ];
+        }
+        return $out;
     }
 
     public function importFromSnapshot(int $userId, array $entry): void

@@ -18,6 +18,7 @@ final class CareerController
     public function index(Request $request): void
     {
         $repo = new CareerRepository($this->pdo);
+        Response::publicCache();
         Response::json(['careers' => $repo->all()]);
     }
 
@@ -28,6 +29,7 @@ final class CareerController
         if (!$curriculum) {
             Response::error('not_found', 404);
         }
+        Response::publicCache();
         Response::json($curriculum);
     }
 }

@@ -379,10 +379,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     defs.innerHTML = `
       <marker id="arrowhead-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
-        <polygon points="0 0, 10 3.5, 0 7" fill="#000"></polygon>
+        <polygon points="0 0, 10 3.5, 0 7" style="fill: var(--utn-arrow-cursar)"></polygon>
       </marker>
       <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
-        <polygon points="0 0, 10 3.5, 0 7" fill="#28a745"></polygon>
+        <polygon points="0 0, 10 3.5, 0 7" style="fill: var(--utn-arrow-aprobar)"></polygon>
       </marker>
     `;
     overlaySvg.appendChild(defs);
@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       path.setAttribute('d', `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`);
       path.setAttribute('class', 'arrow-line');
       if (typeof r === 'object' && r.type === 'regularizada') path.setAttribute('stroke-dasharray', '6,4');
-      path.setAttribute('stroke', '#000');
+      path.style.stroke = 'var(--utn-arrow-cursar)';
       path.setAttribute('marker-end', 'url(#arrowhead-black)');
       overlaySvg.appendChild(path);
     });
@@ -517,7 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`);
       path.setAttribute('class', 'arrow-line');
-      path.setAttribute('stroke', '#28a745');
+      path.style.stroke = 'var(--utn-arrow-aprobar)';
       const t = (typeof r === 'object' && r.type) ? r.type : 'aprobada';
       if (t === 'regularizada') path.setAttribute('stroke-dasharray', '6,4');
       path.setAttribute('marker-end', 'url(#arrowhead-green)');
@@ -543,11 +543,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       path.setAttribute('d', `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`);
       path.setAttribute('class', 'arrow-line');
       if (dep.relation === 'cursar') {
-        path.setAttribute('stroke', '#000');
+        path.style.stroke = 'var(--utn-arrow-cursar)';
         if (dep.type === 'regularizada') path.setAttribute('stroke-dasharray', '6,4');
         path.setAttribute('marker-end', 'url(#arrowhead-black)');
       } else if (dep.relation === 'aprobar') {
-        path.setAttribute('stroke', '#28a745');
+        path.style.stroke = 'var(--utn-arrow-aprobar)';
         if (dep.type === 'regularizada') path.setAttribute('stroke-dasharray', '6,4');
         path.setAttribute('marker-end', 'url(#arrowhead-green)');
       }
@@ -745,6 +745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (fallback) programBadge.textContent = fallback.name;
       }
     }
+    if (programBadge && programBadge.textContent) programBadge.classList.remove('d-none');
 
     loadPlanData();
   } catch (err) {

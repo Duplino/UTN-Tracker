@@ -4,44 +4,122 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>UTN Tracker - Materias</title>
-		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-		<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+		<meta name="color-scheme" content="light dark">
+		<!-- Aplica el tema (claro/oscuro/automático) antes del primer pintado para que no
+		     haya un destello blanco en modo oscuro. La UI para cambiarlo está en theme.js. -->
+		<script>
+			(function(){try{var t=localStorage.getItem('utn.theme')||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-bs-theme',d?'dark':'light');}catch(e){}})();
+		</script>
+		<link href="assets/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
+		<link href="assets/lib/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
 		<link href="assets/css/index.css" rel="stylesheet">
 		<link rel="shortcut icon" href="assets/sello_arana.png" type="image/x-icon">
+		<!-- importmap: en el build de Docker docker/version-assets.php reemplaza este comentario
+		     por un import map con la versión (hash) de cada módulo, para poder cachearlos
+		     por un año sin servir JS viejo después de un deploy. -->
+		<link rel="modulepreload" href="assets/js/index.js">
+		<link rel="modulepreload" href="assets/js/apiClient.js">
+		<link rel="modulepreload" href="assets/js/apiStore.js">
+		<link rel="modulepreload" href="assets/js/auth.js">
+		<link rel="modulepreload" href="assets/js/bootCache.js">
+		<link rel="modulepreload" href="assets/js/careers.js">
+		<link rel="modulepreload" href="assets/js/evaluationSchemes.js">
+		<link rel="modulepreload" href="assets/js/localGuestStore.js">
+		<link rel="modulepreload" href="assets/js/statusEngine.js">
+		<link rel="modulepreload" href="assets/js/theme.js">
+		<link rel="modulepreload" href="assets/js/ui.js">
 	</head>
 	<body>
 		<div class="container-fluid">
-			<!-- Top toolbar (not a navbar) -->
-			<div class="toolbar d-flex flex-wrap justify-content-between align-items-center gap-2">
-				<div class="d-flex align-items-center gap-2" role="group" aria-label="Herramientas">
-					<select id="programSelect" class="form-select" aria-label="Carreras">
+			<!-- Barra superior: a la izquierda lo que cambia el tablero (carrera, título
+			     intermedio, electivas); a la derecha ayuda, estadísticas, tema y el menú de usuario. -->
+			<header class="toolbar d-flex flex-wrap justify-content-between align-items-center gap-2">
+				<div class="d-flex flex-wrap align-items-center gap-2" role="group" aria-label="Tablero">
+					<a class="app-brand d-flex align-items-center gap-2 text-decoration-none" href="./" aria-label="UTN Tracker">
+						<img src="assets/sello_arana.png" alt="" width="28" height="28">
+						<span class="fw-semibold d-none d-lg-inline">UTN Tracker</span>
+					</a>
+					<select id="programSelect" class="form-select program-select" aria-label="Carrera">
 						<!-- Opciones generadas dinámicamente por JS según las carreras en las que estás anotado -->
 					</select>
-					<div id="settings-intermediate-title-wrap" class="form-check form-switch d-none text-nowrap" title="Mostrar el mapa hasta el título intermedio">
+					<div id="settings-intermediate-title-wrap" class="form-check form-switch d-none text-nowrap mb-0" title="Mostrar el mapa hasta el título intermedio">
 						<input class="form-check-input" type="checkbox" id="settings-intermediate-title" role="switch">
 						<label class="form-check-label small" for="settings-intermediate-title">Título intermedio</label>
 					</div>
-					<button class="btn btn-outline-secondary" id="btn-electivas">electivas</button>
-				</div>
-				<div class="btn-group" role="group" aria-label="Acciones">
-					<button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#helpModal" id="btn-help">
-						Ayuda
-					</button>
-					<button type="button" class="btn btn-outline-secondary" id="btn-profile" data-bs-toggle="modal" data-bs-target="#profileModal" aria-label="Perfil">
-						Perfil
-					</button>
-					<button type="button" class="btn btn-outline-secondary" id="btn-settings" data-bs-toggle="modal" data-bs-target="#settingsModal" aria-label="Configuración">
-						<i class="bi bi-gear"></i>
-					</button>
-					<button type="button" class="btn btn-outline-secondary" id="btn-stats" data-bs-toggle="modal" data-bs-target="#statsModal" aria-label="Estadísticas">
-						<i class="bi bi-bar-chart"></i>
+					<button type="button" class="btn btn-outline-secondary" id="btn-electivas">
+						<i class="bi bi-plus-square me-1" aria-hidden="true"></i>Electivas
 					</button>
 				</div>
-			</div>
+				<div class="d-flex align-items-center gap-1" role="group" aria-label="Acciones">
+					<span id="sync-indicator" class="sync-indicator text-body-secondary small d-none" role="status">
+						<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+						<span class="d-none d-md-inline ms-1">Sincronizando…</span>
+					</span>
+					<button type="button" class="btn btn-icon" data-bs-toggle="modal" data-bs-target="#helpModal" id="btn-help" title="Ayuda" aria-label="Ayuda">
+						<i class="bi bi-question-circle" aria-hidden="true"></i>
+					</button>
+					<button type="button" class="btn btn-icon" data-bs-toggle="modal" data-bs-target="#statsModal" id="btn-stats" title="Estadísticas" aria-label="Estadísticas">
+						<i class="bi bi-bar-chart" aria-hidden="true"></i>
+					</button>
+					<div class="dropdown">
+						<button type="button" class="btn btn-icon" id="btn-theme" data-bs-toggle="dropdown" aria-expanded="false" title="Tema" aria-label="Tema">
+							<i class="bi bi-circle-half" id="theme-icon" aria-hidden="true"></i>
+						</button>
+						<ul class="dropdown-menu dropdown-menu-end" aria-labelledby="btn-theme">
+							<li><button type="button" class="dropdown-item" data-theme-value="light"><i class="bi bi-sun me-2" aria-hidden="true"></i>Claro</button></li>
+							<li><button type="button" class="dropdown-item" data-theme-value="dark"><i class="bi bi-moon-stars me-2" aria-hidden="true"></i>Oscuro</button></li>
+							<li><button type="button" class="dropdown-item" data-theme-value="auto"><i class="bi bi-circle-half me-2" aria-hidden="true"></i>Automático</button></li>
+						</ul>
+					</div>
+					<!-- Menú de usuario: el contenido (avatar, nombre, iniciar/cerrar sesión) lo
+					     actualiza assets/js/auth.js según haya sesión o no. -->
+					<div class="dropdown">
+						<button type="button" class="btn user-menu-btn d-flex align-items-center gap-2" id="btn-user-menu" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menú de usuario">
+							<img id="user-menu-avatar" class="user-avatar d-none" src="data:," alt="" width="28" height="28" referrerpolicy="no-referrer">
+							<i id="user-menu-icon" class="bi bi-person-circle fs-5" aria-hidden="true"></i>
+							<span id="user-menu-label" class="d-none d-md-inline small">Invitado</span>
+							<i class="bi bi-chevron-down small" aria-hidden="true"></i>
+						</button>
+						<ul class="dropdown-menu dropdown-menu-end user-menu" aria-labelledby="btn-user-menu">
+							<li class="px-3 py-2 user-menu-header">
+								<div class="fw-semibold small" id="user-menu-name">Modo invitado</div>
+								<div class="small text-body-secondary" id="user-menu-email">Tu progreso se guarda solo en este navegador.</div>
+							</li>
+							<li><hr class="dropdown-divider"></li>
+							<li><button type="button" class="dropdown-item" id="menu-signin" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></i>Iniciar sesión</button></li>
+							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-person me-2" aria-hidden="true"></i>Perfil y carreras</button></li>
+							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuración</button></li>
+							<li class="menu-signed-in d-none"><hr class="dropdown-divider"></li>
+							<li class="menu-signed-in d-none"><button type="button" class="dropdown-item text-danger" id="menu-signout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión</button></li>
+						</ul>
+					</div>
+				</div>
+			</header>
 
 			<!-- Columns with subject cards -->
-			<section class="columns-grid" aria-label="Materias">
-				<!-- Columns produced dynamically by JS -->
+			<section class="columns-grid" aria-label="Materias" aria-busy="true">
+				<!-- Skeleton de carga: se ve hasta que index.js dibuja el tablero (renderGroups
+				     vacía este contenedor). Las columnas las genera JS. -->
+				<div class="skeleton-col">
+					<div class="placeholder col-7 mb-3"></div>
+					<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+				</div>
+				<div class="skeleton-col">
+					<div class="placeholder col-7 mb-3"></div>
+					<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+				</div>
+				<div class="skeleton-col">
+					<div class="placeholder col-7 mb-3"></div>
+					<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+				</div>
+				<div class="skeleton-col">
+					<div class="placeholder col-7 mb-3"></div>
+					<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+				</div>
+				<div class="skeleton-col">
+					<div class="placeholder col-7 mb-3"></div>
+					<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+				</div>
 			</section>
 
 			<!-- Toast de requisitos faltantes (solo mobile, ver assets/js/index.js) -->
@@ -57,7 +135,8 @@
 			<!-- Bottom statistics and progress -->
 			<section class="mt-3">
 				<div class="stats-row" id="stats-row-container">
-					<!-- Dynamic stat cards inserted by JS -->
+					<!-- Tarjetas de estadísticas generadas por JS; hasta entonces, skeleton de carga. -->
+					<div class="card stat-card p-2 skeleton-stat"></div><div class="card stat-card p-2 skeleton-stat"></div><div class="card stat-card p-2 skeleton-stat"></div><div class="card stat-card p-2 skeleton-stat"></div><div class="card stat-card p-2 skeleton-stat"></div>
 				</div>
 
 				<div class="progress-wrap">
@@ -87,7 +166,7 @@
 			</section>
 		</div>
 
-		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+		<script src="assets/lib/bootstrap/bootstrap.bundle.min.js"></script>
 		<script src="https://accounts.google.com/gsi/client" async defer></script>
 		<script type="module" src="assets/js/index.js"></script>
 
@@ -112,7 +191,7 @@
 		              <div class="accordion-body">
 		                <p>Las correlativas se muestran con flechas que indican dependencias entre materias:</p>
 		                <ul>
-		                  <li><strong>Flechas negras</strong>: requisito <em>para cursar</em> (asistencia/inscripción).</li>
+		                  <li><strong>Flechas negras</strong> (claras en modo oscuro): requisito <em>para cursar</em> (asistencia/inscripción).</li>
 		                  <li><strong>Flechas verdes</strong>: requisito <em>para aprobar</em> (condición para la calificación final).</li>
 		                </ul>
 		                <p>Para los requisitos <em>para aprobar</em> hay dos estados:</p>
@@ -122,19 +201,19 @@
 		                </ul>
 		                <p><strong>Ejemplo:</strong></p>
 		                <div class="d-flex gap-2 align-items-center">
-		                  <svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" marker-end="url(#help-arrow-black)"></path></svg>
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" style="fill: var(--utn-arrow-cursar)"></polygon></marker></defs><path d="M5 10 L70 10" style="stroke: var(--utn-arrow-cursar)" stroke-width="2" fill="none" marker-end="url(#help-arrow-black)"></path></svg>
 		                  <span>Requisito para cursar - aprobado (negro, continuo)</span>
 		                </div>
 		                <div class="d-flex gap-2 align-items-center">
-		                  <svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#000"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#000" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-black)"></path></svg>
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" style="fill: var(--utn-arrow-cursar)"></polygon></marker></defs><path d="M5 10 L70 10" style="stroke: var(--utn-arrow-cursar)" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-black)"></path></svg>
 		                  <span>Requisito para cursar - regularizada (negro, punteado)</span>
 		                </div>
 		                <div class="d-flex gap-2 align-items-center mt-2">
-		                  <svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" marker-end="url(#help-arrow-green)"></path></svg>
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" style="fill: var(--utn-arrow-aprobar)"></polygon></marker></defs><path d="M5 10 L70 10" style="stroke: var(--utn-arrow-aprobar)" stroke-width="2" fill="none" marker-end="url(#help-arrow-green)"></path></svg>
 		                  <span>Requisito para aprobar - aprobado (verde, continuo)</span>
 		                </div>
 		                <div class="d-flex gap-2 align-items-center mt-2">
-		                  <svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#28a745"></polygon></marker></defs><path d="M5 10 L70 10" stroke="#28a745" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-green)"></path></svg>
+		                  <svg width="80" height="20"><defs><marker id="help-arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" style="fill: var(--utn-arrow-aprobar)"></polygon></marker></defs><path d="M5 10 L70 10" style="stroke: var(--utn-arrow-aprobar)" stroke-width="2" fill="none" stroke-dasharray="6,4" marker-end="url(#help-arrow-green)"></path></svg>
 		                  <span>Requisito para aprobar - regularizada (verde, punteado)</span>
 		                </div>
 		              </div>

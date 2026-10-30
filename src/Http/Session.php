@@ -12,6 +12,9 @@ final class Session
     private const COOKIE_NAME = 'utn_session';
     private const TTL_DAYS = 30;
 
+    private static ?string $resolvedHash = null;
+    private static ?array $resolvedUser = null;
+
     public static function issue(PDO $pdo, int $userId): void
     {
         $token = bin2hex(random_bytes(32));
@@ -41,20 +44,33 @@ final class Session
         }
         $hash = hash('sha256', $token);
 
+        // Cache por request: varios controllers (y /api/bootstrap) pueden pedir el
+        // usuario actual en la misma ejecución.
+        if (self::$resolvedHash === $hash) {
+            return self::$resolvedUser;
+        }
+
         $stmt = $pdo->prepare(
-            'SELECT u.* FROM user_sessions s
+            'SELECT u.*, (s.last_used_at < NOW() - INTERVAL 10 MINUTE) AS session_stale
+             FROM user_sessions s
              JOIN users u ON u.id = s.user_id
              WHERE s.token_hash = :hash AND s.expires_at > NOW()'
         );
         $stmt->execute(['hash' => $hash]);
-        $user = $stmt->fetch();
-        if (!$user) {
-            return null;
+        $user = $stmt->fetch() ?: null;
+
+        // last_used_at es informativo: actualizarlo como mucho cada 10 minutos evita
+        // una escritura en cada request autenticado.
+        if ($user && (int) $user['session_stale'] === 1) {
+            $pdo->prepare('UPDATE user_sessions SET last_used_at = NOW() WHERE token_hash = :hash')
+                ->execute(['hash' => $hash]);
+        }
+        if ($user) {
+            unset($user['session_stale']);
         }
 
-        $pdo->prepare('UPDATE user_sessions SET last_used_at = NOW() WHERE token_hash = :hash')
-            ->execute(['hash' => $hash]);
-
+        self::$resolvedHash = $hash;
+        self::$resolvedUser = $user;
         return $user;
     }
 

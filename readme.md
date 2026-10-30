@@ -71,6 +71,19 @@ Cambios de esquema de DB se siguen aplicando a mano (`docker compose exec db mys
 
 No corras `docker-compose.yml` (el de desarrollo) y `docker-compose.prod.yml` a la vez en el mismo directorio: Compose deriva el nombre del proyecto del nombre de la carpeta, así que sin `-p` distinto terminarían compartiendo red y volumen de DB.
 
+### Caché (navegador y Cloudflare)
+
+- **HTML**: `Cache-Control: no-cache` (siempre revalida, un deploy se ve al instante).
+- **Assets** (`/assets/*`): en el build de la imagen, `docker/version-assets.php` agrega `?v=<hash>` a cada CSS/JS/imagen referenciado desde los HTML y genera un import map para los módulos JS. Apache sirve esas URLs versionadas con `max-age=31536000, immutable` (ver `docker/apache-vhost.conf`). En desarrollo (bind mount o `php -S`) no se versiona nada y no pasa nada.
+- **API**: todo `/api/*` sale con `no-store`, salvo el catálogo que es igual para todos (`/api/careers`, `/api/careers/{code}/curriculum`, `/api/evaluation-schemes`), que sale con `public, max-age=300, s-maxage=86400`.
+
+Cloudflare no cachea rutas sin extensión por defecto, así que para que el catálogo se sirva desde el borde hace falta una **Cache Rule** (Caching → Cache Rules → Create rule):
+
+- Si: `URI Path` empieza con `/api/careers` **o** `URI Path` es igual a `/api/evaluation-schemes`, y el método es `GET`.
+- Entonces: *Eligible for cache*, con *Edge TTL* = "Use cache-control header if present" y *Browser TTL* = "Respect origin".
+
+No pongas una regla de "Cache Everything" sobre todo `/api/*`: el resto es data por usuario (igual sale con `no-store`, pero mejor no depender de eso). Después de cambiar los seeds de carreras o esquemas, purgá esas URLs en Cloudflare (o esperá hasta un día).
+
 ## Staging (probar antes de pushear)
 
 `docker-compose.staging.yml` es igual a `docker-compose.prod.yml` (misma imagen, sin bind mount, DB propia) salvo por el nombre del contenedor (`utntracker-app-staging`), para poder correr los dos al mismo tiempo en el mismo VPS sin que choquen.

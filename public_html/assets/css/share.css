@@ -20,7 +20,7 @@
 
 /* Empty electiva placeholder */
 .card-electiva-placeholder {
-  border: 2px dashed rgba(0, 0, 0, 0.08);
+  border: 2px dashed var(--utn-dashed);
   background: transparent;
   min-height: 56px;
   margin-bottom: 0.35rem;
@@ -28,7 +28,7 @@
 
 /* Share page title styling */
 #share-title {
-  color: #495057;
+  color: var(--bs-emphasis-color);
 }
 
 #share-program {
@@ -42,5 +42,5 @@
 
 /* Electiva cards in public view */
 .card-electiva {
-  border-left: 3px solid #6c757d;
+  border-left: 3px solid var(--bs-secondary-color);
 }

@@ -5,8 +5,13 @@ import { getCareers, getCareerCurriculum } from './careers.js';
 import { localGuestStore } from './localGuestStore.js';
 import { apiStore } from './apiStore.js';
 import { initAuth } from './auth.js';
+import { toast, toastError, setBusy, confirmDialog } from './ui.js';
+import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
+import { initThemeToggle } from './theme.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initThemeToggle();
+
   // Carrera actualmente mostrada en el tablero. `userCareers` son las carreras en las
   // que el usuario está anotado (controla qué aparece en el dropdown); se puebla en
   // initApp()/onLoginSuccess/onLogout a partir de activeStore.getUserCareers().
@@ -71,6 +76,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // de nuevo). Se puebla junto con enrollmentCache/electivesCache y se corrige
   // puntualmente después de recursar/editar el número (ver doRecursar más abajo).
   let retakesCache = {};
+  // Usuario con sesión (null en modo invitado) y las últimas preferencias conocidas
+  // del servidor, para poder guardar la copia local del arranque (ver bootCache.js).
+  let currentUser = null;
+  let lastPreferences = null;
 
   async function refreshEnrollmentCache(){
     const list = await activeStore.getEnrollments();
@@ -87,14 +96,138 @@ document.addEventListener('DOMContentLoaded', async () => {
     catch(e){ console.error('Error cargando conteo de recursadas', e); retakesCache = {}; }
   }
 
-  async function switchStoreAndReload(nextStore){
-    activeStore = nextStore;
+  // Modo invitado: todo sale de localStorage (localGuestStore), no hay red de por medio.
+  async function loadGuestState(){
+    activeStore = localGuestStore;
+    lastPreferences = null;
     await Promise.all([refreshEnrollmentCache(), refreshElectivesCache(), refreshRetakesCache()]);
     userCareers = await activeStore.getUserCareers();
+  }
+
+  // Usuario con sesión: puebla todos los caches desde una respuesta de GET /api/bootstrap
+  // (recién llegada del servidor o la copia local de bootCache.js).
+  function applyBootstrapData(data){
+    activeStore = apiStore;
+    currentUser = data.user || null;
+    if (Array.isArray(data.schemes) && data.schemes.length) schemesCache = data.schemes;
+    enrollmentCache = {};
+    (Array.isArray(data.enrollments) ? data.enrollments : []).forEach(e => { enrollmentCache[e.subjectCode] = e; });
+    electivesCache = Array.isArray(data.electives) ? data.electives : [];
+    // PHP serializa un array asociativo vacío como [], no como {}.
+    retakesCache = (data.retakes && !Array.isArray(data.retakes)) ? data.retakes : {};
+    userCareers = Array.isArray(data.userCareers) ? data.userCareers : [];
+    lastPreferences = data.preferences || null;
+  }
+
+  // Lo que hoy está en memoria, con la misma forma que la respuesta de /api/bootstrap:
+  // se guarda como copia local al salir de la página, así el próximo arranque
+  // instantáneo ya incluye los cambios hechos en esta sesión.
+  function currentStateAsBootstrap(){
+    return {
+      authenticated: true,
+      user: currentUser,
+      schemes: schemesCache,
+      preferences: lastPreferences,
+      userCareers,
+      enrollments: Object.values(enrollmentCache),
+      electives: electivesCache,
+      retakes: retakesCache,
+    };
+  }
+
+  // Firma de lo que afecta al tablero, para no re-renderizar (ni hacer parpadear la
+  // pantalla) si la respuesta del servidor coincide con lo que ya se dibujó.
+  function boardSignature(data){
+    const enrollments = (Array.isArray(data.enrollments) ? data.enrollments : [])
+      .slice().sort((x, y) => String(x.subjectCode).localeCompare(String(y.subjectCode)));
+    const retakes = (data.retakes && !Array.isArray(data.retakes)) ? data.retakes : {};
+    return JSON.stringify([enrollments, data.electives || [], retakes, data.userCareers || []]);
+  }
+
+  // Las preferencias guardadas en el servidor pisan las locales (localStorage hace de
+  // espejo síncrono para el resto del código). Devuelve true si algo visible cambió.
+  function applyServerPreferences(preferences){
+    if (!preferences) return false;
+    let changed = false;
+    if (preferences.activeCareerCode && userCareers.some(c => c.code === preferences.activeCareerCode)){
+      if (localStorage.getItem('career') !== preferences.activeCareerCode) changed = true;
+      localStorage.setItem('career', preferences.activeCareerCode);
+    }
+    if (typeof preferences.yearStarted === 'number'){
+      if (localStorage.getItem('yearStarted') !== String(preferences.yearStarted)) changed = true;
+      localStorage.setItem('yearStarted', String(preferences.yearStarted));
+    }
+    if (Array.isArray(preferences.selectedStats) && preferences.selectedStats.length){
+      const v = JSON.stringify(preferences.selectedStats);
+      if (localStorage.getItem('selectedStats') !== v) changed = true;
+      localStorage.setItem('selectedStats', v);
+    }
+    if (typeof preferences.showCorrelativas === 'boolean'){
+      if (correlativasEnabled !== preferences.showCorrelativas) changed = true;
+      localStorage.setItem('mostrarCorrelativas', preferences.showCorrelativas ? '1' : '0');
+      correlativasEnabled = preferences.showCorrelativas;
+      if (correlativasToggle) correlativasToggle.checked = correlativasEnabled;
+    }
+    if (typeof preferences.showStatus === 'boolean'){
+      if (showStatusEnabled !== preferences.showStatus) changed = true;
+      localStorage.setItem('mostrarEstado', preferences.showStatus ? '1' : '0');
+      showStatusEnabled = preferences.showStatus;
+      if (showStatusToggle) showStatusToggle.checked = showStatusEnabled;
+    }
+    return changed;
+  }
+
+  // Dibuja el tablero a partir de los caches en memoria.
+  function renderFromState(){
     populateProgramSelect();
     currentCareer = pickInitialCareer();
+    if (programSelect && currentCareer) programSelect.value = currentCareer;
     syncIntermediateTitleState();
     loadPlanData();
+  }
+
+  // Si hay un modal abierto (ej. cargando notas), re-renderizar el tablero por debajo
+  // le cambiaría las tarjetas al usuario mientras edita: se espera a que lo cierre.
+  function renderFromStateWhenIdle(){
+    const openModal = document.querySelector('.modal.show');
+    if (!openModal){ renderFromState(); return; }
+    openModal.addEventListener('hidden.bs.modal', () => renderFromStateWhenIdle(), { once: true });
+  }
+
+  // Trae /api/bootstrap y aplica la respuesta. Devuelve la respuesta (o null si no
+  // hubo red). Usado al arrancar, al iniciar sesión y en "Sincronizar ahora".
+  async function syncFromServer({ forceRender = false } = {}){
+    setSyncIndicator(true);
+    let fresh = null;
+    try{
+      fresh = await api.get('/bootstrap');
+    }catch(e){
+      console.warn('No se pudo contactar al servidor', e);
+    }finally{
+      setSyncIndicator(false);
+    }
+    if (!fresh) return null;
+    if (Array.isArray(fresh.schemes) && fresh.schemes.length) schemesCache = fresh.schemes;
+
+    if (fresh.authenticated){
+      const before = activeStore === apiStore ? boardSignature(currentStateAsBootstrap()) : null;
+      applyBootstrapData(fresh);
+      writeBootCache(fresh);
+      const prefsChanged = applyServerPreferences(fresh.preferences);
+      if (forceRender || prefsChanged || before !== boardSignature(fresh)) renderFromStateWhenIdle();
+    } else {
+      clearBootCache();
+      if (activeStore === apiStore || forceRender){
+        await loadGuestState();
+        renderFromStateWhenIdle();
+      }
+    }
+    return fresh;
+  }
+
+  function setSyncIndicator(on){
+    const el = document.getElementById('sync-indicator');
+    if (el) el.classList.toggle('d-none', !on);
   }
 
   // Detección de mobile: en pantallas angostas el tablero pasa a una sola columna,
@@ -179,7 +312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
   // Program selector: solo lista las carreras en las que el usuario está anotado
-  // (userCareers, poblado en initApp()/switchStoreAndReload()); las opciones se generan
+  // (userCareers, poblado por loadGuestState()/applyBootstrapData()); las opciones se generan
   // dinámicamente, ya no hay un <option> fijo por carrera en el HTML.
   const programSelect = document.getElementById('programSelect');
   function populateProgramSelect() {
@@ -257,7 +390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await enrollInCareer(career.code);
           }catch(e){
             console.error('Error anotándose a la carrera', e);
-            alert('No se pudo anotar a la carrera.');
+            toastError('No se pudo anotar a la carrera', e);
             btn.disabled = false;
           }
         });
@@ -274,6 +407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!currentCareer) {
       planData = null;
       electivasList = [];
+      if (columnsContainer) columnsContainer.removeAttribute('aria-busy');
       try{ renderCareerEnrollmentPrompt(); }catch(e){ console.error('Error mostrando el listado de carreras', e); }
       try{ computeStats([]); }catch(e){}
       return;
@@ -290,8 +424,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
       .catch(err => {
         console.error('Error cargando el curriculum de la carrera', err);
-        if (columnsContainer) columnsContainer.innerHTML = '<div class="alert alert-danger">No se pudo cargar el plan de materias.</div>';
-      });
+        if (!columnsContainer) return;
+        columnsContainer.style.gridTemplateColumns = '';
+        columnsContainer.innerHTML = `
+          <div class="alert alert-danger d-flex flex-wrap align-items-center gap-2" style="grid-column: 1 / -1">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <span class="me-auto">No se pudo cargar el plan de materias. Revisá tu conexión.</span>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-action="retry-plan">Reintentar</button>
+          </div>`;
+        const retry = columnsContainer.querySelector('[data-action="retry-plan"]');
+        if (retry) retry.addEventListener('click', () => { setBusy(retry, true); loadPlanData(); });
+      })
+      .finally(() => { if (columnsContainer) columnsContainer.removeAttribute('aria-busy'); });
   }
 
   initProgramSelector();
@@ -928,15 +1072,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const select = document.getElementById('subject-start-scheme');
       const defaultScheme = schemes.find(s => s.code === '2-partials') || schemes[0];
       const schemeCode = select ? select.value : (defaultScheme ? defaultScheme.code : null);
-      if (!schemeCode){ alert('No hay esquemas de evaluación configurados.'); return; }
-      btn.disabled = true;
+      if (!schemeCode){ toastError('No hay esquemas de evaluación configurados'); return; }
+      setBusy(btn, true);
       let hydrated;
       try{
         hydrated = await activeStore.createEnrollment(code, schemeCode);
       }catch(err){
         console.error('Error creando inscripción', err);
-        alert('No se pudo anotar a la materia: ' + (err && err.message ? err.message : err));
-        btn.disabled = false;
+        toastError('No se pudo anotar a la materia', err);
+        setBusy(btn, false);
         return;
       }
       putSubjectDataInCache(code, hydrated);
@@ -1089,10 +1233,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     switch(status){
       case 'Aprobada': cls = 'alert-success'; btnCls = 'btn-success'; break;
       case 'Desaprobada': cls = 'alert-danger'; btnCls = 'btn-danger'; break;
-      case 'Promocionada': cls = 'alert-info text-dark'; btnCls = 'btn-info'; break;
-      case 'Regularizada': cls = 'alert-warning text-dark'; btnCls = 'btn-warning'; break;
-      case 'Faltan notas': cls = 'alert-warning text-dark'; btnCls = 'btn-warning'; break;
-      case 'No regularizada': cls = 'alert-warning text-dark'; btnCls = 'btn-warning'; break;
+      case 'Promocionada': cls = 'alert-info'; btnCls = 'btn-info'; break;
+      case 'Regularizada': cls = 'alert-warning'; btnCls = 'btn-warning'; break;
+      case 'Faltan notas': cls = 'alert-warning'; btnCls = 'btn-warning'; break;
+      case 'No regularizada': cls = 'alert-warning'; btnCls = 'btn-warning'; break;
       default: cls = 'alert-secondary'; btnCls = 'btn-secondary'; break;
     }
     const alertDiv = document.createElement('div');
@@ -1165,7 +1309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       hydrated = await activeStore.setOverride(effectiveCode, status);
     }catch(err){
       console.error('Error aplicando override', err);
-      alert('No se pudo actualizar el estado: ' + (err && err.message ? err.message : err));
+      toastError('No se pudo actualizar el estado', err);
       return;
     }
     putSubjectDataInCache(effectiveCode, hydrated);
@@ -1421,7 +1565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const partials = readDynamicPartials(schemeConfig);
       const finals = readDynamicFinals();
       const checklist = readDynamicChecklist(schemeConfig);
-      newSave.disabled = true;
+      setBusy(newSave, true);
       try{
         const hydrated = await activeStore.saveResults(code, { partials, finals, checklist, clearOverride: true });
         putSubjectDataInCache(code, hydrated);
@@ -1435,9 +1579,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
       }catch(err){
         console.error('Error guardando notas', err);
-        alert('No se pudieron guardar las notas: ' + (err && err.message ? err.message : err));
+        toastError('No se pudieron guardar las notas', err);
       }finally{
-        newSave.disabled = false;
+        setBusy(newSave, false);
       }
     });
   }
@@ -1481,10 +1625,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const schemeChanged = newSchemeCode && newSchemeCode !== stored.schemeCode;
         const cursadaChanged = Number.isFinite(newCursadaNumber) && newCursadaNumber !== currentCursadaNumber;
         if (schemeChanged){
-          const proceed = window.confirm('Cambiar el esquema de evaluación puede borrar las notas ya cargadas para esta materia. ¿Continuar?');
+          const proceed = await confirmDialog({
+            title: '¿Cambiar el esquema de evaluación?',
+            message: 'Se van a borrar las notas ya cargadas para esta materia.',
+            confirmText: 'Cambiar esquema',
+            danger: true,
+          });
           if (!proceed) return;
         }
-        newApply.disabled = true;
+        setBusy(newApply, true);
         try{
           if (cursadaChanged){
             // Endpoint separado: el conteo de recursadas vive independiente de la
@@ -1507,12 +1656,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           // atributo disabled) — si lo reactivamos recién en el finally, ya es tarde:
           // el clon que quedó en el DOM nace deshabilitado y este 'newApply' es un
           // nodo viejo, desconectado, sobre el que ya no se puede hacer nada.
-          newApply.disabled = false;
+          setBusy(newApply, false);
           await renderEnrolledSubject(code);
         }catch(err){
           console.error('Error actualizando configuración de la materia', err);
-          alert('No se pudo actualizar la configuración: ' + (err && err.message ? err.message : err));
-          newApply.disabled = false;
+          toastError('No se pudo actualizar la configuración de la materia', err);
+          setBusy(newApply, false);
         }
       });
     }
@@ -1521,8 +1670,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const newRecursar = recursarBtn.cloneNode(true);
       recursarBtn.parentNode.replaceChild(newRecursar, recursarBtn);
       newRecursar.addEventListener('click', async () => {
-        newRecursar.disabled = true;
-        try{ await doRecursar(code); }finally{ newRecursar.disabled = false; }
+        setBusy(newRecursar, true);
+        try{ await doRecursar(code); }finally{ setBusy(newRecursar, false); }
       });
     }
 
@@ -1530,8 +1679,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const newUnenroll = unenrollBtn.cloneNode(true);
       unenrollBtn.parentNode.replaceChild(newUnenroll, unenrollBtn);
       newUnenroll.addEventListener('click', async () => {
-        newUnenroll.disabled = true;
-        try{ await doUnenroll(code); }finally{ newUnenroll.disabled = false; }
+        setBusy(newUnenroll, true);
+        try{ await doUnenroll(code); }finally{ setBusy(newUnenroll, false); }
       });
     }
   }
@@ -1544,7 +1693,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // sube en 1 — por eso la tarjeta va a mostrar el numeral (ej. "II") aunque ya no
   // haya una inscripción activa.
   async function doRecursar(code){
-    const proceed = window.confirm('¿Marcar esta materia como recursada? Se van a borrar las notas cargadas y la materia va a quedar disponible para volver a cursar, sumando una cursada.');
+    const proceed = await confirmDialog({
+      title: '¿Recursar esta materia?',
+      message: 'Se van a borrar las notas cargadas y la materia va a quedar disponible para volver a cursar, sumando una cursada.',
+      confirmText: 'Recursar',
+      danger: true,
+    });
     if (!proceed) return;
     let prevAvailable = [];
     try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
@@ -1562,14 +1716,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
     }catch(err){
       console.error('Error al recursar', err);
-      alert('No se pudo recursar la materia: ' + (err && err.message ? err.message : err));
+      toastError('No se pudo recursar la materia', err);
     }
   }
 
   // Baja completa (distinto de recursar): borra la inscripción entera, la materia
   // vuelve a verse "no iniciada" (borde punteado), sin sumar una cursada.
   async function doUnenroll(code){
-    const proceed = window.confirm('¿Dar de baja esta materia? Se va a borrar toda la inscripción (notas incluidas) y la materia va a volver a verse como no iniciada.');
+    const proceed = await confirmDialog({
+      title: '¿Dar de baja esta materia?',
+      message: 'Se va a borrar toda la inscripción (notas incluidas) y la materia va a volver a verse como no iniciada.',
+      confirmText: 'Dar de baja',
+      danger: true,
+    });
     if (!proceed) return;
     let prevAvailable = [];
     try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
@@ -1586,7 +1745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
     }catch(err){
       console.error('Error al dar de baja', err);
-      alert('No se pudo dar de baja la materia: ' + (err && err.message ? err.message : err));
+      toastError('No se pudo dar de baja la materia', err);
     }
   }
 
@@ -1680,10 +1839,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
     defs.innerHTML = `
       <marker id="arrowhead-black" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
-        <polygon points="0 0, 10 3.5, 0 7" fill="#000"></polygon>
+        <polygon points="0 0, 10 3.5, 0 7" style="fill: var(--utn-arrow-cursar)"></polygon>
       </marker>
       <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
-        <polygon points="0 0, 10 3.5, 0 7" fill="#28a745"></polygon>
+        <polygon points="0 0, 10 3.5, 0 7" style="fill: var(--utn-arrow-aprobar)"></polygon>
       </marker>
     `;
     overlaySvg.appendChild(defs);
@@ -1842,7 +2001,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (typeof r === 'object' && r.type === 'regularizada'){
         path.setAttribute('stroke-dasharray', '6,4');
       }
-      path.setAttribute('stroke', '#000');
+      path.style.stroke = 'var(--utn-arrow-cursar)';
       path.setAttribute('marker-end','url(#arrowhead-black)');
       overlaySvg.appendChild(path);
     });
@@ -1862,7 +2021,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const d = `M ${fromX} ${fromY} Q ${qx} ${qy} ${toX} ${toY}`;
       path.setAttribute('d', d);
       path.setAttribute('class','arrow-line');
-      path.setAttribute('stroke', '#28a745');
+      path.style.stroke = 'var(--utn-arrow-aprobar)';
       const t = (typeof r === 'object' && r.type) ? r.type : 'aprobada';
       if (t === 'regularizada') path.setAttribute('stroke-dasharray', '6,4');
       path.setAttribute('marker-end','url(#arrowhead-green)');
@@ -1893,11 +2052,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       path.setAttribute('class','arrow-line');
       // set stroke + marker depending on relation and type
       if (dep.relation === 'cursar'){
-        path.setAttribute('stroke', '#000');
+        path.style.stroke = 'var(--utn-arrow-cursar)';
         if (dep.type === 'regularizada') path.setAttribute('stroke-dasharray', '6,4');
         path.setAttribute('marker-end','url(#arrowhead-black)');
       } else if (dep.relation === 'aprobar'){
-        path.setAttribute('stroke', '#28a745');
+        path.style.stroke = 'var(--utn-arrow-aprobar)';
         if (dep.type === 'regularizada') path.setAttribute('stroke-dasharray', '6,4');
         path.setAttribute('marker-end','url(#arrowhead-green)');
       }
@@ -2168,7 +2327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Insert electiva into a given column index and persist via activeStore (electivesCache)
-  function performAddElectiveToColumn(subj, colIndex, placeholderEl, skipConfirm){
+  async function performAddElectiveToColumn(subj, colIndex, placeholderEl, skipConfirm){
     try{
       // avoid duplicates
       if (subj.code && codeMap[subj.code]){
@@ -2180,7 +2339,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       tmp.dataset.requirements = JSON.stringify(subj.requirements || { cursar: [], aprobar: [] });
       const meets = cursarRequirementsMetForCard(tmp);
       if (!meets && !skipConfirm){
-        const proceed = window.confirm('La electiva no cumple las correlativas para cursar. ¿Deseás agregarla de todos modos?');
+        const proceed = await confirmDialog({
+          title: '¿Agregar la electiva igual?',
+          message: 'La electiva no cumple las correlativas para cursar.',
+          confirmText: 'Agregar igual',
+        });
         if (!proceed) return;
       }
       const newCard = createCard(subj);
@@ -2201,10 +2364,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         removeBtn.style.right = '6px';
         removeBtn.style.zIndex = '10';
         removeBtn.style.padding = '0.15rem 0.4rem';
-        removeBtn.innerHTML = '🗑';
+        removeBtn.innerHTML = '<i class="bi bi-trash3" aria-hidden="true"></i>';
         // deletion handler: stop propagation (don't open modal), remove from board and storage
         removeBtn.addEventListener('click', async (ev) => {
           ev.stopPropagation();
+          const proceed = await confirmDialog({
+            title: '¿Quitar esta electiva?',
+            message: 'Se va a sacar del tablero y se van a borrar las notas que tenga cargadas.',
+            confirmText: 'Quitar',
+            danger: true,
+          });
+          if (!proceed) return;
           removeBtn.disabled = true;
           try{
             await activeStore.removeElective(currentCareer, key);
@@ -2227,7 +2397,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             try{ computeStats(displayedSubjects); }catch(e){}
           }catch(err){
             console.error('Error eliminando electiva', err);
-            alert('No se pudo eliminar la electiva: ' + (err && err.message ? err.message : err));
+            toastError('No se pudo eliminar la electiva', err);
             removeBtn.disabled = false;
           }
         });
@@ -2866,7 +3036,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await populateCareersModalTable();
           }catch(e){
             console.error('Error dándose de baja de la carrera', e);
-            alert('No se pudo dar de baja de la carrera.');
+            toastError('No se pudo dar de baja de la carrera', e);
             btn.disabled = false;
           }
         });
@@ -2881,7 +3051,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await populateCareersModalTable();
           }catch(e){
             console.error('Error anotándose a la carrera', e);
-            alert('No se pudo anotar a la carrera.');
+            toastError('No se pudo anotar a la carrera', e);
             btn.disabled = false;
           }
         });
@@ -2929,18 +3099,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggle.addEventListener('change', async () => {
       if (activeStore !== apiStore){
         toggle.checked = false;
-        alert('Debés iniciar sesión para compartir tu tablero.');
+        toast('Iniciá sesión para compartir tu tablero.', { variant: 'info' });
         return;
       }
       const isChecked = toggle.checked;
       toggle.disabled = true;
       try{
         const prefs = await activeStore.updatePreferences({ isPublic: isChecked });
+        lastPreferences = prefs;
         applyState(prefs);
       }catch(err){
         console.error('Error actualizando configuración de compartir', err);
         toggle.checked = !isChecked;
-        alert('Error al actualizar la configuración de compartir.');
+        toastError('No se pudo actualizar la configuración de compartir', err);
       }finally{
         toggle.disabled = false;
       }
@@ -2953,72 +3124,51 @@ document.addEventListener('DOMContentLoaded', async () => {
   // NOTA: no llamar a esta función "bootstrap" — colisiona con el objeto global `bootstrap`
   // de Bootstrap JS (window.bootstrap.Modal, etc.) usado en todo este archivo.
   async function initApp(){
-    try{ schemesCache = await getEvaluationSchemes(); }catch(e){ console.error('Error cargando esquemas de evaluación', e); }
-
     const shareToggleCtl = initShareToggleUI();
 
-    let initialUser = null;
-    let mockAuthEnabled = false;
-    try{
-      const me = await api.get('/auth/me');
-      if (me && me.authenticated) initialUser = me.user;
-      mockAuthEnabled = !!(me && me.mockAuthEnabled);
-    }catch(e){
-      // Sin conexión o error de red: degradar a modo invitado sin bloquear la app.
-      console.warn('No se pudo verificar la sesión, se usa modo invitado', e);
+    // 1) Dibujar algo ya, sin esperar a la red: la copia local del último arranque
+    //    (si hubo sesión) o los datos de invitado. El curriculum también sale de
+    //    localStorage si ya se había descargado alguna vez (ver careers.js).
+    const cached = readBootCache();
+    if (cached){
+      applyBootstrapData(cached);
+    } else {
+      await loadGuestState();
     }
-    if (initialUser) activeStore = apiStore;
+    renderFromState();
+    shareToggleCtl.applyState(lastPreferences);
 
-    await Promise.all([refreshEnrollmentCache(), refreshElectivesCache(), refreshRetakesCache()]);
-
-    userCareers = await activeStore.getUserCareers();
-    populateProgramSelect();
-
-    let preferences = null;
-    try{ preferences = await activeStore.getPreferences(); }catch(e){ console.error('Error cargando preferencias', e); }
-
-    if (preferences && preferences.activeCareerCode && userCareers.some(c => c.code === preferences.activeCareerCode)){
-      localStorage.setItem('career', preferences.activeCareerCode);
+    // 2) Revalidar contra el servidor con un único request y re-dibujar solo si cambió algo.
+    const fresh = await syncFromServer();
+    if (!fresh && cached){
+      toast('Sin conexión: se muestra la última copia guardada de tu tablero.', { variant: 'warning' });
     }
-    currentCareer = pickInitialCareer();
-    if (programSelect && currentCareer) programSelect.value = currentCareer;
-    syncIntermediateTitleState();
-
-    if (activeStore === apiStore && preferences){
-      if (typeof preferences.yearStarted === 'number'){
-        localStorage.setItem('yearStarted', String(preferences.yearStarted));
-      }
-      if (Array.isArray(preferences.selectedStats) && preferences.selectedStats.length){
-        localStorage.setItem('selectedStats', JSON.stringify(preferences.selectedStats));
-      }
-      if (typeof preferences.showCorrelativas === 'boolean'){
-        localStorage.setItem('mostrarCorrelativas', preferences.showCorrelativas ? '1' : '0');
-        correlativasEnabled = preferences.showCorrelativas;
-        if (correlativasToggle) correlativasToggle.checked = correlativasEnabled;
-      }
-      if (typeof preferences.showStatus === 'boolean'){
-        localStorage.setItem('mostrarEstado', preferences.showStatus ? '1' : '0');
-        showStatusEnabled = preferences.showStatus;
-        if (showStatusToggle) showStatusToggle.checked = showStatusEnabled;
-      }
+    if (!schemesCache.length){
+      try{ schemesCache = await getEvaluationSchemes(); }catch(e){ console.error('Error cargando esquemas de evaluación', e); }
     }
-    shareToggleCtl.applyState(preferences);
+    shareToggleCtl.applyState(lastPreferences);
+
+    // Guardar la copia local al salir/ocultar la pestaña, con los cambios de esta sesión.
+    const persistState = () => { if (activeStore === apiStore && currentUser) writeBootCache(currentStateAsBootstrap()); };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistState(); });
+    window.addEventListener('pagehide', persistState);
 
     initAuth({
-      initialUser,
-      mockAuthEnabled,
+      initialUser: activeStore === apiStore ? currentUser : null,
+      mockAuthEnabled: !!(fresh && fresh.mockAuthEnabled),
       onLoginSuccess: async () => {
-        await switchStoreAndReload(apiStore);
-        try{ shareToggleCtl.applyState(await activeStore.getPreferences()); }catch(e){ console.error(e); }
+        const synced = await syncFromServer({ forceRender: true });
+        if (!synced) throw new TypeError('network_error');
+        shareToggleCtl.applyState(lastPreferences);
       },
       onLogout: async () => {
-        await switchStoreAndReload(localGuestStore);
-        try{ shareToggleCtl.applyState(await activeStore.getPreferences()); }catch(e){ console.error(e); }
+        clearBootCache();
+        currentUser = null;
+        await loadGuestState();
+        renderFromState();
+        shareToggleCtl.applyState(null);
       },
     });
-
-    // Carga el curriculum de la carrera activa y renderiza el tablero.
-    loadPlanData();
   }
 
   initApp();
