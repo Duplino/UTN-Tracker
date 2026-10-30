@@ -10,7 +10,7 @@ GET /api/public/{identifier}/progress/{careerCode}
 
 ### `{identifier}`
 
-El **share token** del usuario (el que se genera al hacer público el perfil; es el mismo identificador que ya usa `GET /api/public/{identifier}` para compartir el tablero completo, y el que aparece en el link de "compartir" de la app).
+El **share token** del usuario (el que se genera al hacer público el perfil; es el mismo identificador que ya usa `GET /api/public/{identifier}` para compartir el tablero completo, y el que aparece en el link de "compartir" de la app). Si el usuario vuelve su perfil a privado, el token se revoca y el endpoint responde `404`; si después lo hace público otra vez, sale un token nuevo.
 
 ### `{careerCode}`
 

@@ -19,6 +19,13 @@ final class PreferencesRepository
         'isPublic' => 'is_public',
     ];
 
+    // Columnas TINYINT(1): PDO manda los bool de PHP como string ('' para false), y
+    // MySQL en modo estricto rechaza '' en una columna entera. Por eso se pasan a 0/1
+    // a mano. Antes de esto, apagar cualquiera de estos toggles tiraba un 500 y no se
+    // guardaba: entre ellos isPublic, así que un perfil público no se podía volver
+    // privado y su link seguía andando.
+    private const BOOLEAN_FIELDS = ['showCorrelativas', 'showStatus', 'isPublic'];
+
     private const MAX_SEMESTER_PLANS_BYTES = 65535;
 
     public function __construct(private PDO $pdo)
@@ -50,6 +57,12 @@ final class PreferencesRepository
                 continue;
             }
             $value = $fields[$inputKey];
+            if (in_array($inputKey, self::BOOLEAN_FIELDS, true)) {
+                if (!is_bool($value)) {
+                    Response::error("invalid_{$inputKey}", 422);
+                }
+                $value = $value ? 1 : 0;
+            }
             if ($inputKey === 'selectedStats') {
                 $value = json_encode($value);
             }
@@ -60,12 +73,16 @@ final class PreferencesRepository
             $params[$column] = $value;
         }
 
-        if (($fields['isPublic'] ?? false) === true) {
+        // Volver a privado revoca el link: si después se vuelve a hacer público, sale
+        // un token nuevo y el link viejo (que pudo haber quedado circulando) ya no anda.
+        if (($fields['isPublic'] ?? null) === true) {
             $current = $this->find($userId);
             if (!$current['shareToken']) {
                 $sets[] = 'share_token = :share_token';
                 $params['share_token'] = bin2hex(random_bytes(16));
             }
+        } elseif (($fields['isPublic'] ?? null) === false) {
+            $sets[] = 'share_token = NULL';
         }
 
         // activeCareerCode no es una columna directa: hay que resolver el código a
