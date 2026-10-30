@@ -1,7 +1,7 @@
 // Tests de los helpers de la agenda de parciales y finales (assets/js/agenda.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { daysUntil, examLabel, gradeFor, nextInstance, relativeLabel, splitAgenda, subjectOptions } from '../../public_html/assets/js/agenda.js';
+import { daysUntil, examLabel, gradeFor, needsGrade, nextInstance, resultsWithGrade, relativeLabel, splitAgenda, subjectOptions } from '../../public_html/assets/js/agenda.js';
 
 const today = new Date(2026, 9, 30); // 30/10/2026
 
@@ -61,4 +61,34 @@ test('después de agregar una fecha pasa a la instancia siguiente', () => {
   assert.deepEqual(nextInstance(1, 1, 2), { partialNumber: 1, attemptNumber: 2 });
   assert.deepEqual(nextInstance(1, 3, 2), { partialNumber: 2, attemptNumber: 1 });
   assert.deepEqual(nextInstance(2, 3, 2), { partialNumber: 2, attemptNumber: 3 });
+});
+
+test('pide la nota de las fechas pasadas solo si hace falta', () => {
+  const cursando = { status: 'Faltan notas', partials: { 1: { 1: 4 }, 2: { 1: 8 } }, finals: [] };
+  const p = (partialNumber, attemptNumber) => ({ kind: 'parcial', partialNumber, attemptNumber });
+  assert.equal(needsGrade(p(1, 1), cursando), false, 'ya tiene nota');
+  assert.equal(needsGrade(p(1, 2), cursando), true, 'desaprobó la primera fecha');
+  assert.equal(needsGrade(p(2, 2), cursando), false, 'aprobó la primera fecha, no rindió el recuperatorio');
+  assert.equal(needsGrade(p(1, 3), cursando), false, 'todavía no cargó el primer recuperatorio');
+  assert.equal(needsGrade(p(3, 1), cursando), true);
+  assert.equal(needsGrade({ kind: 'final', date: '2026-10-01' }, cursando), true);
+  assert.equal(needsGrade(p(1, 2), { ...cursando, status: 'Promocionada' }), false);
+  assert.equal(needsGrade(p(1, 1), null), false, 'sin inscripción no hay dónde guardarla');
+});
+
+test('agrega la nota a los resultados sin tocar el resto', () => {
+  const enrollment = {
+    partials: { 1: { 1: 4 } },
+    finals: [{ attemptNumber: 1, grade: 3, examDate: '2026-07-10' }],
+    checklist: { tp: { 1: true } },
+  };
+  const parcial = resultsWithGrade(enrollment, { kind: 'parcial', partialNumber: 1, attemptNumber: 2 }, 7);
+  assert.deepEqual(parcial.partials, { 1: { 1: 4, 2: 7 } });
+  assert.deepEqual(parcial.checklist, { tp: { 1: true } });
+  assert.deepEqual(enrollment.partials, { 1: { 1: 4 } }, 'no muta la inscripción del cache');
+
+  const nuevaMesa = resultsWithGrade(enrollment, { kind: 'final', date: '2026-12-10' }, 8);
+  assert.deepEqual(nuevaMesa.finals, { 1: { grade: 3, examDate: '2026-07-10' }, 2: { grade: 8, examDate: '2026-12-10' } });
+  const mismaMesa = resultsWithGrade({ ...enrollment, finals: [{ attemptNumber: 1, grade: null, examDate: '2026-07-10' }] }, { kind: 'final', date: '2026-07-10' }, 6);
+  assert.deepEqual(mismaMesa.finals, { 1: { grade: 6, examDate: '2026-07-10' } });
 });

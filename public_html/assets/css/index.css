@@ -474,6 +474,9 @@ body{
   color: var(--bs-secondary-color);
   text-transform: uppercase;
 }
+.agenda-grade input{
+  width: 4.5rem;
+}
 .agenda-past{
   opacity: 0.7;
 }

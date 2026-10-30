@@ -93,6 +93,39 @@ function partialCount(enrollment) {
   return Number.isInteger(n) && n >= 0 ? n : 2;
 }
 
+// ¿Hay que cargar la nota de esta fecha (ya pasada)? No, si la materia ya está
+// aprobada, si la nota ya está o si no hay inscripción donde guardarla. Un
+// recuperatorio solo cuenta si la instancia anterior tiene nota y no alcanzó
+// para regularizar: si aprobaste el parcial, el recuperatorio no se rindió.
+export function needsGrade(entry, enrollment) {
+  if (!entry || !enrollment || APPROVED.includes(enrollment.status)) return false;
+  if (gradeFor(entry, enrollment) !== null) return false;
+  if (entry.kind === 'final' || entry.attemptNumber <= 1) return true;
+  const prev = gradeFor({ ...entry, attemptNumber: entry.attemptNumber - 1 }, enrollment);
+  const minNote = enrollment.schemeConfig?.regularization?.min_note ?? 6;
+  return prev !== null && prev < minNote;
+}
+
+// Resultados de la inscripción con la nota de esta fecha agregada, con el shape
+// del body de PUT /results. Un final va en la mesa con esa fecha o, si no hay
+// ninguna, en la siguiente libre.
+export function resultsWithGrade(enrollment, entry, grade) {
+  const partials = {};
+  Object.entries(enrollment.partials || {}).forEach(([p, attempts]) => { partials[p] = { ...attempts }; });
+  const finals = {};
+  (Array.isArray(enrollment.finals) ? enrollment.finals : []).forEach(f => {
+    if (f) finals[f.attemptNumber] = { grade: f.grade ?? null, examDate: f.examDate ?? null };
+  });
+  if (entry.kind === 'final') {
+    const same = Object.keys(finals).find(k => finals[k].examDate === entry.date);
+    const attempt = same || String(Object.keys(finals).reduce((max, k) => Math.max(max, Number(k)), 0) + 1);
+    finals[attempt] = { grade, examDate: entry.date };
+  } else {
+    partials[entry.partialNumber] = { ...(partials[entry.partialNumber] || {}), [entry.attemptNumber]: grade };
+  }
+  return { partials, finals, checklist: enrollment.checklist || {} };
+}
+
 // Después de agregar un parcial, el formulario pasa a la instancia siguiente
 // para cargar el cronograma de una materia de un tirón.
 export function nextInstance(partialNumber, attemptNumber, partials) {
@@ -110,7 +143,8 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// ctx: { getStore, getEnrollments, getEnrollment(code), getSubjectName(code) }
+// ctx: { getStore, getEnrollments, getEnrollment(code), getSubjectName(code),
+//        saveResults(code, results) -> guarda las notas y actualiza el tablero }
 export function initAgenda(ctx) {
   const modalEl = document.getElementById('agendaModal');
   if (!modalEl) return;
@@ -162,13 +196,13 @@ export function initAgenda(ctx) {
     renderExamOptions(examSel.value);
   }
 
-  function rowHtml(e) {
+  function rowHtml(e, pending = false) {
     const d = parseDate(e.date);
     const grade = gradeFor(e, ctx.getEnrollment(e.subjectCode));
     const soon = e.days >= 0 && e.days <= 7;
     const name = ctx.getSubjectName(e.subjectCode) || e.subjectCode;
     return `
-      <li class="list-group-item agenda-item d-flex align-items-center gap-2 gap-sm-3${e.days < 0 ? ' agenda-past' : ''}">
+      <li class="list-group-item agenda-item d-flex align-items-center gap-2 gap-sm-3${e.days < 0 && !pending ? ' agenda-past' : ''}">
         <div class="agenda-date text-center">
           <div class="agenda-date-day">${d.getDate()}</div>
           <div class="agenda-date-month">${esc(monthFmt.format(d).replace('.', ''))}</div>
@@ -178,10 +212,15 @@ export function initAgenda(ctx) {
           <div class="fw-semibold">${esc(name)}</div>
           <div class="small text-body-secondary">${esc(examLabel(e))}</div>
         </div>
+        ${pending ? `
+        <form class="agenda-grade d-flex align-items-center gap-1 flex-shrink-0" data-id="${esc(e.id)}">
+          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm" placeholder="Nota" aria-label="Nota de ${esc(examLabel(e))}" required>
+          <button type="submit" class="btn btn-sm btn-outline-primary">Guardar</button>
+        </form>` : `
         <div class="d-flex flex-column flex-sm-row align-items-end align-items-sm-center gap-1 gap-sm-2 flex-shrink-0">
           <span class="badge rounded-pill ${soon ? 'text-bg-warning' : 'bg-body-secondary text-body border'}">${esc(relativeLabel(e.days))}</span>
           ${grade !== null ? `<span class="badge text-bg-secondary">Nota ${esc(grade)}</span>` : ''}
-        </div>
+        </div>`}
         <button type="button" class="btn btn-sm btn-icon" data-action="delete" data-id="${esc(e.id)}" title="Borrar fecha" aria-label="Borrar fecha">
           <i class="bi bi-trash" aria-hidden="true"></i>
         </button>
@@ -189,6 +228,7 @@ export function initAgenda(ctx) {
   }
 
   function renderList() {
+    const pastOpen = !!listEl.querySelector('details[open]');
     const { upcoming, past } = splitAgenda(entries);
     if (!upcoming.length && !past.length) {
       listEl.innerHTML = '<p class="text-body-secondary text-center my-4">Todavía no cargaste fechas.</p>';
@@ -196,11 +236,19 @@ export function initAgenda(ctx) {
     }
     let html = '<h6 class="mt-3">Próximas</h6>';
     html += upcoming.length
-      ? `<ul class="list-group">${upcoming.map(rowHtml).join('')}</ul>`
+      ? `<ul class="list-group">${upcoming.map(e => rowHtml(e)).join('')}</ul>`
       : '<p class="small text-body-secondary">No hay fechas por delante.</p>';
-    if (past.length) {
-      html += `<details class="mt-3"><summary class="small text-body-secondary">Pasadas (${past.length})</summary>
-        <ul class="list-group mt-2">${past.map(rowHtml).join('')}</ul></details>`;
+    // Las pasadas sin nota van aparte y a la vista (en orden cronológico), para
+    // cargarlas todas juntas.
+    const missing = past.filter(e => needsGrade(e, ctx.getEnrollment(e.subjectCode))).reverse();
+    const rest = past.filter(e => !missing.includes(e));
+    if (missing.length) {
+      html += `<h6 class="mt-3">Falta cargar la nota <span class="badge rounded-pill text-bg-danger align-text-top">${missing.length}</span></h6>
+        <ul class="list-group">${missing.map(e => rowHtml(e, true)).join('')}</ul>`;
+    }
+    if (rest.length) {
+      html += `<details class="mt-3"${pastOpen ? ' open' : ''}><summary class="small text-body-secondary">Pasadas (${rest.length})</summary>
+        <ul class="list-group mt-2">${rest.map(e => rowHtml(e)).join('')}</ul></details>`;
     }
     listEl.innerHTML = html;
   }
@@ -253,6 +301,29 @@ export function initAgenda(ctx) {
     } catch (err) {
       btn.disabled = false;
       toastError('No se pudo borrar la fecha', err);
+    }
+  });
+
+  listEl.addEventListener('submit', async (ev) => {
+    const gradeForm = ev.target.closest('form.agenda-grade');
+    if (!gradeForm) return;
+    ev.preventDefault();
+    const entry = entries.find(e => String(e.id) === gradeForm.dataset.id);
+    const enrollment = entry ? ctx.getEnrollment(entry.subjectCode) : null;
+    const input = gradeForm.querySelector('input');
+    const grade = Number(input.value);
+    if (!entry || !enrollment) return;
+    if (!Number.isInteger(grade) || grade < 1 || grade > 10) { input.reportValidity(); return; }
+    const btn = gradeForm.querySelector('button');
+    setBusy(btn, true);
+    try {
+      await ctx.saveResults(entry.subjectCode, resultsWithGrade(enrollment, entry, grade));
+      renderList();
+      const next = listEl.querySelector('form.agenda-grade input');
+      if (next) next.focus();
+    } catch (err) {
+      setBusy(btn, false);
+      toastError('No se pudo guardar la nota', err);
     }
   });
 

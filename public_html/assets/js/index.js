@@ -3193,6 +3193,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     getEnrollments: () => Object.values(enrollmentCache),
     getEnrollment: code => loadSubjectData(code),
     getSubjectName: code => getSubjectNameByCode(code),
+    // Misma secuencia que el botón Guardar del modal de la materia, sin el modal.
+    saveResults: async (code, results) => {
+      let prevAvailable = [];
+      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+      const hydrated = await activeStore.saveResults(code, { ...results, clearOverride: true });
+      putSubjectDataInCache(code, hydrated);
+      try{ updateAllCardCursarState(); animateNewlyUnlocked(prevAvailable, getAvailableSubjectCodes()); }catch(e){}
+      try{ computeStats(displayedSubjects); }catch(e){}
+      try{ if (planData) renderGroups(planData); }catch(e){}
+      return hydrated;
+    },
   });
 
   initApp();
