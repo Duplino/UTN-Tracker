@@ -12,12 +12,16 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-COPY composer.json ./
-RUN composer install --no-interaction --no-progress --optimize-autoloader
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --no-progress --optimize-autoloader
 
 COPY . .
 
-RUN composer dump-autoload --optimize
+RUN composer dump-autoload --no-dev --optimize
 
 # Versiona los assets (?v=hash + import map) para poder cachearlos por un año.
 RUN php docker/version-assets.php
+
+# Al arrancar aplica las migraciones pendientes (database/migrations/) y recién
+# después levanta Apache. Si una migración falla, el contenedor no arranca.
+CMD ["sh", "-c", "php bin/migrate.php && exec apache2-foreground"]

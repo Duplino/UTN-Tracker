@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  checks:
+    name: Lint y tests unitarios
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+          coverage: none
+
+      - run: composer install --no-interaction --no-progress
+
+      - name: Sintaxis PHP
+        run: find src bin public_html docker tests -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: PHPUnit (unit)
+        run: vendor/bin/phpunit --testsuite unit
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Sintaxis JS
+        run: for f in public_html/assets/js/*.js; do node --check "$f"; done
+
+      - name: Tests JS
+        run: npm test
+
+      - name: Versionado de assets (sobre una copia)
+        run: |
+          cp -r public_html "$RUNNER_TEMP/public_html"
+          VERSION_ASSETS_ROOT="$RUNNER_TEMP/public_html" php docker/version-assets.php
+          grep -q '<script type="importmap">' "$RUNNER_TEMP/public_html/index.html"
+
+  api:
+    name: Migraciones y API contra MySQL
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: utn_tracker
+          MYSQL_USER: utn_tracker
+          MYSQL_PASSWORD: utn_tracker
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      MYSQL_IP: 127.0.0.1
+      MYSQL_PORT: '3306'
+      DB: utn_tracker
+      DB_USER: utn_tracker
+      DB_PASSWORD: utn_tracker
+      GOOGLE_CLIENT_ID: ci
+      MOCK_AUTH_ENABLED: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, curl
+          tools: composer:v2
+          coverage: none
+
+      - run: composer install --no-interaction --no-progress
+
+      - name: Migraciones sobre una base vacía
+        run: php bin/migrate.php
+
+      - name: Segunda corrida no hace nada
+        run: php bin/migrate.php | grep -q 'nada pendiente'
+
+      - name: Tests de API
+        run: |
+          php -S 127.0.0.1:8001 -t public_html dev-router.php > "$RUNNER_TEMP/server.log" 2>&1 &
+          sleep 1
+          API_TEST_URL=http://127.0.0.1:8001 vendor/bin/phpunit --testsuite api || { cat "$RUNNER_TEMP/server.log"; exit 1; }

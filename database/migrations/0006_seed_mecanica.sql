@@ -7,10 +7,11 @@
 -- Materias compartidas con Sistemas reutilizadas por igual code (mismo code =
 -- misma materia global): F1(2), AM1(3), AGA(4), AM2(10), F2(11), IyS/IngSoc(12),
 -- InglesI/IT1(7), InglesII/IT2(16), PyE(18), y también ECO(950309)/Leg(950310)
--- pese a que hoy tienen distinta carga horaria real en cada carrera (Sistemas
--- las carga con sus propios valores en seed_sistemas.sql vía ON DUPLICATE KEY
--- UPDATE sobre el mismo id/code) -- discrepancia a resolver a futuro, por ahora
--- se ignora.
+-- pese a que hoy tienen distinta carga horaria real en cada carrera (las dos
+-- seeds las cargan vía ON DUPLICATE KEY UPDATE sobre el mismo id/code, gana la
+-- última que corre) -- discrepancia a resolver a futuro, por ahora se ignora.
+-- Tiene que correr después de 0004_seed_sistemas.sql: las materias compartidas
+-- solo se insertan ahí.
 
 SET NAMES utf8mb4;
 

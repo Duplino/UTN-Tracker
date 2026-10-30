@@ -75,7 +75,7 @@ final class EnrollmentRepository
 
     // Baja completa (no "recursar"): borra la inscripción entera, no solo las notas.
     // enrollment_partials/finals/checklist tienen ON DELETE CASCADE sobre enrollment_id
-    // (ver database/schema.sql), así que se limpian solas.
+    // (ver database/migrations/0001_initial_schema.sql), así que se limpian solas.
     public function delete(int $enrollmentId): void
     {
         $this->pdo->prepare('DELETE FROM enrollments WHERE id = :id')->execute(['id' => $enrollmentId]);
@@ -257,7 +257,7 @@ final class EnrollmentRepository
                 'schemeConfig' => $scheme['config'] ?? null,
                 'enrollmentYear' => (int) $row['enrollment_year'],
                 // Fuente de verdad: subject_retakes, no enrollments.recursed_count (ver
-                // comentario en database/schema.sql) — sobrevive a recursar/dar de baja.
+                // comentario en database/migrations/0001_initial_schema.sql) — sobrevive a recursar/dar de baja.
                 'recursedCount' => $retakes[$row['subject_code']] ?? 0,
                 'statusOverride' => $row['status_override'],
                 'status' => $status,

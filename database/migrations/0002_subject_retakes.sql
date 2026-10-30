@@ -1,7 +1,7 @@
 -- Migración única: crea subject_retakes y la puebla con los recursed_count que ya
 -- existan en enrollments (antes de este cambio, era la única fuente del conteo).
 -- Reejecutable (CREATE IF NOT EXISTS + upsert con GREATEST, no pisa un conteo mayor
--- si se corre más de una vez). Correr a mano una sola vez contra la DB de producción.
+-- si se corre más de una vez). En una base nueva no hace nada: la tabla ya la crea 0001.
 
 CREATE TABLE IF NOT EXISTS subject_retakes (
   user_id INT UNSIGNED NOT NULL,

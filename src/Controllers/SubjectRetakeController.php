@@ -12,7 +12,7 @@ use App\Repositories\SubjectRetakeRepository;
 use PDO;
 
 // Conteo de recursadas por materia: recurso propio, separado de enrollments (ver
-// database/schema.sql) porque tiene que sobrevivir a que se borre la inscripción
+// database/migrations/0001_initial_schema.sql) porque tiene que sobrevivir a que se borre la inscripción
 // activa (recursar la borra; ver EnrollmentController::recursar).
 final class SubjectRetakeController
 {

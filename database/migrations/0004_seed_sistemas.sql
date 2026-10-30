@@ -108,7 +108,7 @@ ON DUPLICATE KEY UPDATE
 
 -- ECO y Leg son compartidas con Mecánica (mismo code = misma materia, aunque la
 -- carga horaria real difiera entre carreras; eso se resuelve a futuro), por eso
--- usan el ID "real" del plan de Mecánica (ver seed_mecanica.sql) en vez de autonumérico.
+-- usan el ID "real" del plan de Mecánica (ver 0006_seed_mecanica.sql) en vez de autonumérico.
 INSERT INTO subjects (id, code, name, week_hours, duration) VALUES
   (950309, 'ECO', 'Economía', 3, 'anual'),
   (950310, 'Leg', 'Legislación', 2, 'anual')

@@ -10,6 +10,8 @@ api/test-data/
 
 # PHP
 vendor/
-composer.lock
 
 .env
+backups/
+node_modules/
+.phpunit.result.cache
