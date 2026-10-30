@@ -221,10 +221,9 @@ export function simulate({ universe, plan, getEnrollment, start }) {
   };
 }
 
-// Egreso estimado al ritmo actual, contado en años lectivos completos (marzo a
-// febrero): ritmo = materias aprobadas de cursadas de años ya terminados ÷ esos
-// años. El año en curso no entra en el ritmo, porque sus finales todavía no se
-// rindieron y bajaría el promedio.
+// Egreso estimado al ritmo actual, contado en años lectivos enteros (marzo a
+// febrero): ritmo = materias aprobadas ÷ años lectivos desde el ingreso, contando
+// el año en curso como uno entero. La proyección arranca al terminar el año en curso.
 export function paceEstimate({ universe, getEnrollment, yearStarted, now = new Date() }) {
   const approved = [...universe.required, ...universe.electives].filter(s => realState(getEnrollment(s.code)) === 'approved');
   const isElective = s => !universe.required.includes(s);
@@ -234,10 +233,9 @@ export function paceEstimate({ universe, getEnrollment, yearStarted, now = new D
   const done = countCapped(approved);
   const remaining = Math.max(0, total - done);
 
-  const yearOf = s => { const e = getEnrollment(s.code); const y = e ? Number(e.enrollmentYear) : NaN; return Number.isFinite(y) ? y : null; };
   let from = Number.isInteger(yearStarted) ? yearStarted : null;
   if (from === null) {
-    const years = approved.map(yearOf).filter(y => y !== null);
+    const years = approved.map(s => getEnrollment(s.code)).map(e => e && Number(e.enrollmentYear)).filter(Number.isFinite);
     if (years.length) from = Math.min(...years);
   }
   const base = { remaining, total, done, pace: null, term: null, years: 0 };
@@ -247,16 +245,12 @@ export function paceEstimate({ universe, getEnrollment, yearStarted, now = new D
 
   // En enero y febrero todavía se está cerrando el año lectivo anterior.
   const currentYear = now.getMonth() + 1 >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-  const years = currentYear - from;
-  if (years < 1) return { ...base, reason: 'first-year' };
-  // Una aprobada sin año de cursada se cuenta como de un año ya terminado.
-  const doneInCompleted = countCapped(approved.filter(s => { const y = yearOf(s); return y === null || y < currentYear; }));
-  if (doneInCompleted === 0) return { ...base, years, reason: 'no-approved' };
-  const pace = doneInCompleted / years;
+  const years = Math.max(1, currentYear - from + 1);
+  const pace = done / years;
 
-  // Desde el inicio del año en curso falta lo que queda más lo que ya se aprobó
-  // este año. La parte fraccionaria se pasa a cuatrimestre: primera mitad 1C.
-  const finish = currentYear + (remaining + (done - doneInCompleted)) / pace - 1e-9;
+  // Lo que falta, a ese ritmo, a partir del año lectivo siguiente. La parte
+  // fraccionaria se pasa a cuatrimestre: primera mitad 1C, segunda 2C.
+  const finish = currentYear + 1 + remaining / pace - 1e-9;
   const term = termNumber(Math.floor(finish), finish - Math.floor(finish) < 0.5 ? 1 : 2);
   return { remaining, total, done, pace, term, years, reason: null };
 }
@@ -340,8 +334,7 @@ export function initPlanner(ctx) {
     if (pace.reason === 'done') paceText = 'Ya aprobaste todas las materias.';
     else if (pace.reason === 'no-approved') paceText = 'Todavía no hay materias aprobadas para calcular tu ritmo.';
     else if (pace.reason === 'no-year') paceText = 'Cargá tu año de ingreso en Perfil y carreras para estimarlo.';
-    else if (pace.reason === 'first-year') paceText = 'Se calcula con años lectivos completos: aparece cuando termines tu primer año.';
-    else paceText = `A ${formatPace(pace.pace)} materias por año (en ${pace.years} ${pace.years === 1 ? 'año completo' : 'años completos'}), te faltan ${pace.remaining} de ${pace.total}.`;
+    else paceText = `A ${formatPace(pace.pace)} materias por año (en ${pace.years} ${pace.years === 1 ? 'año lectivo' : 'años lectivos'}), te faltan ${pace.remaining} de ${pace.total}.`;
 
     let planValue;
     let planText;

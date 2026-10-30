@@ -55,23 +55,22 @@ test('normalizePlan descarta resultados inválidos y el valor por defecto', () =
   assert.deepEqual(normalizePlan({ current: { A: 'approved', B: 'regular', C: 'x' } }).current, { A: 'approved' });
 });
 
-test('el ritmo cuenta solo años lectivos completos', () => {
+test('el ritmo cuenta el año en curso como entero', () => {
   const enr = {
     A: { status: 'Aprobada', enrollmentYear: 2025 },
     B: { status: 'Aprobada', enrollmentYear: 2025 },
     C: { status: 'Aprobada', enrollmentYear: 2026 },
   };
   const est = paceEstimate({ universe, getEnrollment: c => enr[c] || null, yearStarted: 2025, now: new Date(2026, 9, 30) });
-  // 2 aprobadas en 2025 (1 año completo) → 2 por año. Faltan D y E, más C que
-  // se aprobó en 2026: (2 + 1) / 2 = 1,5 años desde marzo de 2026, o sea al
-  // terminar el primer cuatrimestre de 2027.
-  assert.equal(est.years, 1);
-  assert.equal(est.pace, 2);
-  assert.equal(est.term, termNumber(2027, 1));
+  // 3 aprobadas en 2 años lectivos (2025 y 2026) → 1,5 por año. Faltan D y E:
+  // 2 / 1,5 ≈ 1,33 años desde marzo de 2027 → 1C 2028.
+  assert.equal(est.years, 2);
+  assert.equal(est.pace, 1.5);
+  assert.equal(est.term, termNumber(2028, 1));
 });
 
-test('en el primer año no se estima el ritmo', () => {
-  const enr = { A: { status: 'Aprobada', enrollmentYear: 2026 } };
-  const est = paceEstimate({ universe, getEnrollment: c => enr[c] || null, yearStarted: 2026, now: new Date(2026, 9, 30) });
-  assert.equal(est.reason, 'first-year');
+test('enero y febrero cuentan como parte del año lectivo anterior', () => {
+  const enr = { A: { status: 'Aprobada', enrollmentYear: 2025 } };
+  const est = paceEstimate({ universe, getEnrollment: c => enr[c] || null, yearStarted: 2025, now: new Date(2026, 1, 15) });
+  assert.equal(est.years, 1);
 });
