@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   show_status TINYINT(1) NOT NULL DEFAULT 1,
   view_mode VARCHAR(20) NOT NULL DEFAULT 'board',
   selected_stats JSON NULL,
+  semester_plans JSON NULL,
   year_started SMALLINT NULL,
   is_public TINYINT(1) NOT NULL DEFAULT 0,
   share_token CHAR(32) NULL,

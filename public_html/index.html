@@ -25,6 +25,7 @@
 		<link rel="modulepreload" href="assets/js/careers.js">
 		<link rel="modulepreload" href="assets/js/evaluationSchemes.js">
 		<link rel="modulepreload" href="assets/js/localGuestStore.js">
+		<link rel="modulepreload" href="assets/js/planner.js">
 		<link rel="modulepreload" href="assets/js/statusEngine.js">
 		<link rel="modulepreload" href="assets/js/theme.js">
 		<link rel="modulepreload" href="assets/js/ui.js">
@@ -48,6 +49,9 @@
 					</div>
 					<button type="button" class="btn btn-outline-secondary" id="btn-electivas">
 						<i class="bi bi-plus-square me-1" aria-hidden="true"></i>Electivas
+					</button>
+					<button type="button" class="btn btn-outline-secondary" id="btn-planner" data-bs-toggle="modal" data-bs-target="#plannerModal">
+						<i class="bi bi-calendar-week me-1" aria-hidden="true"></i>Planificar
 					</button>
 				</div>
 				<div class="d-flex align-items-center gap-1" role="group" aria-label="Acciones">
@@ -495,6 +499,29 @@
 			    </div>
 			  </div>
 			</div>
+
+		<!-- Planificador de cuatrimestres: el contenido lo arma assets/js/planner.js al abrirlo. -->
+		<div class="modal fade" id="plannerModal" tabindex="-1" aria-labelledby="plannerModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-lg-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <div>
+		          <h5 class="modal-title" id="plannerModalLabel">Planificador de cuatrimestres</h5>
+		          <div class="small text-body-secondary" id="planner-career"></div>
+		        </div>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body" id="planner-body"></div>
+		      <div class="modal-footer justify-content-between">
+		        <small class="text-body-secondary">Es una simulación: no cambia tus materias ni tus notas.</small>
+		        <div class="d-flex align-items-center gap-3">
+		          <small class="text-body-secondary" id="planner-save-state" role="status"></small>
+		          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		        </div>
+		      </div>
+		    </div>
+		  </div>
+		</div>
 
 		<!-- Subject modal for entering parciales and finales -->
 		<div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">

@@ -1,0 +1,9 @@
+{
+  "name": "utn-tracker",
+  "private": true,
+  "type": "module",
+  "description": "Solo para los tests del frontend (no hay build ni dependencias de npm).",
+  "scripts": {
+    "test": "node --test \"tests/js/*.test.mjs\""
+  }
+}

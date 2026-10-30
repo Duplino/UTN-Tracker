@@ -9,10 +9,8 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:?falta DB_PASSWORD en .env}
     volumes:
       - db_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql:ro
-      - ./database/seed_schemes.sql:/docker-entrypoint-initdb.d/2_seed_schemes.sql:ro
-      - ./database/seed_mecanica.sql:/docker-entrypoint-initdb.d/3_seed_mecanica.sql:ro
-      - ./database/seed_sistemas.sql:/docker-entrypoint-initdb.d/3_seed_sistemas.sql:ro
+      # El esquema y los datos iniciales los carga la app al arrancar
+      # (bin/migrate.php con database/migrations/), no el entrypoint de MySQL.
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD}"]
       interval: 5s

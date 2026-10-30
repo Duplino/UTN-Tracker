@@ -1,5 +1,4 @@
--- Carga inicial de evaluation_schemes. Se corre una sola vez a mano contra la
--- DB (no lo ejecuta la app en runtime). Reejecutable: usa UPSERT por `code`.
+-- Carga inicial de evaluation_schemes. Reejecutable: usa UPSERT por `code`.
 -- Los criterios reales de cada materia (qué esquema le corresponde) se
 -- terminan de ajustar a mano en `config` a medida que se confirman casos.
 

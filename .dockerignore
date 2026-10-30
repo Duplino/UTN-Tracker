@@ -6,3 +6,7 @@ node_modules
 *.md
 .DS_Store
 .claude
+tests
+.github
+phpunit.xml.dist
+package.json

@@ -8,7 +8,7 @@ use PDO;
 
 // Conteo de recursadas por (usuario, materia). Vive separado de `enrollments` a
 // propósito: "recursar" y "dar de baja" borran la inscripción activa, pero este
-// conteo tiene que sobrevivir a eso (ver database/schema.sql).
+// conteo tiene que sobrevivir a eso (ver database/migrations/0001_initial_schema.sql).
 final class SubjectRetakeRepository
 {
     public function __construct(private PDO $pdo)
