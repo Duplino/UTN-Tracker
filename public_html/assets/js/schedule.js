@@ -611,10 +611,19 @@ export function initSchedule(ctx) {
 
   $('schedule-import-btn').addEventListener('click', () => fileInput.click());
 
-  fileInput.addEventListener('change', async () => {
+  fileInput.addEventListener('change', () => {
     const file = fileInput.files && fileInput.files[0];
     fileInput.value = '';
-    if (!file) return;
+    if (file) processFile(file);
+  });
+
+  // Lee el PDF y muestra la revisión. Si el modal está cerrado (llamado desde
+  // afuera, ej. el onboarding), lo abre y espera a que cargue el horario.
+  async function processFile(file) {
+    if (!modalEl.classList.contains('show')) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+    await loaded;
     const btn = $('schedule-import-btn');
     setBusy(btn, true);
     try {
@@ -629,6 +638,15 @@ export function initSchedule(ctx) {
     } finally {
       setBusy(btn, false);
     }
+  }
+
+  // Punto de entrada para otras pantallas: openScheduleImport() (abajo) dispara
+  // este evento. Con archivo lo procesa; sin archivo abre el selector (tiene que
+  // llamarse desde un click para que el navegador lo permita).
+  document.addEventListener(IMPORT_EVENT, ev => {
+    const file = ev.detail && ev.detail.file;
+    if (file) processFile(file);
+    else fileInput.click();
   });
 
   function boardState(code) {
@@ -757,7 +775,10 @@ export function initSchedule(ctx) {
 
   // --- Abrir ---
 
-  modalEl.addEventListener('show.bs.modal', async () => {
+  let loaded = Promise.resolve();
+  modalEl.addEventListener('show.bs.modal', () => { loaded = load(); });
+
+  async function load() {
     closeImport();
     editing = null;
     dragged = [];
@@ -772,5 +793,13 @@ export function initSchedule(ctx) {
     if (days.size && !days.has(mobileDay)) mobileDay = Math.min(...days);
     renderAll();
     fillForm(null);
-  });
+  }
+}
+
+// Importar el comprobante de inscripción a cursada desde cualquier lado (perfil,
+// onboarding): sin archivo abre el selector de archivos (llamar desde un click),
+// con un File lo lee y abre el horario con la revisión de lo importado.
+const IMPORT_EVENT = 'utn:schedule-import';
+export function openScheduleImport(file = null) {
+  document.dispatchEvent(new CustomEvent(IMPORT_EVENT, { detail: { file } }));
 }
