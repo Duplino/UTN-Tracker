@@ -1,0 +1,92 @@
+name: Deploy
+
+# Cuando el CI de un push a main termina en verde, se conecta por SSH al VPS y
+# corre bin/deploy.sh (git pull + docker compose up -d --build + chequeo de que
+# la app responda). Si el CI falla, no se deploya nada.
+#
+# dev -> staging hace lo mismo, pero solo si la variable de repo
+# AUTO_DEPLOY_STAGING vale "true".
+#
+# Setup (secrets, clave SSH en el VPS): ver "Deploy automático" en el readme.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main, dev]
+  # Botón "Run workflow" en la pestaña Actions, para redeployar a mano.
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Entorno
+        type: choice
+        options: [prod, staging]
+        default: prod
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       (github.event.workflow_run.head_branch == 'main' ||
+        (github.event.workflow_run.head_branch == 'dev' && vars.AUTO_DEPLOY_STAGING == 'true')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.target ||
+            (github.event.workflow_run.head_branch == 'main' && 'prod' || 'staging') }}
+    # Un deploy a la vez; uno nuevo espera al anterior (no lo cancela: cortar un
+    # build a la mitad es peor que esperar).
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Configurar SSH
+        id: ssh
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          # Sin ningún secret cargado todavía, se saltea el deploy en vez de
+          # dejar el CI en rojo (p. ej. justo después de mergear este workflow).
+          if [ -z "$VPS_HOST$VPS_SSH_KEY$VPS_KNOWN_HOSTS" ]; then
+            echo "::warning::Deploy salteado: no hay secrets VPS_* configurados. Ver 'Deploy automático' en el readme."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for s in VPS_HOST VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            if [ -z "${!s}" ]; then
+              echo "::error::Falta el secret $s (Settings → Secrets and variables → Actions). Ver 'Deploy automático' en el readme."
+              exit 1
+            fi
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Host key fijada: si el VPS no es el que esperamos, ssh corta.
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy ${{ env.TARGET }}
+        if: steps.ssh.outputs.skip != 'true'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER || 'debian' }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+        run: |
+          echo "Commit: ${{ github.event.workflow_run.head_sha || github.sha }}"
+          # La clave tiene un forced command en el VPS: lo único que hace es
+          # correr bin/deploy.sh con este argumento.
+          ssh -i ~/.ssh/deploy_key -p "$VPS_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 -o ConnectTimeout=20 \
+            "$VPS_USER@$VPS_HOST" "$TARGET"
+
+      - name: Borrar clave
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
