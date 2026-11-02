@@ -36,62 +36,47 @@
 	</head>
 	<body>
 		<div class="container-fluid">
-			<!-- Barra superior: a la izquierda lo que cambia el tablero (carrera, título
-			     intermedio, electivas); a la derecha ayuda, estadísticas, tema y el menú de usuario. -->
-			<header class="toolbar d-flex flex-wrap justify-content-between align-items-center gap-2">
-				<div class="d-flex flex-wrap align-items-center gap-2" role="group" aria-label="Tablero">
-					<a class="app-brand d-flex align-items-center gap-2 text-decoration-none" href="./" aria-label="UTN Tracker">
-						<img src="assets/sello_arana.png" alt="" width="28" height="28">
-						<span class="fw-semibold d-none d-lg-inline">UTN Tracker</span>
-					</a>
-					<select id="programSelect" class="form-select program-select" aria-label="Carrera">
-						<!-- Opciones generadas dinámicamente por JS según las carreras en las que estás anotado -->
-					</select>
-					<div id="settings-intermediate-title-wrap" class="form-check form-switch d-none text-nowrap mb-0" title="Mostrar el mapa hasta el título intermedio">
-						<input class="form-check-input" type="checkbox" id="settings-intermediate-title" role="switch">
-						<label class="form-check-label small" for="settings-intermediate-title">Título intermedio</label>
-					</div>
-					<button type="button" class="btn btn-outline-secondary" id="btn-electivas">
-						<i class="bi bi-plus-square me-1" aria-hidden="true"></i>Electivas
+			<!-- Barra superior: marca, carrera, secciones (Agenda, Horario, Planificar,
+			     Electivas) y a la derecha estadísticas y el menú de usuario. Ayuda, tema y
+			     "Título intermedio" están en Configuración (menú de usuario).
+			     Debajo de 992 px las secciones (.app-nav) pasan a una barra fija abajo. -->
+			<header class="toolbar">
+				<a class="app-brand d-flex align-items-center gap-2 text-decoration-none" href="./" aria-label="UTN Tracker">
+					<img src="assets/sello_arana.png" alt="" width="28" height="28">
+					<span class="fw-semibold d-none d-xl-inline text-nowrap">UTN Tracker</span>
+				</a>
+				<select id="programSelect" class="form-select program-select" aria-label="Carrera">
+					<!-- Opciones generadas dinámicamente por JS según las carreras en las que estás anotado -->
+				</select>
+				<nav class="app-nav" aria-label="Secciones">
+					<button type="button" class="btn app-nav-btn" id="btn-agenda" data-bs-toggle="modal" data-bs-target="#agendaModal">
+						<i class="bi bi-calendar-event" aria-hidden="true"></i><span>Agenda</span>
 					</button>
-					<button type="button" class="btn btn-outline-secondary" id="btn-agenda" data-bs-toggle="modal" data-bs-target="#agendaModal">
-						<i class="bi bi-calendar-event me-1" aria-hidden="true"></i>Agenda
+					<button type="button" class="btn app-nav-btn" id="btn-schedule" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+						<i class="bi bi-clock" aria-hidden="true"></i><span>Horario</span>
 					</button>
-					<button type="button" class="btn btn-outline-secondary" id="btn-schedule" data-bs-toggle="modal" data-bs-target="#scheduleModal">
-						<i class="bi bi-clock me-1" aria-hidden="true"></i>Horario
+					<button type="button" class="btn app-nav-btn" id="btn-planner" data-bs-toggle="modal" data-bs-target="#plannerModal">
+						<i class="bi bi-calendar-week" aria-hidden="true"></i><span>Planificar</span>
 					</button>
-					<button type="button" class="btn btn-outline-secondary" id="btn-planner" data-bs-toggle="modal" data-bs-target="#plannerModal">
-						<i class="bi bi-calendar-week me-1" aria-hidden="true"></i>Planificar
+					<button type="button" class="btn app-nav-btn" id="btn-electivas">
+						<i class="bi bi-plus-square" aria-hidden="true"></i><span>Electivas</span>
 					</button>
-				</div>
-				<div class="d-flex align-items-center gap-1" role="group" aria-label="Acciones">
+				</nav>
+				<div class="toolbar-actions d-flex align-items-center gap-1" role="group" aria-label="Acciones">
 					<span id="sync-indicator" class="sync-indicator text-body-secondary small d-none" role="status">
 						<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-						<span class="d-none d-md-inline ms-1">Sincronizando…</span>
+						<span class="d-none d-xl-inline ms-1">Sincronizando…</span>
 					</span>
-					<button type="button" class="btn btn-icon" data-bs-toggle="modal" data-bs-target="#helpModal" id="btn-help" title="Ayuda" aria-label="Ayuda">
-						<i class="bi bi-question-circle" aria-hidden="true"></i>
-					</button>
 					<button type="button" class="btn btn-icon" data-bs-toggle="modal" data-bs-target="#statsModal" id="btn-stats" title="Estadísticas" aria-label="Estadísticas">
 						<i class="bi bi-bar-chart" aria-hidden="true"></i>
 					</button>
-					<div class="dropdown">
-						<button type="button" class="btn btn-icon" id="btn-theme" data-bs-toggle="dropdown" aria-expanded="false" title="Tema" aria-label="Tema">
-							<i class="bi bi-circle-half" id="theme-icon" aria-hidden="true"></i>
-						</button>
-						<ul class="dropdown-menu dropdown-menu-end" aria-labelledby="btn-theme">
-							<li><button type="button" class="dropdown-item" data-theme-value="light"><i class="bi bi-sun me-2" aria-hidden="true"></i>Claro</button></li>
-							<li><button type="button" class="dropdown-item" data-theme-value="dark"><i class="bi bi-moon-stars me-2" aria-hidden="true"></i>Oscuro</button></li>
-							<li><button type="button" class="dropdown-item" data-theme-value="auto"><i class="bi bi-circle-half me-2" aria-hidden="true"></i>Automático</button></li>
-						</ul>
-					</div>
 					<!-- Menú de usuario: el contenido (avatar, nombre, iniciar/cerrar sesión) lo
 					     actualiza assets/js/auth.js según haya sesión o no. -->
 					<div class="dropdown">
 						<button type="button" class="btn user-menu-btn d-flex align-items-center gap-2" id="btn-user-menu" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menú de usuario">
 							<img id="user-menu-avatar" class="user-avatar d-none" src="data:," alt="" width="28" height="28" referrerpolicy="no-referrer">
 							<i id="user-menu-icon" class="bi bi-person-circle fs-5" aria-hidden="true"></i>
-							<span id="user-menu-label" class="d-none d-md-inline small">Invitado</span>
+							<span id="user-menu-label" class="d-none d-xl-inline small text-truncate">Invitado</span>
 							<i class="bi bi-chevron-down small" aria-hidden="true"></i>
 						</button>
 						<ul class="dropdown-menu dropdown-menu-end user-menu" aria-labelledby="btn-user-menu">
@@ -102,7 +87,7 @@
 							<li><hr class="dropdown-divider"></li>
 							<li><button type="button" class="dropdown-item" id="menu-signin" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></i>Iniciar sesión</button></li>
 							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-person me-2" aria-hidden="true"></i>Perfil y carreras</button></li>
-							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuración</button></li>
+							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuración y ayuda</button></li>
 							<li class="menu-signed-in d-none"><hr class="dropdown-divider"></li>
 							<li class="menu-signed-in d-none"><button type="button" class="dropdown-item text-danger" id="menu-signout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión</button></li>
 						</ul>
@@ -416,6 +401,23 @@
 				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
 			  </div>
 			  <div class="modal-body">
+				<!-- Tema (antes en la barra superior). Los botones los maneja assets/js/theme.js
+				     por el atributo data-theme-value. -->
+				<div class="mb-3">
+				  <div class="form-label mb-1" id="settings-theme-label">Tema</div>
+				  <div class="btn-group w-100 theme-picker" role="group" aria-labelledby="settings-theme-label">
+					<button type="button" class="btn btn-outline-secondary" data-theme-value="light"><i class="bi bi-sun me-1" aria-hidden="true"></i>Claro</button>
+					<button type="button" class="btn btn-outline-secondary" data-theme-value="dark"><i class="bi bi-moon-stars me-1" aria-hidden="true"></i>Oscuro</button>
+					<button type="button" class="btn btn-outline-secondary" data-theme-value="auto"><i class="bi bi-circle-half me-1" aria-hidden="true"></i>Automático</button>
+				  </div>
+				</div>
+				<!-- Título intermedio (antes en la barra superior): solo se ve si la carrera
+				     tiene título intermedio (ver syncIntermediateTitleState en index.js). -->
+				<div id="settings-intermediate-title-wrap" class="form-check form-switch mb-3 d-none">
+				  <input class="form-check-input" type="checkbox" id="settings-intermediate-title" role="switch">
+				  <label class="form-check-label" for="settings-intermediate-title">Ver solo hasta el título intermedio</label>
+				  <div class="form-text">Muestra el tablero hasta el título intermedio de la carrera.</div>
+				</div>
 				<!-- Mostrar correlativas toggle -->
 				<div class="form-check form-switch mb-3">
 				  <input class="form-check-input" type="checkbox" id="settings-correlativas" role="switch" checked>
@@ -440,7 +442,9 @@
 				  </div>
 				</div>
 			  </div>
-			  <div class="modal-footer">
+			  <div class="modal-footer justify-content-between">
+				<!-- Ayuda (antes en la barra superior): cambia de este modal al de ayuda. -->
+				<button type="button" class="btn btn-outline-secondary" id="btn-help" data-bs-toggle="modal" data-bs-target="#helpModal"><i class="bi bi-question-circle me-1" aria-hidden="true"></i>Ayuda</button>
 				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
 			  </div>
 			</div>
@@ -817,24 +821,6 @@
 
 				<!-- Dynamic status banner (updated live) - dropdown is generated dynamically by JS -->
 				<div id="subject-status" class="mt-3" aria-live="polite" aria-atomic="true">
-				</div>
-
-				<!-- Estado manual: un selector visible (antes era una flechita dentro del banner).
-				     "Automático" usa el estado calculado con las notas. Ver bindStatusOverrideSelect. -->
-				<div id="subject-override-wrap" class="mt-2">
-				  <div class="d-flex align-items-center gap-2">
-				    <label class="form-label small text-body-secondary mb-0 text-nowrap" for="subject-override-select">Estado</label>
-				    <select id="subject-override-select" class="form-select form-select-sm">
-				      <option value="">Automático (según las notas)</option>
-				      <option value="Aprobada">Aprobada</option>
-				      <option value="Promocionada">Promocionada</option>
-				      <option value="Regularizada">Regularizada</option>
-				      <option value="No regularizada">No regularizada</option>
-				      <option value="Desaprobada">Desaprobada</option>
-				      <option value="Faltan notas">Faltan notas</option>
-				    </select>
-				  </div>
-				  <div id="subject-override-note" class="form-text d-none">Lo pusiste a mano. Si guardás notas, vuelve a calcularse solo.</div>
 				</div>
 		      </div>
 		      <div class="modal-footer">

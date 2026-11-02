@@ -783,7 +783,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     columnsContainer.innerHTML = '';
 
     // Dynamically adjust the grid columns based on the number of visible modules
-    columnsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+    // minmax(0, 1fr): las columnas no se ensanchan por su contenido y desbordan la
+    // página. --board-cols lo usa el CSS de tablet (scroll horizontal del tablero).
+    columnsContainer.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+    columnsContainer.style.setProperty('--board-cols', String(columns));
 
     // assign consecutive data-index values for visible columns
     moduleViews.forEach(({ module, normalSubjects, intermediateRequired, intermediateExtras }, visIdx) => {
@@ -1014,7 +1017,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (modalFooter) modalFooter.style.display = '';
     if (settingsPanel) settingsPanel.classList.add('d-none');
     if (settingsToggleBtn) settingsToggleBtn.classList.remove('d-none');
-    toggleOverrideWrap(true);
     if (aprobarWarn) { aprobarWarn.classList.add('d-none'); aprobarWarn.textContent = ''; }
     const prevStartWrap = document.getElementById('subject-start-wrap');
     if (prevStartWrap) prevStartWrap.remove();
@@ -1041,7 +1043,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (statusEl) statusEl.classList.add('d-none');
     if (modalFooter) modalFooter.style.display = 'none';
     if (settingsToggleBtn) settingsToggleBtn.classList.add('d-none');
-    toggleOverrideWrap(false);
 
     const schemes = schemesCache.length ? schemesCache : await getEvaluationSchemes();
     const wrap = document.createElement('div');
@@ -1122,8 +1123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (statusEl) statusEl.classList.remove('d-none');
       if (modalFooter) modalFooter.style.display = '';
       if (settingsToggleBtn) settingsToggleBtn.classList.remove('d-none');
-      toggleOverrideWrap(true);
-      applyCardStatusStyle(currentCard, hydrated.status);
+        applyCardStatusStyle(currentCard, hydrated.status);
       updateAllCardCursarState();
       try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
       try{ computeStats(displayedSubjects); }catch(e){}
@@ -1143,56 +1143,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderDynamicFields(schemeConfig);
     populateDynamicFields(schemeConfig, stored);
-    bindStatusOverrideSelect(stored, schemeConfig);
     bindLiveInputs(schemeConfig);
     bindSubjectSettingsPanel(code, stored);
 
     updateSubjectStatusLive(schemeConfig);
+    if (stored.statusOverride) setStatusBanner(stored.statusOverride);
 
     wireSaveButton(code, schemeConfig);
     bindEnterToSave();
     updateAprobarWarning();
-  }
-
-  // --- Estado manual (selector "Estado" debajo del banner) ---
-  // El valor del selector se aplica al tocar Guardar, junto con las notas. Si está en
-  // "Automático" se usa el estado calculado (y se borra un override previo, como antes).
-  function toggleOverrideWrap(visible){
-    const wrap = document.getElementById('subject-override-wrap');
-    if (wrap) wrap.classList.toggle('d-none', !visible);
-  }
-
-  function getOverrideSelectValue(){
-    const sel = document.getElementById('subject-override-select');
-    return sel ? sel.value : '';
-  }
-
-  function refreshOverrideNote(){
-    const note = document.getElementById('subject-override-note');
-    if (note) note.classList.toggle('d-none', !getOverrideSelectValue());
-  }
-
-  function bindStatusOverrideSelect(stored, schemeConfig){
-    const sel = document.getElementById('subject-override-select');
-    if (!sel) return;
-    const fresh = sel.cloneNode(true);
-    sel.parentNode.replaceChild(fresh, sel);
-    fresh.value = stored.statusOverride || '';
-    if (fresh.value !== (stored.statusOverride || '')) fresh.value = '';
-    fresh.addEventListener('change', () => {
-      refreshOverrideNote();
-      updateSubjectStatusLive(schemeConfig);
-    });
-    refreshOverrideNote();
-  }
-
-  // Si cambian las notas, el estado vuelve a "Automático" (igual que antes: guardar
-  // notas borraba el override). Se ve en el selector, así que se puede volver a elegir.
-  function resetOverrideOnGradeChange(){
-    const sel = document.getElementById('subject-override-select');
-    if (!sel || !sel.value) return;
-    sel.value = '';
-    refreshOverrideNote();
   }
 
   // En escritorio (mouse/trackpad), al abrir la materia el foco va a la primera nota
@@ -1220,14 +1179,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (e.key !== 'Enter' || e.isComposing) return;
       const t = e.target;
       if (!t || t.tagName !== 'INPUT' || t.type === 'checkbox') return;
-      e.preventDefault();
-      const saveBtn = document.getElementById('subject-save');
-      if (saveBtn && !saveBtn.disabled) saveBtn.click();
-    });
-    // Enter también desde el selector de estado (fuera del form).
-    const overrideWrap = document.getElementById('subject-override-wrap');
-    if (overrideWrap) overrideWrap.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
       e.preventDefault();
       const saveBtn = document.getElementById('subject-save');
       if (saveBtn && !saveBtn.disabled) saveBtn.click();
@@ -1309,20 +1260,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     return Number.isFinite(n) ? n : NaN;
   }
 
-  function setStatusBanner(status, promotable = false, manual = false){
+  function setStatusBanner(status, promotable = false){
     const statusContainer = document.getElementById('subject-status');
     if (!statusContainer) return;
-    // Banner con el estado (calculado, o el elegido a mano en el selector "Estado").
+    // Build alert element as DOM with Bootstrap dropdown inside
     statusContainer.innerHTML = '';
     let cls = 'alert-secondary';
+    let btnCls = 'btn-secondary';
     switch(status){
-      case 'Aprobada': cls = 'alert-success'; break;
-      case 'Desaprobada': cls = 'alert-danger'; break;
-      case 'Promocionada': cls = 'alert-info'; break;
-      case 'Regularizada': cls = 'alert-warning'; break;
-      case 'Faltan notas': cls = 'alert-warning'; break;
-      case 'No regularizada': cls = 'alert-warning'; break;
-      default: cls = 'alert-secondary'; break;
+      case 'Aprobada': cls = 'alert-success'; btnCls = 'btn-success'; break;
+      case 'Desaprobada': cls = 'alert-danger'; btnCls = 'btn-danger'; break;
+      case 'Promocionada': cls = 'alert-info'; btnCls = 'btn-info'; break;
+      case 'Regularizada': cls = 'alert-warning'; btnCls = 'btn-warning'; break;
+      case 'Faltan notas': cls = 'alert-warning'; btnCls = 'btn-warning'; break;
+      case 'No regularizada': cls = 'alert-warning'; btnCls = 'btn-warning'; break;
+      default: cls = 'alert-secondary'; btnCls = 'btn-secondary'; break;
     }
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert ${cls} py-1 px-2 mb-0 d-flex justify-content-between align-items-center`;
@@ -1330,14 +1282,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const left = document.createElement('div');
     left.id = 'subject-status-text';
     left.textContent = promotable && status ? `${status} • Puede promocionar` : (status || '');
-    if (manual && status){
-      const tag = document.createElement('span');
-      tag.className = 'badge text-bg-light border ms-2 fw-normal';
-      tag.textContent = 'manual';
-      left.appendChild(tag);
-    }
     alertDiv.appendChild(left);
 
+    // Add Bootstrap dropdown for override actions
+    const dropdownDiv = document.createElement('div');
+    dropdownDiv.className = 'dropdown';
+    dropdownDiv.innerHTML = `
+      <button class="btn ${btnCls} dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false"></button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="#" data-override="computed">Usar calculado</a></li>
+        <li><a class="dropdown-item" href="#" data-override="Aprobada">Aprobada</a></li>
+        <li><a class="dropdown-item" href="#" data-override="Promocionada">Promocionada</a></li>
+        <li><a class="dropdown-item" href="#" data-override="Regularizada">Regularizada</a></li>
+        <li><a class="dropdown-item" href="#" data-override="No regularizada">No regularizada</a></li>
+        <li><a class="dropdown-item" href="#" data-override="Desaprobada">Desaprobada</a></li>
+        <li><a class="dropdown-item" href="#" data-override="Faltan notas">Faltan notas</a></li>
+      </ul>
+    `;
     const rightWrap = document.createElement('div');
     rightWrap.className = 'd-flex align-items-center gap-2';
 
@@ -1355,9 +1316,53 @@ document.addEventListener('DOMContentLoaded', async () => {
       rightWrap.appendChild(recursarBtn);
     }
 
-    if (rightWrap.childElementCount) alertDiv.appendChild(rightWrap);
+    rightWrap.appendChild(dropdownDiv);
+    alertDiv.appendChild(rightWrap);
 
     statusContainer.appendChild(alertDiv);
+
+    // Bind click handlers for dropdown items
+    const dropdownItems = dropdownDiv.querySelectorAll('.dropdown-item');
+    dropdownItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const overrideValue = item.dataset.override;
+        handleOverrideSelection(overrideValue);
+      });
+    });
+  }
+
+  // Handle override selection from the dropdown
+  async function handleOverrideSelection(overrideValue){
+    const effectiveCode = currentCard && currentCard.dataset && currentCard.dataset.code ? currentCard.dataset.code : '';
+    if (!effectiveCode) return;
+
+    let prev = [];
+    try{ prev = getAvailableSubjectCodes(); }catch(e){}
+
+    const status = overrideValue === 'computed' ? null : overrideValue;
+    let hydrated;
+    try{
+      hydrated = await activeStore.setOverride(effectiveCode, status);
+    }catch(err){
+      console.error('Error aplicando override', err);
+      toastError('No se pudo actualizar el estado', err);
+      return;
+    }
+    putSubjectDataInCache(effectiveCode, hydrated);
+    currentEnrollment = hydrated;
+
+    setStatusBanner(hydrated.status);
+    applyCardStatusStyle(currentCard, hydrated.status);
+    try{ computeStats(displayedSubjects); }catch(e){}
+    try{ updateAllCardCursarState(); const now = getAvailableSubjectCodes(); animateNewlyUnlocked(prev, now); }catch(e){}
+    try{
+      const modalEl = document.getElementById('subjectModal');
+      if (modalEl){
+        const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        inst.hide();
+      }
+    }catch(err){ console.error('Error closing modal after override selection', err); }
   }
 
   // --- Generación y lectura del formulario dinámico (parciales/finales/checklist) ---
@@ -1573,9 +1578,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showFinalsUpTo(0);
     }
 
-    const manualStatus = getOverrideSelectValue();
-    if (manualStatus) setStatusBanner(manualStatus, false, true);
-    else setStatusBanner(status, promoCandidates.size > 0);
+    setStatusBanner(status, promoCandidates.size > 0);
     return status;
   }
 
@@ -1593,10 +1596,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const el = document.getElementById(id);
       if (!el) return;
       const evt = el.type === 'checkbox' ? 'change' : 'input';
-      el.addEventListener(evt, () => {
-        resetOverrideOnGradeChange();
-        updateSubjectStatusLive(schemeConfig);
-      });
+      el.addEventListener(evt, () => updateSubjectStatusLive(schemeConfig));
     });
   }
 
@@ -1611,15 +1611,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const partials = readDynamicPartials(schemeConfig);
       const finals = readDynamicFinals();
       const checklist = readDynamicChecklist(schemeConfig);
-      const manualStatus = getOverrideSelectValue();
       setBusy(newSave, true);
       try{
-        // Sin estado manual: se guarda y se borra cualquier override (como siempre).
-        // Con estado manual: se guardan las notas conservándolo y después se fija el elegido.
-        let hydrated = await activeStore.saveResults(code, { partials, finals, checklist, clearOverride: !manualStatus });
-        if (manualStatus && hydrated.statusOverride !== manualStatus){
-          hydrated = await activeStore.setOverride(code, manualStatus);
-        }
+        const hydrated = await activeStore.saveResults(code, { partials, finals, checklist, clearOverride: true });
         putSubjectDataInCache(code, hydrated);
         currentEnrollment = hydrated;
         applyCardStatusStyle(currentCard, hydrated.status);
