@@ -1,6 +1,6 @@
 // Tema claro / oscuro / automático (sigue al sistema). El tema inicial lo aplica un
 // <script> inline en el <head> antes del primer pintado; este módulo solo maneja el
-// selector de la barra superior y los cambios del sistema en modo automático.
+// selector de Configuración y los cambios del sistema en modo automático.
 
 const KEY = 'utn.theme';
 const ICONS = { light: 'bi-sun', dark: 'bi-moon-stars', auto: 'bi-circle-half' };
