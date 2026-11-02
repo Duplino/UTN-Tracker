@@ -3170,6 +3170,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const synced = await syncFromServer({ forceRender: true });
         if (!synced) throw new TypeError('network_error');
         shareToggleCtl.applyState(lastPreferences);
+        maybeShowOnboarding();
       },
       onLogout: async () => {
         clearBootCache();
@@ -3228,6 +3229,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     try{ localStorage.setItem(SIU_HINT_DISMISSED_KEY, '1'); }catch(e){}
     updateSiuImportHint();
   });
+  // Onboarding: la primera vez que alguien inicia sesión sin ninguna materia cargada
+  // (en ninguna carrera), se le ofrece importar lo que ya cursó. Se muestra una sola
+  // vez por usuario y navegador; después queda el botón en el perfil.
+  function maybeShowOnboarding(){
+    if (activeStore !== apiStore || !currentUser) return;
+    if (Object.keys(enrollmentCache).length > 0) return;
+    const key = 'utn.onboardingSeen.' + (currentUser.id ?? currentUser.email ?? 'user');
+    try{ if (localStorage.getItem(key) === '1') return; localStorage.setItem(key, '1'); }catch(e){ return; }
+    const el = document.getElementById('onboardingModal');
+    if (!el || !window.bootstrap) return;
+    // Paso 2 (comprobante de cursada): solo si la app ya tiene el horario semanal
+    // (assets/js/schedule.js escucha el evento 'utn:schedule-import').
+    const hasSchedule = !!document.getElementById('scheduleModal');
+    el.querySelectorAll('[data-schedule-text]').forEach(t => t.classList.toggle('d-none', (t.dataset.scheduleText === 'on') !== hasSchedule));
+    const scheduleBtn = document.getElementById('onboarding-schedule-btn');
+    if (scheduleBtn) scheduleBtn.classList.toggle('d-none', !hasSchedule);
+    const show = () => bootstrap.Modal.getOrCreateInstance(el).show();
+    const open = document.querySelector('.modal.show');
+    if (open) open.addEventListener('hidden.bs.modal', show, { once: true }); else show();
+  }
+
+  const onboardingScheduleBtn = document.getElementById('onboarding-schedule-btn');
+  if (onboardingScheduleBtn) onboardingScheduleBtn.addEventListener('click', () => {
+    const el = document.getElementById('onboardingModal');
+    const inst = el && window.bootstrap ? bootstrap.Modal.getInstance(el) : null;
+    if (inst) inst.hide();
+    // Dentro del click, para que el navegador deje abrir el selector de archivos.
+    document.dispatchEvent(new CustomEvent('utn:schedule-import', { detail: { file: null } }));
+  });
+
   initSiuImport({
     getStore: () => activeStore,
     getCurriculum: () => planData,
