@@ -67,6 +67,8 @@ Para desarrollar sin Docker (PHP + MySQL locales), copiar `.env.example` a `.env
 
 ### Redeploy (cambios de código)
 
+Con el [deploy automático](#deploy-automático-github-actions) configurado no hace falta: pasa solo al mergear a `main`. A mano:
+
 ```
 git pull
 docker compose up -d --build
@@ -77,6 +79,54 @@ Compose lee el `.env` de la carpeta solo, no hace falta `--env-file`.
 Las migraciones nuevas se aplican solas al arrancar el contenedor (ver [Base de datos](#base-de-datos-migraciones)). Si una falla, el contenedor `app` no levanta: `docker compose logs app` muestra cuál y por qué.
 
 No corras `docker-compose.dev.yml` y `docker-compose.yml` a la vez en el mismo directorio: Compose deriva el nombre del proyecto del nombre de la carpeta, así que sin `-p` distinto terminarían compartiendo red y volumen de DB.
+
+### Deploy automático (GitHub Actions)
+
+Cada push a `main` corre el CI; si termina en verde, `.github/workflows/deploy.yml` entra por SSH al VPS y corre `bin/deploy.sh prod`, que hace lo mismo que el redeploy a mano y un poco más:
+
+1. `git fetch` + `git merge --ff-only origin/main` (si alguien tocó archivos del repo en el VPS, corta en vez de pisarlos; el `.env` no se toca).
+2. Backup de la base con `bin/backup-db.sh` (antes de que corran migraciones nuevas).
+3. `docker compose up -d --build`.
+4. Espera hasta 90 s a que `/api/careers` responda desde adentro del contenedor (eso prueba Apache, migraciones y conexión a MySQL). Si no responde, el job queda en rojo con los últimos logs de `app`, y GitHub te manda un mail.
+5. `docker image prune -f` para que las imágenes viejas no llenen el disco.
+
+Si el CI falla, no se deploya. Para redeployar a mano sin pushear: pestaña **Actions → Deploy → Run workflow**. En el VPS también se puede correr directo: `/opt/UTN-Tracker/prod/bin/deploy.sh prod`.
+
+La clave SSH que usa GitHub está limitada en el VPS con un *forced command*: aunque se filtre, lo único que permite es correr `deploy.sh prod` o `deploy.sh staging`, no abrir una shell.
+
+#### Setup (una sola vez)
+
+En el VPS, con el usuario que deploya (`debian`):
+
+1. Traer el script por primera vez a mano: `cd /opt/UTN-Tracker/prod && git pull`.
+2. Verificar que ese usuario puede usar Docker sin `sudo`: `docker ps`. Si da *permission denied*: `sudo usermod -aG docker debian` y volver a entrar por SSH.
+3. Crear una clave solo para el deploy (sin passphrase):
+   ```
+   ssh-keygen -t ed25519 -N "" -C github-deploy -f ~/github-deploy
+   ```
+4. Autorizarla con el forced command. Agregar **una línea** a `~/.ssh/authorized_keys`, con `restrict,command="..."` adelante del contenido de `~/github-deploy.pub`:
+   ```
+   echo "restrict,command=\"/opt/UTN-Tracker/prod/bin/deploy.sh\" $(cat ~/github-deploy.pub)" >> ~/.ssh/authorized_keys
+   ```
+5. Copiar la clave privada (`cat ~/github-deploy`, todo incluidas las líneas `-----BEGIN/END-----`) para el secret de abajo, y después borrarla del VPS: `rm ~/github-deploy ~/github-deploy.pub`.
+
+Desde tu compu (no desde el VPS), sacar la huella del servidor para fijarla: `ssh-keyscan -t ed25519 <IP-del-VPS>`. Copiar la línea que empieza con la IP.
+
+En GitHub, **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Valor |
+|---|---|
+| `VPS_HOST` | La **IP** del VPS. No el dominio: `utntracker.com.ar` apunta a Cloudflare, que no deja pasar SSH. |
+| `VPS_SSH_KEY` | La clave privada del paso 5. |
+| `VPS_KNOWN_HOSTS` | La línea de `ssh-keyscan`. |
+| `VPS_USER` | Opcional, default `debian`. |
+| `VPS_PORT` | Opcional, default `22`. |
+
+Probarlo con **Actions → Deploy → Run workflow → prod**. Si el SSH del VPS está limitado por firewall a ciertas IPs, hay que abrirlo: los runners de GitHub no tienen IP fija.
+
+Mientras no haya ningún secret `VPS_*` cargado, el workflow se saltea con un aviso en vez de fallar.
+
+**Staging automático (opcional):** para que cada push a `dev` con CI verde se deploye en `/opt/UTN-Tracker/dev`, crear la *variable* (no secret) `AUTO_DEPLOY_STAGING` = `true` en la misma pantalla, pestaña *Variables*. Usa la misma clave. Ojo: si tenías una rama de PR checkouteada en staging para probarla, el siguiente push a `dev` la vuelve a `dev`.
 
 ### Caché (navegador y Cloudflare)
 
