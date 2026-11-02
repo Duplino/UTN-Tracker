@@ -324,10 +324,19 @@ body{
   margin-bottom: 0.35rem;
 }
 
-.card-electiva-add > div{ /* the + symbol */
-  font-size: 28px;
+.card-electiva-add > div{ /* "+ Elegir electiva" */
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
   color: var(--utn-muted-symbol);
   line-height: 1;
+}
+.card-electiva-add > div .bi{
+  font-size: 1.1rem;
+}
+.card-electiva-add:hover > div{
+  color: var(--bs-body-color);
 }
 
 /* Hover style for electiva placeholder: subtle background highlight without dimming others */
@@ -427,6 +436,26 @@ body{
   flex: 1 1 0;
   min-width: 100px;
   max-width: 280px;
+}
+/* Mobile: grilla de 2 columnas a todo el ancho (con el max-width de arriba las
+   tarjetas quedaban más angostas que la pantalla). Si son impares, la última
+   ocupa la fila entera. */
+@media (max-width: 768px){
+  .stats-row{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .stats-row .stat-card{
+    max-width: none;
+    min-width: 0;
+  }
+  .stats-row .stat-card:last-child:nth-child(odd){
+    grid-column: 1 / -1;
+  }
+  .stats-row:empty::before{
+    grid-column: 1 / -1;
+  }
 }
 .stats-row:empty::before{
   content: "No hay estadísticas seleccionadas. Abrí el panel de estadísticas para agregar.";
@@ -788,4 +817,39 @@ body{
     grid-auto-columns: auto;
     overflow-x: visible;
   }
+}
+
+/* Importar la historia académica del SIU (assets/js/siuImport.js) */
+.siu-hint{
+  display: flex;
+  margin-bottom: 0.75rem;
+}
+.siu-steps-list li + li{
+  margin-top: 0.25rem;
+}
+.siu-drop{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 1.25rem 1rem;
+  border: 2px dashed var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--bs-tertiary-bg);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.siu-drop:hover,
+.siu-drop:focus-within,
+.siu-drop.siu-drop-over{
+  border-color: var(--bs-primary);
+  background: var(--bs-primary-bg-subtle);
+}
+.siu-table .siu-check{
+  width: 2rem;
+}
+.siu-table td{
+  vertical-align: top;
 }
