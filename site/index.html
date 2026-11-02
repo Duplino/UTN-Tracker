@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>UTN Tracker · Seguí tu carrera en la UTN: correlativas, notas y planificador</title>
-		<meta name="description" content="Organizá tu carrera en la UTN: importá tu historia académica del SIU Guaraní, mirá qué materias podés cursar según tus correlativas, planificá los próximos cuatrimestres y calculá cuándo te recibís. Gratis.">
+		<meta name="description" content="Organizá tu carrera en la UTN: cargá tus notas, mirá qué materias podés cursar según tus correlativas, planificá los próximos cuatrimestres y calculá cuándo te recibís. Gratis.">
 		<link rel="canonical" href="https://utntracker.com.ar/">
 		<meta name="color-scheme" content="light dark">
 		<meta name="theme-color" content="#f8f9fa" media="(prefers-color-scheme: light)">
@@ -16,7 +16,7 @@
 		<meta property="og:locale" content="es_AR">
 		<meta property="og:url" content="https://utntracker.com.ar/">
 		<meta property="og:title" content="UTN Tracker · Tu carrera en la UTN, materia por materia">
-		<meta property="og:description" content="Importá tu historia académica del SIU, mirá tus correlativas y planificá cuándo te recibís. Gratis.">
+		<meta property="og:description" content="Mirá tus correlativas, planificá los próximos cuatrimestres y calculá cuándo te recibís. Gratis.">
 		<meta property="og:image" content="https://utntracker.com.ar/assets/img/og.png">
 		<meta property="og:image:width" content="1200">
 		<meta property="og:image:height" content="630">
@@ -44,7 +44,7 @@
 					"applicationCategory": "EducationalApplication",
 					"operatingSystem": "Web",
 					"inLanguage": "es-AR",
-					"description": "Panel para estudiantes de la UTN: correlativas, notas, planificador de cuatrimestres, horario y agenda de parciales, con importación de la historia académica del SIU Guaraní.",
+					"description": "Panel para estudiantes de la UTN: correlativas, notas, planificador de cuatrimestres, horario y agenda de parciales.",
 					"offers": { "@type": "Offer", "price": "0", "priceCurrency": "ARS" }
 				},
 				{
@@ -52,8 +52,7 @@
 					"mainEntity": [
 						{ "@type": "Question", "name": "¿UTN Tracker es gratis?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Entrás con tu cuenta de Google y listo." } },
 						{ "@type": "Question", "name": "¿Es una app oficial de la UTN?", "acceptedAnswer": { "@type": "Answer", "text": "No. Es un proyecto independiente hecho por estudiantes. Tus notas oficiales siguen siendo las del SIU Guaraní." } },
-						{ "@type": "Question", "name": "¿Qué pasa con mi historia académica del SIU?", "acceptedAnswer": { "@type": "Answer", "text": "El PDF se lee en tu navegador y no se sube a ningún servidor. Solo se guardan las materias y notas que confirmás." } },
-						{ "@type": "Question", "name": "¿Sirve para cualquier facultad regional?", "acceptedAnswer": { "@type": "Answer", "text": "Los planes de estudio son los mismos en todas las regionales. La importación del SIU está probada con el autogestión de la FRBA." } },
+						{ "@type": "Question", "name": "¿Sirve para cualquier facultad regional?", "acceptedAnswer": { "@type": "Answer", "text": "Los planes de estudio son los mismos en todas las regionales." } },
 						{ "@type": "Question", "name": "¿Cómo sabe qué materias puedo cursar?", "acceptedAnswer": { "@type": "Answer", "text": "Usa las correlativas del plan de estudios. Con lo que tenés aprobado y regularizado, marca qué materias podés cursar el próximo cuatrimestre." } },
 						{ "@type": "Question", "name": "¿Puedo compartir mi progreso?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Podés activar un perfil público con un link para compartir. Viene apagado." } }
 					]
@@ -82,7 +81,7 @@
 					<div class="col-lg-6 d-grid gap-3">
 						<span class="eyebrow">Para estudiantes de la UTN</span>
 						<h1>Tu carrera en la UTN, materia por materia.</h1>
-						<p class="lead text-body-secondary mb-1">Cargá tu historia académica del SIU en un minuto y mirá qué tenés aprobado, qué podés cursar según tus correlativas y cuándo te recibís si seguís a este ritmo.</p>
+						<p class="lead text-body-secondary mb-1">Cargá tus materias y notas, y mirá qué tenés aprobado, qué podés cursar según tus correlativas y cuándo te recibís si seguís a este ritmo.</p>
 						<div class="d-flex flex-wrap gap-2">
 							<a class="btn btn-primary btn-lg" href="https://app.utntracker.com.ar"><i class="bi bi-google me-2" aria-hidden="true"></i>Entrar con Google</a>
 							<a class="btn btn-outline-secondary btn-lg" href="#funciones">Ver cómo funciona</a>
@@ -121,29 +120,6 @@
 				</div>
 			</section>
 
-			<section class="section section-band" aria-labelledby="siu-titulo">
-				<div class="container">
-					<div class="row g-4 g-lg-5 align-items-center">
-						<div class="col-lg-5 d-grid gap-3">
-							<span class="eyebrow">Importar del SIU Guaraní</span>
-							<h2 id="siu-titulo" class="fw-bold">No cargues las notas a mano.</h2>
-							<ol class="steps">
-								<li><p class="mb-0"><strong>Descargá tu historia académica</strong> desde el autogestión del SIU, con el filtro en «Todos».</p></li>
-								<li><p class="mb-0"><strong>Subí el PDF</strong> a UTN Tracker. Detecta las materias aprobadas, promocionadas, regularizadas y en curso, con sus notas y recursadas.</p></li>
-								<li><p class="mb-0"><strong>Revisá la vista previa</strong> y confirmá. Tu tablero queda armado.</p></li>
-							</ol>
-							<div class="alert alert-success d-flex gap-2 mb-0" role="note">
-								<i class="bi bi-shield-lock" aria-hidden="true"></i>
-								<div>El PDF se lee en tu navegador. No se sube a ningún servidor.</div>
-							</div>
-						</div>
-						<div class="col-lg-7">
-							<figure class="shot"><img src="/assets/img/siu.webp" width="1200" height="771" loading="lazy" alt="Vista previa de la importación del SIU, con las materias detectadas y su estado antes de confirmar"></figure>
-						</div>
-					</div>
-				</div>
-			</section>
-
 			<section class="section" id="funciones" aria-labelledby="funciones-titulo">
 				<div class="container">
 					<div class="mb-4" style="max-width: 44rem">
@@ -158,7 +134,7 @@
 							<h3 class="h4 fw-semibold mb-0">Correlativas y estado de cada materia</h3>
 							<p class="text-body-secondary mb-0">Cargá parciales, recuperatorios, TPs y finales. UTN Tracker calcula solo si la materia queda promocionada, regularizada o aprobada, y te muestra qué podés cursar el próximo cuatrimestre.</p>
 						</div>
-						<div class="col-lg-7"><figure class="shot"><img src="/assets/img/tablero.webp" width="1200" height="771" loading="lazy" alt="Tablero con las materias de Ingeniería en Sistemas K23 por nivel, con horas semanales, promedio y materias aprobadas"></figure></div>
+						<div class="col-lg-7"><figure class="shot"><img src="/assets/img/tablero.webp" width="1200" height="696" loading="lazy" alt="Tablero con las materias de Ingeniería en Sistemas K23 por nivel, con horas semanales, promedio y materias aprobadas"></figure></div>
 					</article>
 
 					<article class="feature row g-4 align-items-center">
@@ -174,7 +150,7 @@
 						<div class="col-lg-5 d-grid gap-2">
 							<span class="feature-icon"><i class="bi bi-clock" aria-hidden="true"></i></span>
 							<h3 class="h4 fw-semibold mb-0">Horario semanal</h3>
-							<p class="text-body-secondary mb-0">Tus clases en una grilla de lunes a sábado. Cargalas a mano o importá el comprobante de inscripción a cursada del SIU.</p>
+							<p class="text-body-secondary mb-0">Tus clases en una grilla de lunes a sábado.</p>
 						</div>
 						<div class="col-lg-7"><figure class="shot"><picture><source srcset="/assets/img/horario-oscuro.webp" media="(prefers-color-scheme: dark)"><img src="/assets/img/horario.webp" width="1200" height="806" loading="lazy" alt="Grilla del horario semanal con las materias en curso"></picture></figure></div>
 					</article>
@@ -240,8 +216,7 @@
 							<div class="faq">
 								<details open><summary>¿Es gratis?</summary><p>Sí. Entrás con tu cuenta de Google y listo.</p></details>
 								<details><summary>¿Es una app oficial de la UTN?</summary><p>No. Es un proyecto independiente hecho por estudiantes. Tus notas oficiales siguen siendo las del SIU Guaraní.</p></details>
-								<details><summary>¿Qué pasa con mi historia académica del SIU?</summary><p>El PDF se lee en tu navegador y no se sube a ningún servidor. Solo se guardan las materias y notas que confirmás, asociadas a tu cuenta.</p></details>
-								<details><summary>¿Sirve para cualquier facultad regional?</summary><p>Los planes de estudio son los mismos en todas las regionales. La importación del SIU está probada con el autogestión de la FRBA.</p></details>
+								<details><summary>¿Sirve para cualquier facultad regional?</summary><p>Los planes de estudio son los mismos en todas las regionales.</p></details>
 								<details><summary>¿Cómo sabe qué materias puedo cursar?</summary><p>Usa las correlativas del plan de estudios. Con lo que tenés aprobado y regularizado, marca qué materias podés cursar el próximo cuatrimestre.</p></details>
 								<details><summary>¿Puedo compartir mi progreso?</summary><p>Sí. Podés activar un perfil público con un link para compartir. Viene apagado.</p></details>
 							</div>
