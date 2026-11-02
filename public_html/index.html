@@ -692,12 +692,23 @@
 		    <div class="modal-content">
 		      <div class="modal-header">
 		        <h5 class="modal-title" id="subjectModalLabel">Materia</h5>
-		        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="subject-settings-toggle" title="Esquema de evaluación / año" aria-label="Configuración de la materia">
-		          <i class="bi bi-gear"></i>
-		        </button>
+		        <!-- Menú "⋯" de la materia: lo de uso ocasional (esquema/año) arriba y las
+		             acciones destructivas al final, separadas. Ver bindSubjectSettingsPanel. -->
+		        <div class="dropdown ms-2" id="subject-actions">
+		          <button type="button" class="btn btn-icon" id="subject-settings-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Más opciones" aria-label="Más opciones de la materia">
+		            <i class="bi bi-three-dots" aria-hidden="true"></i>
+		          </button>
+		          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="subject-settings-toggle">
+		            <li><button type="button" class="dropdown-item" id="subject-settings-open"><i class="bi bi-sliders me-2" aria-hidden="true"></i>Esquema, año y cursada…</button></li>
+		            <li><hr class="dropdown-divider"></li>
+		            <li><button type="button" class="dropdown-item text-danger" id="subject-recursar-action"><i class="bi bi-arrow-repeat me-2" aria-hidden="true"></i>Recursar</button></li>
+		            <li><button type="button" class="dropdown-item text-danger" id="subject-unenroll-action"><i class="bi bi-x-circle me-2" aria-hidden="true"></i>Dar de baja</button></li>
+		          </ul>
+		        </div>
 		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
 		      </div>
-		      <!-- Panel de configuración: esquema de evaluación + año de cursada (oculto por defecto) -->
+		      <!-- Panel de configuración: esquema de evaluación + año de cursada (oculto por defecto,
+		           se abre desde "Esquema, año y cursada…" del menú ⋯) -->
 		      <div id="subject-settings-panel" class="px-3 pt-3 d-none">
 		        <div class="mb-2">
 		          <label class="form-label small" for="subject-scheme-select">Esquema de evaluación</label>
@@ -712,9 +723,8 @@
 		          <input id="subject-cursada-input" type="number" min="1" max="20" step="1" class="form-control form-control-sm" />
 		        </div>
 		        <div class="d-flex gap-2 mb-2">
-		          <button type="button" class="btn btn-sm btn-outline-primary" id="subject-settings-apply">Aplicar</button>
-		          <button type="button" class="btn btn-sm btn-outline-danger" id="subject-recursar-action">Recursar</button>
-		          <button type="button" class="btn btn-sm btn-outline-secondary" id="subject-unenroll-action">Dar de baja</button>
+		          <button type="button" class="btn btn-sm btn-primary" id="subject-settings-apply">Aplicar</button>
+		          <button type="button" class="btn btn-sm btn-outline-secondary" id="subject-settings-cancel">Cancelar</button>
 		        </div>
 		        <hr>
 		      </div>
@@ -730,6 +740,24 @@
 
 				<!-- Dynamic status banner (updated live) - dropdown is generated dynamically by JS -->
 				<div id="subject-status" class="mt-3" aria-live="polite" aria-atomic="true">
+				</div>
+
+				<!-- Estado manual: un selector visible (antes era una flechita dentro del banner).
+				     "Automático" usa el estado calculado con las notas. Ver bindStatusOverrideSelect. -->
+				<div id="subject-override-wrap" class="mt-2">
+				  <div class="d-flex align-items-center gap-2">
+				    <label class="form-label small text-body-secondary mb-0 text-nowrap" for="subject-override-select">Estado</label>
+				    <select id="subject-override-select" class="form-select form-select-sm">
+				      <option value="">Automático (según las notas)</option>
+				      <option value="Aprobada">Aprobada</option>
+				      <option value="Promocionada">Promocionada</option>
+				      <option value="Regularizada">Regularizada</option>
+				      <option value="No regularizada">No regularizada</option>
+				      <option value="Desaprobada">Desaprobada</option>
+				      <option value="Faltan notas">Faltan notas</option>
+				    </select>
+				  </div>
+				  <div id="subject-override-note" class="form-text d-none">Lo pusiste a mano. Si guardás notas, vuelve a calcularse solo.</div>
 				</div>
 		      </div>
 		      <div class="modal-footer">
