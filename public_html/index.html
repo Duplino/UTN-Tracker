@@ -28,6 +28,8 @@
 		<link rel="modulepreload" href="assets/js/planner.js">
 		<link rel="modulepreload" href="assets/js/agenda.js">
 		<link rel="modulepreload" href="assets/js/statusEngine.js">
+		<link rel="modulepreload" href="assets/js/siuImport.js">
+		<link rel="modulepreload" href="assets/js/pdfText.js">
 		<link rel="modulepreload" href="assets/js/theme.js">
 		<link rel="modulepreload" href="assets/js/ui.js">
 	</head>
@@ -103,6 +105,16 @@
 					</div>
 				</div>
 			</header>
+
+			<!-- Aviso para quien llega a mitad de la carrera: importar la historia académica
+			     del SIU en vez de cargar materia por materia. Lo muestra index.js cuando la
+			     carrera elegida no tiene ninguna materia cargada. -->
+			<div id="siu-import-hint" class="alert alert-info siu-hint d-none flex-wrap align-items-center gap-2 py-2" role="region" aria-label="Importar del SIU">
+				<i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i>
+				<span class="me-auto small">¿Ya venís cursando? Importá tu historia académica del SIU Guaraní y se cargan solas tus materias, notas y recursadas.</span>
+				<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#siuImportModal">Importar del SIU</button>
+				<button type="button" class="btn-close" id="siu-import-hint-close" aria-label="No mostrar más"></button>
+			</div>
 
 			<!-- Columns with subject cards -->
 			<section class="columns-grid" aria-label="Materias" aria-busy="true">
@@ -271,6 +283,28 @@
 		            </div>
 		          </div>
 		          
+		          <!-- Importar del SIU -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingSiu">
+		              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSiu" aria-expanded="false" aria-controls="collapseSiu">
+		                Importar la historia académica del SIU
+		              </button>
+		            </h2>
+		            <div id="collapseSiu" class="accordion-collapse collapse" aria-labelledby="headingSiu" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p class="small">Si ya venís cursando, podés cargar todo de una vez con el PDF de tu historia académica:</p>
+		                <ol class="siu-steps-list small mb-0">
+		                  <li>Entrá a <a href="https://guarani.frba.utn.edu.ar/autogestion/grado/historia_academica" target="_blank" rel="noopener">Historia académica en el SIU Guaraní</a> (te va a pedir iniciar sesión).</li>
+		                  <li>En <strong>Filtros</strong>, marcá <strong>«Todos»</strong>. Si no, el PDF trae solo una parte (por ejemplo, solo las aprobadas) y no se pueden contar las recursadas ni las materias en curso.</li>
+		                  <li>Descargá el PDF de la historia académica.</li>
+		                  <li>Subilo acá. El archivo se lee en tu navegador y no se sube a ningún lado.</li>
+		                </ol>
+		                <p class="mt-2 mb-2 small">Cada fila del PDF se interpreta así: <strong>Regularidad</strong> es la cursada (si está reprobada, suma una recursada), <strong>Examen</strong> es un final (aprobado = materia aprobada con la nota del examen) y <strong>Promoción</strong> es materia promocionada con esa nota.</p>
+		                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#siuImportModal">Importar del SIU</button>
+		              </div>
+		            </div>
+		          </div>
+
 		          <!-- Badges -->
 		          <div class="accordion-item">
 		            <h2 class="accordion-header" id="headingBadges">
@@ -329,6 +363,17 @@
 					<button id="profile-sync-btn" class="btn btn-outline-secondary">Sincronizar ahora</button>
 				  </div>
 				  <div class="mt-3"><small class="text-muted">Cuando inicies sesión, podrás sincronizar tu tablero entre dispositivos.</small></div>
+				</div>
+				<!-- Importar la historia académica del SIU (assets/js/siuImport.js) -->
+				<hr class="my-3">
+				<div class="d-flex flex-wrap align-items-center gap-2">
+				  <div class="me-auto">
+					<div class="small fw-semibold">Historia académica del SIU</div>
+					<div class="form-text mt-0">Cargá de una vez las materias que ya cursaste.</div>
+				  </div>
+				  <button type="button" class="btn btn-outline-primary btn-sm" id="profile-siu-import" data-bs-toggle="modal" data-bs-target="#siuImportModal">
+					<i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i>Importar del SIU
+				  </button>
 				</div>
 				<!-- Year started input (always visible, persisted locally) -->
 				<hr class="my-3">
@@ -570,6 +615,78 @@
 		</div>
 
 		<!-- Subject modal for entering parciales and finales -->
+		<!-- Onboarding del primer inicio de sesión (index.js, maybeShowOnboarding): se
+		     muestra una vez a quien inicia sesión sin ninguna materia cargada. Cada paso
+		     abre su propio modal; el paso del comprobante de cursada aparece solo si existe
+		     el horario semanal (#scheduleModal, evento utn:schedule-import). -->
+		<div class="modal fade" id="onboardingModal" tabindex="-1" aria-labelledby="onboardingModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="onboardingModalLabel">¡Bienvenido/a a UTN Tracker!</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <p class="small text-body-secondary">Si ya venís cursando, cargá tu progreso en dos pasos con los PDFs del SIU Guaraní. Lo podés hacer después desde tu perfil.</p>
+		        <ol class="list-group list-group-numbered onboarding-steps">
+		          <li class="list-group-item d-flex gap-2 align-items-start">
+		            <div class="ms-1 me-auto">
+		              <div class="fw-semibold">Lo que ya cursaste</div>
+		              <div class="small text-body-secondary">Importá tu historia académica: materias aprobadas, promocionadas, regularizadas y recursadas.</div>
+		            </div>
+		            <button type="button" class="btn btn-sm btn-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#siuImportModal">Importar</button>
+		          </li>
+		          <li class="list-group-item d-flex gap-2 align-items-start" id="onboarding-current-courses">
+		            <div class="ms-1 me-auto">
+		              <div class="fw-semibold">Lo que cursás ahora</div>
+		              <div class="small text-body-secondary" data-schedule-text="off">Las materias en curso salen de la historia académica. Muy pronto vas a poder importar también tu comprobante de cursada, con horarios y comisiones.</div>
+		              <div class="small text-body-secondary d-none" data-schedule-text="on">Importá tu comprobante de inscripción a cursada y se arma tu horario semanal, con comisiones y aulas.</div>
+		            </div>
+		            <button type="button" class="btn btn-sm btn-primary text-nowrap d-none" id="onboarding-schedule-btn">Importar</button>
+		          </li>
+		        </ol>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Empezar de cero</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- Importar la historia académica del SIU Guaraní (assets/js/siuImport.js) -->
+		<div class="modal fade" id="siuImportModal" tabindex="-1" aria-labelledby="siuImportModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="siuImportModalLabel">Importar del SIU</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <div id="siu-steps">
+		          <p class="small mb-2">Cargá de una vez las materias que ya cursaste, con el PDF de tu <strong>historia académica</strong>:</p>
+		          <ol class="siu-steps-list small mb-0">
+		                  <li>Entrá a <a href="https://guarani.frba.utn.edu.ar/autogestion/grado/historia_academica" target="_blank" rel="noopener">Historia académica en el SIU Guaraní</a> (te va a pedir iniciar sesión).</li>
+		                  <li>En <strong>Filtros</strong>, marcá <strong>«Todos»</strong>. Si no, el PDF trae solo una parte (por ejemplo, solo las aprobadas) y no se pueden contar las recursadas ni las materias en curso.</li>
+		                  <li>Descargá el PDF de la historia académica.</li>
+		                  <li>Subilo acá. El archivo se lee en tu navegador y no se sube a ningún lado.</li>
+		                </ol>
+		          <label id="siu-drop" class="siu-drop mt-3" for="siu-file">
+		            <i class="bi bi-file-earmark-pdf fs-3" aria-hidden="true"></i>
+		            <span class="fw-semibold">Elegí el PDF o arrastralo acá</span>
+		            <span class="small text-body-secondary">historia_academica.pdf</span>
+		            <input type="file" id="siu-file" class="visually-hidden" accept="application/pdf,.pdf">
+		          </label>
+		        </div>
+		        <div id="siu-preview" aria-live="polite"></div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		        <button type="button" class="btn btn-primary d-none" id="siu-import-btn">Importar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
 		<div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
 		  <div class="modal-dialog modal-dialog-centered">
 		    <div class="modal-content">

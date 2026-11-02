@@ -97,6 +97,13 @@ final class ApiTest extends TestCase
         $curriculum = $this->request('GET', '/api/careers/S23/curriculum', null, false);
         $this->assertSame(200, $curriculum['status']);
         $this->assertStringContainsString('s-maxage', $curriculum['headers']['cache-control'] ?? '');
+
+        // Cada materia trae su código del SIU (para importar la historia académica).
+        $sistemas = $this->request('GET', '/api/careers/sistemas/curriculum', null, false);
+        $subjects = array_merge(...array_column($sistemas['body']['modules'], 'subjects'));
+        $aga = array_values(array_filter($subjects, fn ($s) => $s['code'] === 'AGA'))[0] ?? null;
+        $this->assertNotNull($aga);
+        $this->assertSame(950701, $aga['siuCode']);
     }
 
     public function testPrivateEndpointsRequireSession(): void

@@ -10,6 +10,7 @@ import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
 import { initPlanner } from './planner.js';
 import { initAgenda } from './agenda.js';
+import { initSiuImport } from './siuImport.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
@@ -831,6 +832,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Compute stats after cursar state is updated (so .card-available classes are present)
     computeStats(displayedSubjects);
+    updateSiuImportHint();
+  }
+
+  // Aviso "¿Ya venís cursando? Importá del SIU": solo si la carrera elegida no tiene
+  // ninguna materia cargada y el usuario no lo cerró antes.
+  const SIU_HINT_DISMISSED_KEY = 'utn.siuHintDismissed';
+  function updateSiuImportHint(){
+    const hint = document.getElementById('siu-import-hint');
+    if (!hint) return;
+    let dismissed = false;
+    try{ dismissed = localStorage.getItem(SIU_HINT_DISMISSED_KEY) === '1'; }catch(e){}
+    const modules = (planData && Array.isArray(planData.modules)) ? planData.modules : [];
+    const hasAny = modules.some(m => (m.subjects || []).some(s => s.code && loadSubjectData(s.code)));
+    hint.classList.toggle('d-none', dismissed || !currentCareer || !planData || hasAny);
   }
 
   function createCard(subject, group = null){
@@ -3208,6 +3223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const synced = await syncFromServer({ forceRender: true });
         if (!synced) throw new TypeError('network_error');
         shareToggleCtl.applyState(lastPreferences);
+        maybeShowOnboarding();
       },
       onLogout: async () => {
         clearBootCache();
@@ -3256,6 +3272,64 @@ document.addEventListener('DOMContentLoaded', async () => {
       try{ computeStats(displayedSubjects); }catch(e){}
       try{ if (planData) renderGroups(planData); }catch(e){}
       return hydrated;
+    },
+  });
+
+  // Importar la historia académica del SIU (assets/js/siuImport.js): carga las
+  // materias con el store activo y después refresca los caches y el tablero.
+  const siuHintClose = document.getElementById('siu-import-hint-close');
+  if (siuHintClose) siuHintClose.addEventListener('click', () => {
+    try{ localStorage.setItem(SIU_HINT_DISMISSED_KEY, '1'); }catch(e){}
+    updateSiuImportHint();
+  });
+  // Onboarding: la primera vez que alguien inicia sesión sin ninguna materia cargada
+  // (en ninguna carrera), se le ofrece importar lo que ya cursó. Se muestra una sola
+  // vez por usuario y navegador; después queda el botón en el perfil.
+  function maybeShowOnboarding(){
+    if (activeStore !== apiStore || !currentUser) return;
+    if (Object.keys(enrollmentCache).length > 0) return;
+    const key = 'utn.onboardingSeen.' + (currentUser.id ?? currentUser.email ?? 'user');
+    try{ if (localStorage.getItem(key) === '1') return; localStorage.setItem(key, '1'); }catch(e){ return; }
+    const el = document.getElementById('onboardingModal');
+    if (!el || !window.bootstrap) return;
+    // Paso 2 (comprobante de cursada): solo si la app ya tiene el horario semanal
+    // (assets/js/schedule.js escucha el evento 'utn:schedule-import').
+    const hasSchedule = !!document.getElementById('scheduleModal');
+    el.querySelectorAll('[data-schedule-text]').forEach(t => t.classList.toggle('d-none', (t.dataset.scheduleText === 'on') !== hasSchedule));
+    const scheduleBtn = document.getElementById('onboarding-schedule-btn');
+    if (scheduleBtn) scheduleBtn.classList.toggle('d-none', !hasSchedule);
+    const show = () => bootstrap.Modal.getOrCreateInstance(el).show();
+    const open = document.querySelector('.modal.show');
+    if (open) open.addEventListener('hidden.bs.modal', show, { once: true }); else show();
+  }
+
+  const onboardingScheduleBtn = document.getElementById('onboarding-schedule-btn');
+  if (onboardingScheduleBtn) onboardingScheduleBtn.addEventListener('click', () => {
+    const el = document.getElementById('onboardingModal');
+    const inst = el && window.bootstrap ? bootstrap.Modal.getInstance(el) : null;
+    if (inst) inst.hide();
+    // Dentro del click, para que el navegador deje abrir el selector de archivos.
+    document.dispatchEvent(new CustomEvent('utn:schedule-import', { detail: { file: null } }));
+  });
+
+  initSiuImport({
+    getStore: () => activeStore,
+    getCurriculum: () => planData,
+    getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
+    getEnrollment: code => loadSubjectData(code),
+    getRetakes: code => retakesCache[code] || 0,
+    getSchemes: async () => (schemesCache.length ? schemesCache : await getEvaluationSchemes()),
+    getElectivePlacements: () => getElectivesForCurrentCareer(),
+    placeElective: async (code, columnIndex) => {
+      await activeStore.setElective(currentCareer, code, columnIndex);
+      const entry = { careerCode: currentCareer, subjectCode: code, columnIndex };
+      const idx = electivesCache.findIndex(e => e.careerCode === currentCareer && e.subjectCode === code);
+      if (idx >= 0) electivesCache[idx] = entry; else electivesCache.push(entry);
+    },
+    onImported: async () => {
+      await Promise.all([refreshEnrollmentCache(), refreshElectivesCache(), refreshRetakesCache()]);
+      if (activeStore === apiStore && currentUser) writeBootCache(currentStateAsBootstrap());
+      renderFromStateWhenIdle();
     },
   });
 

@@ -62,7 +62,7 @@ final class CareerRepository
         $stmt = $this->pdo->prepare(
             'SELECT cs.id AS career_subject_id, cs.module_id, cs.is_elective, cs.only_for_intermediate,
                     cs.required_for_intermediate_title, cs.display_order,
-                    s.code, s.name, s.week_hours, s.duration
+                    s.id AS subject_id, s.code, s.name, s.week_hours, s.duration
              FROM career_subjects cs
              JOIN subjects s ON s.id = cs.subject_id
              WHERE cs.career_id = :cid
@@ -94,6 +94,9 @@ final class CareerRepository
             $reqs = $requirementsByCareerSubject[$careerSubjectId] ?? [];
             $dto = [
                 'code' => $row['code'],
+                // El id de la materia es su código en el SIU Guaraní (ej. 950701): sirve
+                // para reconocerla al importar la historia académica (siuImport.js).
+                'siuCode' => (int) $row['subject_id'],
                 'name' => $row['name'],
                 'weekHours' => (int) $row['week_hours'],
                 'duration' => $row['duration'],

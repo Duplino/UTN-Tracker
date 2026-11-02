@@ -691,3 +691,38 @@ body{
     overflow-x: visible;
   }
 }
+
+/* Importar la historia académica del SIU (assets/js/siuImport.js) */
+.siu-hint{
+  display: flex;
+  margin-bottom: 0.75rem;
+}
+.siu-steps-list li + li{
+  margin-top: 0.25rem;
+}
+.siu-drop{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 1.25rem 1rem;
+  border: 2px dashed var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--bs-tertiary-bg);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.siu-drop:hover,
+.siu-drop:focus-within,
+.siu-drop.siu-drop-over{
+  border-color: var(--bs-primary);
+  background: var(--bs-primary-bg-subtle);
+}
+.siu-table .siu-check{
+  width: 2rem;
+}
+.siu-table td{
+  vertical-align: top;
+}
