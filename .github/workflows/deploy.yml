@@ -7,7 +7,7 @@ name: Deploy
 # dev -> staging hace lo mismo, pero solo si la variable de repo
 # AUTO_DEPLOY_STAGING vale "true".
 #
-# Setup (secrets, clave SSH en el VPS): ver "Deploy automático" en el readme.
+# Secrets que necesita: ver "Deploy automático" en el readme.
 
 on:
   workflow_run:
