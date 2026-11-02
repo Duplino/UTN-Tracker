@@ -108,6 +108,39 @@ export const apiStore = {
     await api.patch(`/user-careers/${enc(careerCode)}`, { showIntermediateTitle: !!value });
   },
 
+  // --- Agenda (fechas de parciales y finales) ---
+  async getExamDates() {
+    const res = await api.get('/exam-dates');
+    return Array.isArray(res?.examDates) ? res.examDates : [];
+  },
+
+  async saveExamDate(entry) {
+    return api.post('/exam-dates', entry);
+  },
+
+  async deleteExamDate(id) {
+    await api.delete(`/exam-dates/${enc(id)}`);
+  },
+
+  // --- Horario semanal (ver assets/js/schedule.js) ---
+  async getClassSchedule() {
+    const res = await api.get('/class-schedule');
+    return Array.isArray(res?.sessions) ? res.sessions : [];
+  },
+
+  // Reemplaza las filas de una materia ({sessions, commission, campus}); sessions
+  // vacío la saca del horario. Devuelve el horario completo.
+  async saveSubjectSchedule(subjectCode, data) {
+    const res = await api.put(`/class-schedule/${enc(subjectCode)}`, data);
+    return Array.isArray(res?.sessions) ? res.sessions : [];
+  },
+
+  // Reemplaza el horario completo: [{subjectCode, sessions, commission, campus}].
+  async replaceClassSchedule(subjects) {
+    const res = await api.put('/class-schedule', { subjects });
+    return Array.isArray(res?.sessions) ? res.sessions : [];
+  },
+
   // --- Preferencias ---
   async getPreferences() {
     return api.get('/preferences');

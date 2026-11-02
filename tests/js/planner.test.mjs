@@ -1,7 +1,7 @@
 // Tests de la simulación del planificador de cuatrimestres (assets/js/planner.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { curriculumUniverse, normalizePlan, simulate, termNumber } from '../../public_html/assets/js/planner.js';
+import { curriculumUniverse, normalizePlan, paceEstimate, simulate, termNumber } from '../../public_html/assets/js/planner.js';
 
 const curriculum = {
   modules: [
@@ -53,4 +53,24 @@ test('una anual planificada habilita recién dos cuatrimestres después', () => 
 
 test('normalizePlan descarta resultados inválidos y el valor por defecto', () => {
   assert.deepEqual(normalizePlan({ current: { A: 'approved', B: 'regular', C: 'x' } }).current, { A: 'approved' });
+});
+
+test('el ritmo cuenta el año en curso como entero', () => {
+  const enr = {
+    A: { status: 'Aprobada', enrollmentYear: 2025 },
+    B: { status: 'Aprobada', enrollmentYear: 2025 },
+    C: { status: 'Aprobada', enrollmentYear: 2026 },
+  };
+  const est = paceEstimate({ universe, getEnrollment: c => enr[c] || null, yearStarted: 2025, now: new Date(2026, 9, 30) });
+  // 3 aprobadas en 2 años lectivos (2025 y 2026) → 1,5 por año. Faltan D y E:
+  // 2 / 1,5 ≈ 1,33 años desde marzo de 2027 → 1C 2028.
+  assert.equal(est.years, 2);
+  assert.equal(est.pace, 1.5);
+  assert.equal(est.term, termNumber(2028, 1));
+});
+
+test('enero y febrero cuentan como parte del año lectivo anterior', () => {
+  const enr = { A: { status: 'Aprobada', enrollmentYear: 2025 } };
+  const est = paceEstimate({ universe, getEnrollment: c => enr[c] || null, yearStarted: 2025, now: new Date(2026, 1, 15) });
+  assert.equal(est.years, 1);
 });

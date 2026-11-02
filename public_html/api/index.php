@@ -9,9 +9,11 @@ use App\Config\Database;
 use App\Config\Env;
 use App\Controllers\BootstrapController;
 use App\Controllers\CareerController;
+use App\Controllers\ClassScheduleController;
 use App\Controllers\ElectivesController;
 use App\Controllers\EnrollmentController;
 use App\Controllers\EvaluationSchemeController;
+use App\Controllers\ExamDateController;
 use App\Controllers\PreferencesController;
 use App\Controllers\PublicController;
 use App\Controllers\SubjectRetakeController;
@@ -62,6 +64,16 @@ $router->put('/api/enrollments/{subjectCode}/results', [$enrollments, 'saveResul
 $retakes = new SubjectRetakeController($pdo);
 $router->get('/api/subject-retakes', [$retakes, 'index']);
 $router->patch('/api/subject-retakes/{subjectCode}', [$retakes, 'update']);
+
+$examDates = new ExamDateController($pdo);
+$router->get('/api/exam-dates', [$examDates, 'index']);
+$router->post('/api/exam-dates', [$examDates, 'save']);
+$router->delete('/api/exam-dates/{id}', [$examDates, 'remove']);
+
+$classSchedule = new ClassScheduleController($pdo);
+$router->get('/api/class-schedule', [$classSchedule, 'index']);
+$router->put('/api/class-schedule', [$classSchedule, 'replaceAll']);
+$router->put('/api/class-schedule/{subjectCode}', [$classSchedule, 'saveSubject']);
 
 $electives = new ElectivesController($pdo);
 $router->get('/api/electives', [$electives, 'index']);

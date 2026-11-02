@@ -1,13 +1,34 @@
+# Lo que no entra a la imagen de la app (la imagen copia el repo con COPY . .).
+
+# Secretos y config local
+.env
+.env.*
+
+# Git, CI y editores
 .git
 .gitignore
-.env
+.github
+.claude
+.DS_Store
+.vscode
+.idea
+
+# Dependencias (composer install corre dentro del build)
 vendor
 node_modules
-*.md
-.DS_Store
-.claude
-tests
-.github
-phpunit.xml.dist
 package.json
+
+# Tests y documentación
+tests
+phpunit.xml.dist
+*.md
+dbdiagram.txt
+
+# Landing (se publica aparte en Cloudflare Pages, no la sirve esta app)
 site
+
+# Archivos de deploy que no hacen falta adentro del contenedor
+docker-compose*.yml
+backups
+index.html
+dev-router.php

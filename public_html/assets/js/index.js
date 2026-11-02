@@ -9,6 +9,10 @@ import { toast, toastError, setBusy, confirmDialog } from './ui.js';
 import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
 import { initPlanner } from './planner.js';
+import { initAgenda } from './agenda.js';
+import { initSchedule } from './schedule.js';
+import { initTogether } from './together.js';
+import { initSiuImport } from './siuImport.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
@@ -780,7 +784,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     columnsContainer.innerHTML = '';
 
     // Dynamically adjust the grid columns based on the number of visible modules
-    columnsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+    // minmax(0, 1fr): las columnas no se ensanchan por su contenido y desbordan la
+    // página. --board-cols lo usa el CSS de tablet (scroll horizontal del tablero).
+    columnsContainer.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+    columnsContainer.style.setProperty('--board-cols', String(columns));
 
     // assign consecutive data-index values for visible columns
     moduleViews.forEach(({ module, normalSubjects, intermediateRequired, intermediateExtras }, visIdx) => {
@@ -830,6 +837,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Compute stats after cursar state is updated (so .card-available classes are present)
     computeStats(displayedSubjects);
+    updateSiuImportHint();
+  }
+
+  // Aviso "¿Ya venís cursando? Importá del SIU": solo si la carrera elegida no tiene
+  // ninguna materia cargada y el usuario no lo cerró antes.
+  const SIU_HINT_DISMISSED_KEY = 'utn.siuHintDismissed';
+  function updateSiuImportHint(){
+    const hint = document.getElementById('siu-import-hint');
+    if (!hint) return;
+    let dismissed = false;
+    try{ dismissed = localStorage.getItem(SIU_HINT_DISMISSED_KEY) === '1'; }catch(e){}
+    const modules = (planData && Array.isArray(planData.modules)) ? planData.modules : [];
+    const hasAny = modules.some(m => (m.subjects || []).some(s => s.code && loadSubjectData(s.code)));
+    hint.classList.toggle('d-none', dismissed || !currentCareer || !planData || hasAny);
   }
 
   function createCard(subject, group = null){
@@ -912,7 +933,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     card.setAttribute('aria-label','Agregar electiva');
     card.style.cursor = 'pointer';
     card.dataset.targetColumn = String(typeof colIndex === 'number' ? colIndex : '');
-    card.innerHTML = `<div>+</div>`;
+    card.innerHTML = `<div class="electiva-add-label"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>Elegir electiva</span></div>`;
     // Open electivas modal when clicked and remember insertion target
     card.addEventListener('click', (ev) => {
       electivaInsertTarget = { colIndex: typeof colIndex === 'number' ? colIndex : null, placeholderEl: card };
@@ -1103,7 +1124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (statusEl) statusEl.classList.remove('d-none');
       if (modalFooter) modalFooter.style.display = '';
       if (settingsToggleBtn) settingsToggleBtn.classList.remove('d-none');
-      applyCardStatusStyle(currentCard, hydrated.status);
+        applyCardStatusStyle(currentCard, hydrated.status);
       updateAllCardCursarState();
       try{ const nowAvailable = getAvailableSubjectCodes(); animateNewlyUnlocked(prevAvailable, nowAvailable); }catch(e){}
       try{ computeStats(displayedSubjects); }catch(e){}
@@ -1130,7 +1151,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (stored.statusOverride) setStatusBanner(stored.statusOverride);
 
     wireSaveButton(code, schemeConfig);
+    bindEnterToSave();
     updateAprobarWarning();
+  }
+
+  // En escritorio (mouse/trackpad), al abrir la materia el foco va a la primera nota
+  // vacía, para cargar y apretar Enter sin tocar el mouse. En pantallas táctiles no,
+  // porque abriría el teclado y taparía el modal.
+  (function bindFocusFirstEmptyGrade(){
+    const modalEl = document.getElementById('subjectModal');
+    if (!modalEl) return;
+    modalEl.addEventListener('shown.bs.modal', () => {
+      if (!window.matchMedia('(pointer: fine)').matches) return;
+      const formEl = document.getElementById('subject-form');
+      if (!formEl || formEl.classList.contains('d-none')) return;
+      const inputs = formEl.querySelectorAll('input[type="number"]:not(.d-none)');
+      const target = Array.from(inputs).find(i => i.value === '' && i.offsetParent !== null);
+      if (target) target.focus();
+    });
+  })();
+
+  // Enter en cualquier campo del formulario guarda (como tocar Guardar).
+  function bindEnterToSave(){
+    const formEl = document.getElementById('subject-form');
+    if (!formEl || formEl.dataset.enterBound === '1') return;
+    formEl.dataset.enterBound = '1';
+    formEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      const t = e.target;
+      if (!t || t.tagName !== 'INPUT' || t.type === 'checkbox') return;
+      e.preventDefault();
+      const saveBtn = document.getElementById('subject-save');
+      if (saveBtn && !saveBtn.disabled) saveBtn.click();
+    });
   }
 
   // When a disabled card is clicked, highlight the missing 'cursar' requirements
@@ -1333,9 +1386,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       group.innerHTML = `
         <label class="form-label small">Parcial ${p}</label>
         <div class="d-flex gap-1">
-          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm" id="p_${p}_1" placeholder="Nota">
-          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_2" placeholder="Recuperatorio">
-          <input type="number" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_3" placeholder="Recuperatorio">
+          <input type="number" inputmode="numeric" enterkeyhint="done" min="1" max="10" step="1" class="form-control form-control-sm" id="p_${p}_1" placeholder="Nota">
+          <input type="number" inputmode="numeric" enterkeyhint="done" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_2" placeholder="Recuperatorio">
+          <input type="number" inputmode="numeric" enterkeyhint="done" min="1" max="10" step="1" class="form-control form-control-sm d-none" id="p_${p}_3" placeholder="Recuperatorio">
         </div>`;
       container.appendChild(group);
     }
@@ -1373,7 +1426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       row.className = 'd-flex gap-1 final-row d-none';
       row.id = `final-row-${i}`;
       row.innerHTML = `
-        <input type="number" min="1" max="10" step="1" class="form-control form-control-sm" id="final_${i}" placeholder="Nota final ${i}">
+        <input type="number" inputmode="numeric" enterkeyhint="done" min="1" max="10" step="1" class="form-control form-control-sm" id="final_${i}" placeholder="Nota final ${i}">
         <input type="date" class="form-control form-control-sm" id="final_${i}_date" title="Fecha del final">`;
       finalsBody.appendChild(row);
     }
@@ -1580,8 +1633,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Panel de configuración de la materia (⚙): cambiar esquema/año/número de cursada,
-  // recursar, o darse de baja.
+  // Menú "⋯" de la materia: "Esquema, año y cursada…" abre el panel de configuración
+  // (cambiar esquema/año/número de cursada); Recursar y Dar de baja van al final del menú.
   function bindSubjectSettingsPanel(code, stored){
     const toggleBtn = document.getElementById('subject-settings-toggle');
     const panel = document.getElementById('subject-settings-panel');
@@ -1591,12 +1644,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const applyBtn = document.getElementById('subject-settings-apply');
     const recursarBtn = document.getElementById('subject-recursar-action');
     const unenrollBtn = document.getElementById('subject-unenroll-action');
+    const openBtn = document.getElementById('subject-settings-open');
+    const cancelBtn = document.getElementById('subject-settings-cancel');
     if (!toggleBtn || !panel) return;
 
     panel.classList.add('d-none');
-    const newToggle = toggleBtn.cloneNode(true);
-    toggleBtn.parentNode.replaceChild(newToggle, toggleBtn);
-    newToggle.addEventListener('click', () => panel.classList.toggle('d-none'));
+    if (openBtn){
+      const newOpen = openBtn.cloneNode(true);
+      openBtn.parentNode.replaceChild(newOpen, openBtn);
+      newOpen.addEventListener('click', () => {
+        panel.classList.remove('d-none');
+        try{ const sel = document.getElementById('subject-scheme-select'); if (sel) sel.focus(); }catch(e){}
+      });
+    }
+    if (cancelBtn){
+      const newCancel = cancelBtn.cloneNode(true);
+      cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+      newCancel.addEventListener('click', () => panel.classList.add('d-none'));
+    }
 
     const schemes = schemesCache.length ? schemesCache : [];
     if (schemeSelect){
@@ -3154,6 +3219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const synced = await syncFromServer({ forceRender: true });
         if (!synced) throw new TypeError('network_error');
         shareToggleCtl.applyState(lastPreferences);
+        maybeShowOnboarding();
       },
       onLogout: async () => {
         clearBootCache();
@@ -3182,6 +3248,132 @@ document.addEventListener('DOMContentLoaded', async () => {
     savePlans: async (semesterPlans) => {
       await activeStore.updatePreferences({ semesterPlans });
       if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
+    },
+  });
+
+  // Agenda de parciales y finales (assets/js/agenda.js): las fechas las guarda el
+  // store activo; las materias y notas salen del mismo cache que el tablero.
+  initAgenda({
+    getStore: () => activeStore,
+    getEnrollments: () => Object.values(enrollmentCache),
+    getEnrollment: code => loadSubjectData(code),
+    getSubjectName: code => getSubjectNameByCode(code),
+    // Misma secuencia que el botón Guardar del modal de la materia, sin el modal.
+    saveResults: async (code, results) => {
+      let prevAvailable = [];
+      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+      const hydrated = await activeStore.saveResults(code, { ...results, clearOverride: true });
+      putSubjectDataInCache(code, hydrated);
+      try{ updateAllCardCursarState(); animateNewlyUnlocked(prevAvailable, getAvailableSubjectCodes()); }catch(e){}
+      try{ computeStats(displayedSubjects); }catch(e){}
+      try{ if (planData) renderGroups(planData); }catch(e){}
+      return hydrated;
+    },
+  });
+
+  // ¿Qué podemos cursar juntos? (assets/js/together.js): compara con el perfil
+  // público de un compañero; "Al plan" usa el mismo plan que el planificador.
+  initTogether({
+    getCurriculum: () => planData,
+    getCareerCode: () => currentCareer,
+    getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
+    getEnrollment: code => loadSubjectData(code),
+    fetchPublic: token => api.get(`/public/${encodeURIComponent(token)}`),
+    loadPlans: async () => {
+      const prefs = activeStore === apiStore ? lastPreferences : await activeStore.getPreferences();
+      return (prefs && prefs.semesterPlans) || {};
+    },
+    savePlans: async (semesterPlans) => {
+      await activeStore.updatePreferences({ semesterPlans });
+      if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
+    },
+  });
+
+  // Horario semanal (assets/js/schedule.js): lo guarda el store activo. Al importar
+  // el comprobante, las materias que se pueden cursar y no estaban empezadas se
+  // marcan en curso con el esquema de evaluación por defecto.
+  initSchedule({
+    getStore: () => activeStore,
+    getEnrollments: () => Object.values(enrollmentCache),
+    getEnrollment: code => loadSubjectData(code),
+    getSubjectName: code => getSubjectNameByCode(code),
+    getCareerSubjects: () => ((planData && planData.modules) || []).flatMap(m =>
+      (m.subjects || []).map(s => ({ code: s.code, name: s.name, elective: m.id === 'electives' }))),
+    getAvailableCodes: () => { try{ return getAvailableSubjectCodes(); }catch(e){ return []; } },
+    startCursada: async (codes) => {
+      const schemes = schemesCache.length ? schemesCache : await getEvaluationSchemes();
+      const scheme = schemes.find(s => s.code === '2-partials') || schemes[0];
+      if (!scheme) return;
+      let prevAvailable = [];
+      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+      for (const code of codes){
+        try{
+          putSubjectDataInCache(code, await activeStore.createEnrollment(code, scheme.code));
+        }catch(err){
+          toastError(`No se pudo marcar en curso ${getSubjectNameByCode(code)}`, err);
+        }
+      }
+      try{ updateAllCardCursarState(); animateNewlyUnlocked(prevAvailable, getAvailableSubjectCodes()); }catch(e){}
+      try{ computeStats(displayedSubjects); }catch(e){}
+      try{ if (planData) renderGroups(planData); }catch(e){}
+    },
+  });
+
+  // Importar la historia académica del SIU (assets/js/siuImport.js): carga las
+  // materias con el store activo y después refresca los caches y el tablero.
+  const siuHintClose = document.getElementById('siu-import-hint-close');
+  if (siuHintClose) siuHintClose.addEventListener('click', () => {
+    try{ localStorage.setItem(SIU_HINT_DISMISSED_KEY, '1'); }catch(e){}
+    updateSiuImportHint();
+  });
+  // Onboarding: la primera vez que alguien inicia sesión sin ninguna materia cargada
+  // (en ninguna carrera), se le ofrece importar lo que ya cursó. Se muestra una sola
+  // vez por usuario y navegador; después queda el botón en el perfil.
+  function maybeShowOnboarding(){
+    if (activeStore !== apiStore || !currentUser) return;
+    if (Object.keys(enrollmentCache).length > 0) return;
+    const key = 'utn.onboardingSeen.' + (currentUser.id ?? currentUser.email ?? 'user');
+    try{ if (localStorage.getItem(key) === '1') return; localStorage.setItem(key, '1'); }catch(e){ return; }
+    const el = document.getElementById('onboardingModal');
+    if (!el || !window.bootstrap) return;
+    // Paso 2 (comprobante de cursada): solo si la app ya tiene el horario semanal
+    // (assets/js/schedule.js escucha el evento 'utn:schedule-import').
+    const hasSchedule = !!document.getElementById('scheduleModal');
+    el.querySelectorAll('[data-schedule-text]').forEach(t => t.classList.toggle('d-none', (t.dataset.scheduleText === 'on') !== hasSchedule));
+    const scheduleBtn = document.getElementById('onboarding-schedule-btn');
+    if (scheduleBtn) scheduleBtn.classList.toggle('d-none', !hasSchedule);
+    const show = () => bootstrap.Modal.getOrCreateInstance(el).show();
+    const open = document.querySelector('.modal.show');
+    if (open) open.addEventListener('hidden.bs.modal', show, { once: true }); else show();
+  }
+
+  const onboardingScheduleBtn = document.getElementById('onboarding-schedule-btn');
+  if (onboardingScheduleBtn) onboardingScheduleBtn.addEventListener('click', () => {
+    const el = document.getElementById('onboardingModal');
+    const inst = el && window.bootstrap ? bootstrap.Modal.getInstance(el) : null;
+    if (inst) inst.hide();
+    // Dentro del click, para que el navegador deje abrir el selector de archivos.
+    document.dispatchEvent(new CustomEvent('utn:schedule-import', { detail: { file: null } }));
+  });
+
+  initSiuImport({
+    getStore: () => activeStore,
+    getCurriculum: () => planData,
+    getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
+    getEnrollment: code => loadSubjectData(code),
+    getRetakes: code => retakesCache[code] || 0,
+    getSchemes: async () => (schemesCache.length ? schemesCache : await getEvaluationSchemes()),
+    getElectivePlacements: () => getElectivesForCurrentCareer(),
+    placeElective: async (code, columnIndex) => {
+      await activeStore.setElective(currentCareer, code, columnIndex);
+      const entry = { careerCode: currentCareer, subjectCode: code, columnIndex };
+      const idx = electivesCache.findIndex(e => e.careerCode === currentCareer && e.subjectCode === code);
+      if (idx >= 0) electivesCache[idx] = entry; else electivesCache.push(entry);
+    },
+    onImported: async () => {
+      await Promise.all([refreshEnrollmentCache(), refreshElectivesCache(), refreshRetakesCache()]);
+      if (activeStore === apiStore && currentUser) writeBootCache(currentStateAsBootstrap());
+      renderFromStateWhenIdle();
     },
   });
 

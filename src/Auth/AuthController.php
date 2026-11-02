@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Config\Env;
+use App\Controllers\ClassScheduleController;
+use App\Controllers\ExamDateController;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Session;
 use App\Repositories\CareerRepository;
 use App\Repositories\EnrollmentRepository;
 use App\Repositories\EvaluationSchemeRepository;
+use App\Repositories\ClassScheduleRepository;
+use App\Repositories\ExamDateRepository;
 use App\Repositories\UserCareerRepository;
 use App\Repositories\UserRepository;
 use PDO;
@@ -170,7 +174,47 @@ final class AuthController
             $imported++;
         }
 
-        Response::json(['imported' => $imported, 'skipped' => $skipped]);
+        // Agenda del invitado: se suma a la del usuario (los parciales con fecha ya
+        // cargada en la cuenta se pisan con la del navegador, los finales se agregan).
+        $examDates = new ExamDateRepository($this->pdo);
+        $importedDates = 0;
+        foreach ((array) $request->input('examDates', []) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $subjectId = $repo->subjectIdByCode((string) ($entry['subjectCode'] ?? ''));
+            $parsed = ExamDateController::parse($entry);
+            if ($subjectId === null || is_string($parsed)) {
+                continue;
+            }
+            $examDates->save((int) $user['id'], $subjectId, $parsed['kind'], $parsed['partialNumber'], $parsed['attemptNumber'], $parsed['date']);
+            $importedDates++;
+        }
+
+        // Horario del invitado: cada materia que trae reemplaza la de la cuenta (las
+        // que no trae quedan como estaban).
+        $schedule = new ClassScheduleRepository($this->pdo);
+        $bySubject = [];
+        foreach ((array) $request->input('classSchedule', []) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $code = (string) ($entry['subjectCode'] ?? '');
+            $bySubject[$code] ??= ['sessions' => [], 'commission' => $entry['commission'] ?? null, 'campus' => $entry['campus'] ?? null];
+            $bySubject[$code]['sessions'][] = ['weekday' => $entry['weekday'] ?? null, 'start' => $entry['start'] ?? null, 'end' => $entry['end'] ?? null];
+        }
+        $importedSchedule = 0;
+        foreach ($bySubject as $code => $input) {
+            $subjectId = $repo->subjectIdByCode((string) $code);
+            $parsed = ClassScheduleController::parseSubject($input);
+            if ($subjectId === null || is_string($parsed)) {
+                continue;
+            }
+            $schedule->replaceSubject((int) $user['id'], $subjectId, $parsed['sessions'], $parsed['commission'], $parsed['campus']);
+            $importedSchedule++;
+        }
+
+        Response::json(['imported' => $imported, 'skipped' => $skipped, 'importedExamDates' => $importedDates, 'importedScheduleSubjects' => $importedSchedule]);
     }
 
     private function publicUser(array $user): array

@@ -26,62 +26,58 @@
 		<link rel="modulepreload" href="assets/js/evaluationSchemes.js">
 		<link rel="modulepreload" href="assets/js/localGuestStore.js">
 		<link rel="modulepreload" href="assets/js/planner.js">
+		<link rel="modulepreload" href="assets/js/agenda.js">
+		<link rel="modulepreload" href="assets/js/schedule.js">
+		<link rel="modulepreload" href="assets/js/together.js">
 		<link rel="modulepreload" href="assets/js/statusEngine.js">
+		<link rel="modulepreload" href="assets/js/siuImport.js">
+		<link rel="modulepreload" href="assets/js/pdfText.js">
 		<link rel="modulepreload" href="assets/js/theme.js">
 		<link rel="modulepreload" href="assets/js/ui.js">
 	</head>
 	<body>
 		<div class="container-fluid">
-			<!-- Barra superior: a la izquierda lo que cambia el tablero (carrera, título
-			     intermedio, electivas); a la derecha ayuda, estadísticas, tema y el menú de usuario. -->
-			<header class="toolbar d-flex flex-wrap justify-content-between align-items-center gap-2">
-				<div class="d-flex flex-wrap align-items-center gap-2" role="group" aria-label="Tablero">
-					<a class="app-brand d-flex align-items-center gap-2 text-decoration-none" href="./" aria-label="UTN Tracker">
-						<img src="assets/sello_arana.png" alt="" width="28" height="28">
-						<span class="fw-semibold d-none d-lg-inline">UTN Tracker</span>
-					</a>
-					<select id="programSelect" class="form-select program-select" aria-label="Carrera">
-						<!-- Opciones generadas dinámicamente por JS según las carreras en las que estás anotado -->
-					</select>
-					<div id="settings-intermediate-title-wrap" class="form-check form-switch d-none text-nowrap mb-0" title="Mostrar el mapa hasta el título intermedio">
-						<input class="form-check-input" type="checkbox" id="settings-intermediate-title" role="switch">
-						<label class="form-check-label small" for="settings-intermediate-title">Título intermedio</label>
-					</div>
-					<button type="button" class="btn btn-outline-secondary" id="btn-electivas">
-						<i class="bi bi-plus-square me-1" aria-hidden="true"></i>Electivas
+			<!-- Barra superior: marca, carrera, secciones (Agenda, Horario, Planificar,
+			     Electivas) y a la derecha estadísticas y el menú de usuario. Ayuda, tema y
+			     "Título intermedio" están en Configuración (menú de usuario).
+			     Debajo de 992 px las secciones (.app-nav) pasan a una barra fija abajo. -->
+			<header class="toolbar">
+				<a class="app-brand d-flex align-items-center gap-2 text-decoration-none" href="./" aria-label="UTN Tracker">
+					<img src="assets/sello_arana.png" alt="" width="28" height="28">
+					<span class="fw-semibold d-none d-xl-inline text-nowrap">UTN Tracker</span>
+				</a>
+				<select id="programSelect" class="form-select program-select" aria-label="Carrera">
+					<!-- Opciones generadas dinámicamente por JS según las carreras en las que estás anotado -->
+				</select>
+				<nav class="app-nav" aria-label="Secciones">
+					<button type="button" class="btn app-nav-btn" id="btn-agenda" data-bs-toggle="modal" data-bs-target="#agendaModal">
+						<i class="bi bi-calendar-event" aria-hidden="true"></i><span>Agenda</span>
 					</button>
-					<button type="button" class="btn btn-outline-secondary" id="btn-planner" data-bs-toggle="modal" data-bs-target="#plannerModal">
-						<i class="bi bi-calendar-week me-1" aria-hidden="true"></i>Planificar
+					<button type="button" class="btn app-nav-btn" id="btn-schedule" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+						<i class="bi bi-clock" aria-hidden="true"></i><span>Horario</span>
 					</button>
-				</div>
-				<div class="d-flex align-items-center gap-1" role="group" aria-label="Acciones">
+					<button type="button" class="btn app-nav-btn" id="btn-planner" data-bs-toggle="modal" data-bs-target="#plannerModal">
+						<i class="bi bi-calendar-week" aria-hidden="true"></i><span>Planificar</span>
+					</button>
+					<button type="button" class="btn app-nav-btn" id="btn-electivas">
+						<i class="bi bi-plus-square" aria-hidden="true"></i><span>Electivas</span>
+					</button>
+				</nav>
+				<div class="toolbar-actions d-flex align-items-center gap-1" role="group" aria-label="Acciones">
 					<span id="sync-indicator" class="sync-indicator text-body-secondary small d-none" role="status">
 						<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-						<span class="d-none d-md-inline ms-1">Sincronizando…</span>
+						<span class="d-none d-xl-inline ms-1">Sincronizando…</span>
 					</span>
-					<button type="button" class="btn btn-icon" data-bs-toggle="modal" data-bs-target="#helpModal" id="btn-help" title="Ayuda" aria-label="Ayuda">
-						<i class="bi bi-question-circle" aria-hidden="true"></i>
-					</button>
 					<button type="button" class="btn btn-icon" data-bs-toggle="modal" data-bs-target="#statsModal" id="btn-stats" title="Estadísticas" aria-label="Estadísticas">
 						<i class="bi bi-bar-chart" aria-hidden="true"></i>
 					</button>
-					<div class="dropdown">
-						<button type="button" class="btn btn-icon" id="btn-theme" data-bs-toggle="dropdown" aria-expanded="false" title="Tema" aria-label="Tema">
-							<i class="bi bi-circle-half" id="theme-icon" aria-hidden="true"></i>
-						</button>
-						<ul class="dropdown-menu dropdown-menu-end" aria-labelledby="btn-theme">
-							<li><button type="button" class="dropdown-item" data-theme-value="light"><i class="bi bi-sun me-2" aria-hidden="true"></i>Claro</button></li>
-							<li><button type="button" class="dropdown-item" data-theme-value="dark"><i class="bi bi-moon-stars me-2" aria-hidden="true"></i>Oscuro</button></li>
-							<li><button type="button" class="dropdown-item" data-theme-value="auto"><i class="bi bi-circle-half me-2" aria-hidden="true"></i>Automático</button></li>
-						</ul>
-					</div>
 					<!-- Menú de usuario: el contenido (avatar, nombre, iniciar/cerrar sesión) lo
 					     actualiza assets/js/auth.js según haya sesión o no. -->
 					<div class="dropdown">
 						<button type="button" class="btn user-menu-btn d-flex align-items-center gap-2" id="btn-user-menu" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menú de usuario">
 							<img id="user-menu-avatar" class="user-avatar d-none" src="data:," alt="" width="28" height="28" referrerpolicy="no-referrer">
 							<i id="user-menu-icon" class="bi bi-person-circle fs-5" aria-hidden="true"></i>
-							<span id="user-menu-label" class="d-none d-md-inline small">Invitado</span>
+							<span id="user-menu-label" class="d-none d-xl-inline small text-truncate">Invitado</span>
 							<i class="bi bi-chevron-down small" aria-hidden="true"></i>
 						</button>
 						<ul class="dropdown-menu dropdown-menu-end user-menu" aria-labelledby="btn-user-menu">
@@ -92,13 +88,24 @@
 							<li><hr class="dropdown-divider"></li>
 							<li><button type="button" class="dropdown-item" id="menu-signin" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></i>Iniciar sesión</button></li>
 							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-person me-2" aria-hidden="true"></i>Perfil y carreras</button></li>
-							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuración</button></li>
+							<li><button type="button" class="dropdown-item" id="menu-together" data-bs-toggle="modal" data-bs-target="#togetherModal"><i class="bi bi-people me-2" aria-hidden="true"></i>Cursar con un compañero</button></li>
+							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuración y ayuda</button></li>
 							<li class="menu-signed-in d-none"><hr class="dropdown-divider"></li>
 							<li class="menu-signed-in d-none"><button type="button" class="dropdown-item text-danger" id="menu-signout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión</button></li>
 						</ul>
 					</div>
 				</div>
 			</header>
+
+			<!-- Aviso para quien llega a mitad de la carrera: importar la historia académica
+			     del SIU en vez de cargar materia por materia. Lo muestra index.js cuando la
+			     carrera elegida no tiene ninguna materia cargada. -->
+			<div id="siu-import-hint" class="alert alert-info siu-hint d-none flex-wrap align-items-center gap-2 py-2" role="region" aria-label="Importar del SIU">
+				<i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i>
+				<span class="me-auto small">¿Ya venís cursando? Importá tu historia académica del SIU Guaraní y se cargan solas tus materias, notas y recursadas.</span>
+				<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#siuImportModal">Importar del SIU</button>
+				<button type="button" class="btn-close" id="siu-import-hint-close" aria-label="No mostrar más"></button>
+			</div>
 
 			<!-- Columns with subject cards -->
 			<section class="columns-grid" aria-label="Materias" aria-busy="true">
@@ -267,6 +274,28 @@
 		            </div>
 		          </div>
 		          
+		          <!-- Importar del SIU -->
+		          <div class="accordion-item">
+		            <h2 class="accordion-header" id="headingSiu">
+		              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSiu" aria-expanded="false" aria-controls="collapseSiu">
+		                Importar la historia académica del SIU
+		              </button>
+		            </h2>
+		            <div id="collapseSiu" class="accordion-collapse collapse" aria-labelledby="headingSiu" data-bs-parent="#helpAccordion">
+		              <div class="accordion-body">
+		                <p class="small">Si ya venís cursando, podés cargar todo de una vez con el PDF de tu historia académica:</p>
+		                <ol class="siu-steps-list small mb-0">
+		                  <li>Entrá a <a href="https://guarani.frba.utn.edu.ar/autogestion/grado/historia_academica" target="_blank" rel="noopener">Historia académica en el SIU Guaraní</a> (te va a pedir iniciar sesión).</li>
+		                  <li>En <strong>Filtros</strong>, marcá <strong>«Todos»</strong>. Si no, el PDF trae solo una parte (por ejemplo, solo las aprobadas) y no se pueden contar las recursadas ni las materias en curso.</li>
+		                  <li>Descargá el PDF de la historia académica.</li>
+		                  <li>Subilo acá. El archivo se lee en tu navegador y no se sube a ningún lado.</li>
+		                </ol>
+		                <p class="mt-2 mb-2 small">Cada fila del PDF se interpreta así: <strong>Regularidad</strong> es la cursada (si está reprobada, suma una recursada), <strong>Examen</strong> es un final (aprobado = materia aprobada con la nota del examen) y <strong>Promoción</strong> es materia promocionada con esa nota.</p>
+		                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#siuImportModal">Importar del SIU</button>
+		              </div>
+		            </div>
+		          </div>
+
 		          <!-- Badges -->
 		          <div class="accordion-item">
 		            <h2 class="accordion-header" id="headingBadges">
@@ -326,6 +355,17 @@
 				  </div>
 				  <div class="mt-3"><small class="text-muted">Cuando inicies sesión, podrás sincronizar tu tablero entre dispositivos.</small></div>
 				</div>
+				<!-- Importar la historia académica del SIU (assets/js/siuImport.js) -->
+				<hr class="my-3">
+				<div class="d-flex flex-wrap align-items-center gap-2">
+				  <div class="me-auto">
+					<div class="small fw-semibold">Historia académica del SIU</div>
+					<div class="form-text mt-0">Cargá de una vez las materias que ya cursaste.</div>
+				  </div>
+				  <button type="button" class="btn btn-outline-primary btn-sm" id="profile-siu-import" data-bs-toggle="modal" data-bs-target="#siuImportModal">
+					<i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i>Importar del SIU
+				  </button>
+				</div>
 				<!-- Year started input (always visible, persisted locally) -->
 				<hr class="my-3">
 				<div class="mb-2">
@@ -363,6 +403,23 @@
 				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
 			  </div>
 			  <div class="modal-body">
+				<!-- Tema (antes en la barra superior). Los botones los maneja assets/js/theme.js
+				     por el atributo data-theme-value. -->
+				<div class="mb-3">
+				  <div class="form-label mb-1" id="settings-theme-label">Tema</div>
+				  <div class="btn-group w-100 theme-picker" role="group" aria-labelledby="settings-theme-label">
+					<button type="button" class="btn btn-outline-secondary" data-theme-value="light"><i class="bi bi-sun me-1" aria-hidden="true"></i>Claro</button>
+					<button type="button" class="btn btn-outline-secondary" data-theme-value="dark"><i class="bi bi-moon-stars me-1" aria-hidden="true"></i>Oscuro</button>
+					<button type="button" class="btn btn-outline-secondary" data-theme-value="auto"><i class="bi bi-circle-half me-1" aria-hidden="true"></i>Automático</button>
+				  </div>
+				</div>
+				<!-- Título intermedio (antes en la barra superior): solo se ve si la carrera
+				     tiene título intermedio (ver syncIntermediateTitleState en index.js). -->
+				<div id="settings-intermediate-title-wrap" class="form-check form-switch mb-3 d-none">
+				  <input class="form-check-input" type="checkbox" id="settings-intermediate-title" role="switch">
+				  <label class="form-check-label" for="settings-intermediate-title">Ver solo hasta el título intermedio</label>
+				  <div class="form-text">Muestra el tablero hasta el título intermedio de la carrera.</div>
+				</div>
 				<!-- Mostrar correlativas toggle -->
 				<div class="form-check form-switch mb-3">
 				  <input class="form-check-input" type="checkbox" id="settings-correlativas" role="switch" checked>
@@ -387,7 +444,9 @@
 				  </div>
 				</div>
 			  </div>
-			  <div class="modal-footer">
+			  <div class="modal-footer justify-content-between">
+				<!-- Ayuda (antes en la barra superior): cambia de este modal al de ayuda. -->
+				<button type="button" class="btn btn-outline-secondary" id="btn-help" data-bs-toggle="modal" data-bs-target="#helpModal"><i class="bi bi-question-circle me-1" aria-hidden="true"></i>Ayuda</button>
 				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
 			  </div>
 			</div>
@@ -523,18 +582,252 @@
 		  </div>
 		</div>
 
+		<!-- Agenda: fechas de parciales y finales (assets/js/agenda.js) -->
+		<div class="modal fade" id="agendaModal" tabindex="-1" aria-labelledby="agendaModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-md-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="agendaModalLabel">Agenda</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <form id="agenda-form" class="agenda-form row g-2 align-items-end" novalidate>
+		          <div class="col-12 col-md-3">
+		            <label class="form-label small mb-1" for="agenda-subject">Materia</label>
+		            <select id="agenda-subject" class="form-select form-select-sm"></select>
+		          </div>
+		          <div class="col-6 col-md-2">
+		            <label class="form-label small mb-1" for="agenda-exam">Examen</label>
+		            <select id="agenda-exam" class="form-select form-select-sm"></select>
+		          </div>
+		          <div class="col-6 col-md-3" id="agenda-attempt-wrap">
+		            <label class="form-label small mb-1" for="agenda-attempt">Instancia</label>
+		            <select id="agenda-attempt" class="form-select form-select-sm"></select>
+		          </div>
+		          <div class="col col-md">
+		            <label class="form-label small mb-1" for="agenda-date">Fecha</label>
+		            <input type="date" id="agenda-date" class="form-control form-control-sm" required>
+		          </div>
+		          <div class="col-auto">
+		            <button type="submit" class="btn btn-sm btn-primary" id="agenda-submit">
+		              <i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Agregar</span>
+		            </button>
+		          </div>
+		        </form>
+		        <p id="agenda-no-subjects" class="small text-body-secondary d-none mb-0">Para agregar fechas, empezá a cursar alguna materia desde el tablero.</p>
+		        <div id="agenda-list"></div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- Horario semanal: grilla por bloques, carga manual e importación del comprobante (assets/js/schedule.js) -->
+		<div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-lg-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <div>
+		          <h5 class="modal-title" id="scheduleModalLabel">Horario semanal</h5>
+		          <div class="small text-body-secondary" id="schedule-summary"></div>
+		        </div>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <div id="schedule-main" class="row g-4">
+		          <div class="col-lg-8">
+		            <div id="schedule-grid" class="d-none d-sm-block"></div>
+		            <div id="schedule-days" class="d-sm-none"></div>
+		          </div>
+		          <div class="col-lg-4">
+		            <button type="button" class="btn btn-primary w-100 mb-1" id="schedule-import-btn">
+		              <i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i><span>Importar comprobante de cursada</span>
+		            </button>
+		            <input type="file" id="schedule-file" accept="application/pdf,.pdf" class="d-none">
+		            <p class="small text-body-secondary mb-3">El PDF de inscripción a cursada que descargás del SIU. Se lee en tu navegador, no se sube a ningún lado.</p>
+		            <form id="schedule-form" class="border rounded p-2 mb-3" novalidate>
+		              <div class="small fw-semibold mb-2" id="schedule-form-title">Cargar a mano</div>
+		              <select id="schedule-subject" class="form-select form-select-sm mb-2" aria-label="Materia"></select>
+		              <div class="row g-1 small text-body-secondary mb-1" aria-hidden="true">
+		                <div class="col-3">Día</div><div class="col-4">Desde</div><div class="col-4">Hasta</div>
+		              </div>
+		              <div id="schedule-rows"></div>
+		              <button type="button" class="btn btn-link btn-sm px-0" data-action="add-row"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Otro día</button>
+		              <div class="row g-1 mb-2">
+		                <div class="col-6"><input type="text" id="schedule-commission" class="form-control form-control-sm" placeholder="Comisión" aria-label="Comisión" maxlength="20"></div>
+		                <div class="col-6"><input type="text" id="schedule-campus" class="form-control form-control-sm" placeholder="Sede" aria-label="Sede" maxlength="60" list="schedule-campus-list"></div>
+		                <datalist id="schedule-campus-list"><option value="Medrano"><option value="Campus"></datalist>
+		              </div>
+		              <div id="schedule-form-error" class="small text-danger mb-2 d-none" role="alert"></div>
+		              <div class="d-flex gap-2 flex-wrap">
+		                <button type="submit" class="btn btn-sm btn-primary" id="schedule-save">Guardar</button>
+		                <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="schedule-cancel">Cancelar</button>
+		                <button type="button" class="btn btn-sm btn-outline-danger ms-auto d-none" id="schedule-remove">Quitar del horario</button>
+		              </div>
+		            </form>
+		            <div id="schedule-subjects"></div>
+		          </div>
+		        </div>
+		        <div id="schedule-import" class="d-none">
+		          <div class="small text-body-secondary mb-2" id="schedule-import-file"></div>
+		          <div id="schedule-import-alert" class="alert py-2 small" role="status"></div>
+		          <div class="table-responsive">
+		            <table class="table table-sm align-middle small mb-2">
+		              <thead><tr><th style="width:28px"><span class="visually-hidden">Importar</span></th><th>Materia</th><th>Horario</th></tr></thead>
+		              <tbody id="schedule-import-rows"></tbody>
+		            </table>
+		          </div>
+		          <div class="form-check small">
+		            <input class="form-check-input" type="checkbox" id="schedule-import-replace" checked>
+		            <label class="form-check-label" for="schedule-import-replace">Reemplazar todo el horario que tenía cargado</label>
+		          </div>
+		        </div>
+		      </div>
+		      <div class="modal-footer justify-content-between" id="schedule-footer-main">
+		        <small class="text-body-secondary d-none d-sm-inline">Arrastrá sobre la grilla para elegir los bloques, o tocá una materia para editarla.</small>
+		        <button type="button" class="btn btn-secondary ms-auto" data-bs-dismiss="modal">Cerrar</button>
+		      </div>
+		      <div class="modal-footer d-none" id="schedule-footer-import">
+		        <button type="button" class="btn btn-outline-secondary" id="schedule-import-cancel">Cancelar</button>
+		        <button type="button" class="btn btn-primary" id="schedule-import-save">Guardar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- ¿Qué podemos cursar juntos? Compara con el perfil público de un compañero (assets/js/together.js) -->
+		<div class="modal fade" id="togetherModal" tabindex="-1" aria-labelledby="togetherModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-lg-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <div>
+		          <h5 class="modal-title" id="togetherModalLabel">¿Qué podemos cursar juntos?</h5>
+		          <div class="small text-body-secondary">Compará tus correlativas con las de un compañero para el próximo cuatrimestre</div>
+		        </div>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <form id="together-form" class="row g-2 align-items-end mb-2" novalidate>
+		          <div class="col-12 col-md">
+		            <label class="form-label small mb-1" for="together-link">Link del perfil público de tu compañero</label>
+		            <input type="text" id="together-link" class="form-control form-control-sm" placeholder="https://…/share.html?uid=…" autocomplete="off">
+		          </div>
+		          <div class="col col-md-3">
+		            <label class="form-label small mb-1" for="together-alias">¿Cómo se llama? (opcional)</label>
+		            <input type="text" id="together-alias" class="form-control form-control-sm" maxlength="30" placeholder="Ej: Juli">
+		          </div>
+		          <div class="col-auto">
+		            <button type="submit" class="btn btn-sm btn-primary" id="together-submit"><i class="bi bi-people me-1" aria-hidden="true"></i><span>Comparar</span></button>
+		          </div>
+		        </form>
+		        <div id="together-friends" class="d-flex flex-wrap gap-2 align-items-center small mb-3"></div>
+		        <div id="together-result"></div>
+		      </div>
+		      <div class="modal-footer justify-content-between">
+		        <small class="text-body-secondary"><i class="bi bi-lock me-1" aria-hidden="true"></i>Solo funciona con perfiles públicos. Tu compañero no ve tus datos salvo que tu perfil también sea público.</small>
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
 		<!-- Subject modal for entering parciales and finales -->
+		<!-- Onboarding del primer inicio de sesión (index.js, maybeShowOnboarding): se
+		     muestra una vez a quien inicia sesión sin ninguna materia cargada. Cada paso
+		     abre su propio modal; el paso del comprobante de cursada aparece solo si existe
+		     el horario semanal (#scheduleModal, evento utn:schedule-import). -->
+		<div class="modal fade" id="onboardingModal" tabindex="-1" aria-labelledby="onboardingModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-dialog-centered">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="onboardingModalLabel">¡Bienvenido/a a UTN Tracker!</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <p class="small text-body-secondary">Si ya venís cursando, cargá tu progreso en dos pasos con los PDFs del SIU Guaraní. Lo podés hacer después desde tu perfil.</p>
+		        <ol class="list-group list-group-numbered onboarding-steps">
+		          <li class="list-group-item d-flex gap-2 align-items-start">
+		            <div class="ms-1 me-auto">
+		              <div class="fw-semibold">Lo que ya cursaste</div>
+		              <div class="small text-body-secondary">Importá tu historia académica: materias aprobadas, promocionadas, regularizadas y recursadas.</div>
+		            </div>
+		            <button type="button" class="btn btn-sm btn-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#siuImportModal">Importar</button>
+		          </li>
+		          <li class="list-group-item d-flex gap-2 align-items-start" id="onboarding-current-courses">
+		            <div class="ms-1 me-auto">
+		              <div class="fw-semibold">Lo que cursás ahora</div>
+		              <div class="small text-body-secondary" data-schedule-text="off">Las materias en curso salen de la historia académica. Muy pronto vas a poder importar también tu comprobante de cursada, con horarios y comisiones.</div>
+		              <div class="small text-body-secondary d-none" data-schedule-text="on">Importá tu comprobante de inscripción a cursada y se arma tu horario semanal, con comisiones y aulas.</div>
+		            </div>
+		            <button type="button" class="btn btn-sm btn-primary text-nowrap d-none" id="onboarding-schedule-btn">Importar</button>
+		          </li>
+		        </ol>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Empezar de cero</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- Importar la historia académica del SIU Guaraní (assets/js/siuImport.js) -->
+		<div class="modal fade" id="siuImportModal" tabindex="-1" aria-labelledby="siuImportModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <h5 class="modal-title" id="siuImportModalLabel">Importar del SIU</h5>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <div id="siu-steps">
+		          <p class="small mb-2">Cargá de una vez las materias que ya cursaste, con el PDF de tu <strong>historia académica</strong>:</p>
+		          <ol class="siu-steps-list small mb-0">
+		                  <li>Entrá a <a href="https://guarani.frba.utn.edu.ar/autogestion/grado/historia_academica" target="_blank" rel="noopener">Historia académica en el SIU Guaraní</a> (te va a pedir iniciar sesión).</li>
+		                  <li>En <strong>Filtros</strong>, marcá <strong>«Todos»</strong>. Si no, el PDF trae solo una parte (por ejemplo, solo las aprobadas) y no se pueden contar las recursadas ni las materias en curso.</li>
+		                  <li>Descargá el PDF de la historia académica.</li>
+		                  <li>Subilo acá. El archivo se lee en tu navegador y no se sube a ningún lado.</li>
+		                </ol>
+		          <label id="siu-drop" class="siu-drop mt-3" for="siu-file">
+		            <i class="bi bi-file-earmark-pdf fs-3" aria-hidden="true"></i>
+		            <span class="fw-semibold">Elegí el PDF o arrastralo acá</span>
+		            <span class="small text-body-secondary">historia_academica.pdf</span>
+		            <input type="file" id="siu-file" class="visually-hidden" accept="application/pdf,.pdf">
+		          </label>
+		        </div>
+		        <div id="siu-preview" aria-live="polite"></div>
+		      </div>
+		      <div class="modal-footer">
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		        <button type="button" class="btn btn-primary d-none" id="siu-import-btn">Importar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
 		<div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
 		  <div class="modal-dialog modal-dialog-centered">
 		    <div class="modal-content">
 		      <div class="modal-header">
 		        <h5 class="modal-title" id="subjectModalLabel">Materia</h5>
-		        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="subject-settings-toggle" title="Esquema de evaluación / año" aria-label="Configuración de la materia">
-		          <i class="bi bi-gear"></i>
-		        </button>
+		        <!-- Menú "⋯" de la materia: lo de uso ocasional (esquema/año) arriba y las
+		             acciones destructivas al final, separadas. Ver bindSubjectSettingsPanel. -->
+		        <div class="dropdown ms-2" id="subject-actions">
+		          <button type="button" class="btn btn-icon" id="subject-settings-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Más opciones" aria-label="Más opciones de la materia">
+		            <i class="bi bi-three-dots" aria-hidden="true"></i>
+		          </button>
+		          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="subject-settings-toggle">
+		            <li><button type="button" class="dropdown-item" id="subject-settings-open"><i class="bi bi-sliders me-2" aria-hidden="true"></i>Esquema, año y cursada…</button></li>
+		            <li><hr class="dropdown-divider"></li>
+		            <li><button type="button" class="dropdown-item text-danger" id="subject-recursar-action"><i class="bi bi-arrow-repeat me-2" aria-hidden="true"></i>Recursar</button></li>
+		            <li><button type="button" class="dropdown-item text-danger" id="subject-unenroll-action"><i class="bi bi-x-circle me-2" aria-hidden="true"></i>Dar de baja</button></li>
+		          </ul>
+		        </div>
 		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
 		      </div>
-		      <!-- Panel de configuración: esquema de evaluación + año de cursada (oculto por defecto) -->
+		      <!-- Panel de configuración: esquema de evaluación + año de cursada (oculto por defecto,
+		           se abre desde "Esquema, año y cursada…" del menú ⋯) -->
 		      <div id="subject-settings-panel" class="px-3 pt-3 d-none">
 		        <div class="mb-2">
 		          <label class="form-label small" for="subject-scheme-select">Esquema de evaluación</label>
@@ -549,9 +842,8 @@
 		          <input id="subject-cursada-input" type="number" min="1" max="20" step="1" class="form-control form-control-sm" />
 		        </div>
 		        <div class="d-flex gap-2 mb-2">
-		          <button type="button" class="btn btn-sm btn-outline-primary" id="subject-settings-apply">Aplicar</button>
-		          <button type="button" class="btn btn-sm btn-outline-danger" id="subject-recursar-action">Recursar</button>
-		          <button type="button" class="btn btn-sm btn-outline-secondary" id="subject-unenroll-action">Dar de baja</button>
+		          <button type="button" class="btn btn-sm btn-primary" id="subject-settings-apply">Aplicar</button>
+		          <button type="button" class="btn btn-sm btn-outline-secondary" id="subject-settings-cancel">Cancelar</button>
 		        </div>
 		        <hr>
 		      </div>

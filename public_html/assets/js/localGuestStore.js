@@ -15,6 +15,8 @@
 //  - `electives` -> array JSON [{careerCode, subjectCode, columnIndex}, ...]
 //  - `enrolledCareers` -> array JSON [{careerCode, showIntermediateTitle}, ...]
 //  - `preferences` -> objeto JSON (mismo shape que GET /api/preferences)
+//  - `examDates` -> array JSON con la agenda (mismo shape que GET /api/exam-dates)
+//  - `classSchedule` -> array JSON con el horario semanal (mismo shape que GET /api/class-schedule)
 
 import { computeStatus } from './statusEngine.js';
 import { getEvaluationSchemes, findSchemeByCode } from './evaluationSchemes.js';
@@ -25,6 +27,8 @@ const RETAKES_KEY = 'subjectRetakes';
 const ELECTIVES_KEY = 'electives';
 const ENROLLED_CAREERS_KEY = 'enrolledCareers';
 const PREFERENCES_KEY = 'preferences';
+const EXAM_DATES_KEY = 'examDates';
+const CLASS_SCHEDULE_KEY = 'classSchedule';
 
 const DEFAULT_SELECTED_STATS = ['horasSemanales', 'promedio', 'materiasAprobadas', 'finalesPendientes', 'materiasCursables'];
 
@@ -122,6 +126,18 @@ function normalizeFinalsInput(finals) {
     }))
     .filter((f) => Number.isFinite(f.attemptNumber))
     .sort((a, b) => a.attemptNumber - b.attemptNumber);
+}
+
+function guestSessionsFor(subjectCode, data) {
+  const text = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  return (Array.isArray(data?.sessions) ? data.sessions : []).map((s) => ({
+    subjectCode,
+    weekday: Number(s.weekday),
+    start: s.start,
+    end: s.end,
+    commission: text(data.commission),
+    campus: text(data.campus),
+  }));
 }
 
 export const localGuestStore = {
@@ -305,6 +321,67 @@ export const localGuestStore = {
       list[idx].showIntermediateTitle = !!value;
       writeJson(ENROLLED_CAREERS_KEY, list);
     }
+  },
+
+  // --- Agenda (fechas de parciales y finales). Mismas reglas que el backend (ver
+  // ExamDateRepository::save): un parcial tiene una sola fecha por instancia y se
+  // pisa; un final con la misma fecha que otro de la materia no se duplica. ---
+  async getExamDates() {
+    const arr = readJson(EXAM_DATES_KEY, []);
+    return Array.isArray(arr) ? arr : [];
+  },
+
+  async saveExamDate({ subjectCode, kind, partialNumber, attemptNumber, date }) {
+    const arr = await this.getExamDates();
+    const isFinal = kind === 'final';
+    const entry = {
+      subjectCode,
+      kind: isFinal ? 'final' : 'parcial',
+      partialNumber: isFinal ? null : partialNumber,
+      attemptNumber: isFinal ? null : attemptNumber,
+      date,
+    };
+    const existing = arr.find((e) => e.subjectCode === subjectCode && e.kind === entry.kind && (isFinal
+      ? e.date === date
+      : e.partialNumber === partialNumber && e.attemptNumber === attemptNumber));
+    if (existing) {
+      existing.date = date;
+      writeJson(EXAM_DATES_KEY, arr);
+      return { ...existing };
+    }
+    entry.id = arr.reduce((max, e) => Math.max(max, Number(e.id) || 0), 0) + 1;
+    arr.push(entry);
+    writeJson(EXAM_DATES_KEY, arr);
+    return { ...entry };
+  },
+
+  async deleteExamDate(id) {
+    const arr = await this.getExamDates();
+    writeJson(EXAM_DATES_KEY, arr.filter((e) => e.id !== id));
+  },
+
+  // --- Horario semanal. Mismas reglas que el backend (ClassScheduleRepository):
+  // se escribe de a una materia entera, o todo junto al importar. ---
+  async getClassSchedule() {
+    const arr = readJson(CLASS_SCHEDULE_KEY, []);
+    return Array.isArray(arr) ? arr : [];
+  },
+
+  async saveSubjectSchedule(subjectCode, data) {
+    const rest = (await this.getClassSchedule()).filter((s) => s.subjectCode !== subjectCode);
+    return this._writeSchedule(rest.concat(guestSessionsFor(subjectCode, data)));
+  },
+
+  async replaceClassSchedule(subjects) {
+    return this._writeSchedule((subjects || []).flatMap((s) => guestSessionsFor(s.subjectCode, s)));
+  },
+
+  _writeSchedule(sessions) {
+    const sorted = sessions
+      .map((s, i) => ({ ...s, id: i + 1 }))
+      .sort((a, b) => a.weekday - b.weekday || a.start.localeCompare(b.start));
+    writeJson(CLASS_SCHEDULE_KEY, sorted);
+    return sorted.map((s) => ({ ...s }));
   },
 
   // --- Preferencias ---

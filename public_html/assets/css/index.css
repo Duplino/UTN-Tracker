@@ -32,10 +32,89 @@ body{
   padding:1.5rem;
   background: var(--utn-page-bg);
 }
+/* Barra superior: una sola fila. En escritorio las secciones (.app-nav) van en el
+   medio; debajo de 992 px pasan a una barra fija abajo (ver más abajo). */
 .toolbar{
   display:flex;
+  flex-wrap: nowrap;
+  align-items: center;
   gap:0.5rem;
   margin-bottom:1rem;
+}
+.toolbar-actions{
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.app-nav{
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+.app-nav-btn{
+  --bs-btn-padding-x: 0.65rem;
+  --bs-btn-padding-y: 0.35rem;
+  --bs-btn-color: var(--bs-secondary-color);
+  --bs-btn-hover-color: var(--bs-body-color);
+  --bs-btn-hover-bg: var(--bs-tertiary-bg);
+  --bs-btn-active-color: var(--bs-body-color);
+  --bs-btn-active-bg: var(--bs-secondary-bg);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+.app-nav-btn .bi{
+  font-size: 1.05rem;
+}
+.user-menu-btn #user-menu-label{
+  max-width: 9rem;
+}
+.theme-picker .btn.active{
+  color: var(--bs-body-color);
+  background: var(--bs-secondary-bg);
+  border-color: var(--bs-border-color);
+}
+
+/* Tablet y celular: arriba solo logo + carrera + acciones; las secciones van en una
+   barra fija abajo, al alcance del pulgar. El padding del body deja lugar para ella. */
+@media (max-width: 991.98px){
+  body{
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+  .toolbar .program-select{
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+  }
+  .app-nav{
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1030;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom));
+    background: var(--bs-body-bg);
+    border-top: 1px solid var(--bs-border-color);
+    box-shadow: 0 -4px 16px var(--utn-shadow);
+  }
+  .app-nav-btn{
+    flex-direction: column;
+    gap: 0.1rem;
+    --bs-btn-padding-y: 0.3rem;
+    font-size: 0.75rem;
+    border-radius: var(--bs-border-radius);
+  }
+  .app-nav-btn .bi{
+    font-size: 1.25rem;
+  }
+  /* Los avisos no quedan tapados por la barra de abajo. */
+  .app-toasts,
+  .requirements-toast-container{
+    margin-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* Barra superior */
@@ -51,7 +130,9 @@ body{
 }
 .program-select{
   width: auto;
-  max-width: 22rem;
+  max-width: 24rem;
+  min-width: 9rem;
+  flex: 0 1 auto;
 }
 .btn-icon{
   --bs-btn-padding-x: 0.55rem;
@@ -177,10 +258,13 @@ body{
 .progress-wrap{
   margin-top:0.75rem;
 }
-/* Responsive: stack columns on small screens */
-@media (max-width: 992px){
+/* Tablet: las columnas mantienen un ancho legible y el tablero se desplaza de costado
+   (no la página entera). --board-cols lo pone renderGroups en index.js. */
+@media (min-width: 769px) and (max-width: 991.98px){
   .columns-grid{
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(var(--board-cols, 5), minmax(11rem, 1fr)) !important;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
   }
 }
 
@@ -324,10 +408,19 @@ body{
   margin-bottom: 0.35rem;
 }
 
-.card-electiva-add > div{ /* the + symbol */
-  font-size: 28px;
+.card-electiva-add > div{ /* "+ Elegir electiva" */
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
   color: var(--utn-muted-symbol);
   line-height: 1;
+}
+.card-electiva-add > div .bi{
+  font-size: 1.1rem;
+}
+.card-electiva-add:hover > div{
+  color: var(--bs-body-color);
 }
 
 /* Hover style for electiva placeholder: subtle background highlight without dimming others */
@@ -428,6 +521,26 @@ body{
   min-width: 100px;
   max-width: 280px;
 }
+/* Mobile: grilla de 2 columnas a todo el ancho (con el max-width de arriba las
+   tarjetas quedaban más angostas que la pantalla). Si son impares, la última
+   ocupa la fila entera. */
+@media (max-width: 768px){
+  .stats-row{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .stats-row .stat-card{
+    max-width: none;
+    min-width: 0;
+  }
+  .stats-row .stat-card:last-child:nth-child(odd){
+    grid-column: 1 / -1;
+  }
+  .stats-row:empty::before{
+    grid-column: 1 / -1;
+  }
+}
 .stats-row:empty::before{
   content: "No hay estadísticas seleccionadas. Abrí el panel de estadísticas para agregar.";
   color: var(--bs-secondary-color);
@@ -448,14 +561,176 @@ body{
   .skeleton-col + .skeleton-col{
     display: none;
   }
-  .toolbar > [aria-label="Tablero"]{
-    width: 100%;
-  }
-  .program-select{
-    flex: 1 1 calc(100% - 3rem);
-    min-width: 0;
-    max-width: none;
-  }
+}
+
+/* Agenda de parciales y finales (assets/js/agenda.js) */
+.agenda-date{
+  width: 3rem;
+  flex-shrink: 0;
+  line-height: 1.1;
+}
+.agenda-date-day{
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+.agenda-date-month,
+.agenda-date-weekday{
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+  text-transform: uppercase;
+}
+.agenda-grade input{
+  width: 4.5rem;
+}
+.agenda-past{
+  opacity: 0.7;
+}
+.min-w-0{
+  min-width: 0;
+}
+
+/* Horario semanal (assets/js/schedule.js) */
+.sch-grid{
+  --sch-row: 24px;
+  display: grid;
+  grid-template-columns: 4.6rem repeat(6, minmax(0, 1fr));
+  column-gap: 4px;
+  row-gap: 2px;
+  user-select: none;
+}
+.sch-day{
+  grid-row: 1;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+  padding-bottom: 2px;
+}
+.sch-label{
+  grid-column: 1;
+  font-size: 0.72rem;
+  color: var(--bs-secondary-color);
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 6px;
+  align-self: center;
+  position: relative;
+}
+.sch-label b{
+  color: var(--bs-body-color);
+  font-weight: 600;
+}
+.sch-shift{
+  position: absolute;
+  right: 6px;
+  bottom: 100%;
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sch-cell{
+  background: var(--bs-tertiary-bg);
+  border-radius: 3px;
+  cursor: cell;
+}
+.sch-cell:hover{
+  outline: 1px dashed var(--bs-primary);
+  outline-offset: -1px;
+}
+.sch-cell.sch-sel{
+  background: var(--bs-primary-bg-subtle);
+  outline: 2px solid var(--bs-primary);
+  outline-offset: -2px;
+}
+.sch-block{
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  border: 0;
+  border-left: 4px solid var(--sch-color);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sch-color) 22%, var(--bs-body-bg));
+  color: var(--bs-body-color);
+  padding: 2px 6px;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+.sch-block:hover,
+.sch-block.sch-editing{
+  box-shadow: 0 0 0 2px var(--sch-color);
+}
+.sch-block-name{
+  font-weight: 600;
+}
+.sch-block-name,
+.sch-block-time{
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sch-block-time{
+  color: var(--bs-secondary-color);
+}
+.sch-dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: var(--sch-color);
+}
+.sch-day-item{
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+  border: 0;
+  border-left: 4px solid var(--sch-color);
+  border-radius: var(--bs-border-radius);
+  background: color-mix(in srgb, var(--sch-color) 18%, var(--bs-body-bg));
+  color: var(--bs-body-color);
+  padding: 0.5rem 0.75rem;
+}
+.sch-day-time{
+  width: 2.8rem;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--bs-secondary-color);
+}
+#schedule-rows .form-select{
+  font-size: 0.8rem;
+  padding-left: 0.4rem;
+  padding-right: 1.4rem;
+  background-position: right 0.3rem center;
+}
+.sch-c0{ --sch-color: #0d6efd; }
+.sch-c1{ --sch-color: #198754; }
+.sch-c2{ --sch-color: #e0a800; }
+.sch-c3{ --sch-color: #dc3545; }
+.sch-c4{ --sch-color: #8b5cf6; }
+.sch-c5{ --sch-color: #0dcaf0; }
+.sch-c6{ --sch-color: #fd7e14; }
+.sch-c7{ --sch-color: #d63384; }
+
+/* ¿Qué podemos cursar juntos? (assets/js/together.js) */
+.together-chip{
+  font-size: 0.75rem;
+  line-height: 1;
+}
+.together-avatar{
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 /* Planificador de cuatrimestres (assets/js/planner.js) */
@@ -635,4 +910,39 @@ body{
     grid-auto-columns: auto;
     overflow-x: visible;
   }
+}
+
+/* Importar la historia académica del SIU (assets/js/siuImport.js) */
+.siu-hint{
+  display: flex;
+  margin-bottom: 0.75rem;
+}
+.siu-steps-list li + li{
+  margin-top: 0.25rem;
+}
+.siu-drop{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 1.25rem 1rem;
+  border: 2px dashed var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--bs-tertiary-bg);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.siu-drop:hover,
+.siu-drop:focus-within,
+.siu-drop.siu-drop-over{
+  border-color: var(--bs-primary);
+  background: var(--bs-primary-bg-subtle);
+}
+.siu-table .siu-check{
+  width: 2rem;
+}
+.siu-table td{
+  vertical-align: top;
 }
