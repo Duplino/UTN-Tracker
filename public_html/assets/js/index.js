@@ -10,6 +10,7 @@ import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
 import { initPlanner } from './planner.js';
 import { initAgenda } from './agenda.js';
+import { initSiuImport } from './siuImport.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
@@ -831,6 +832,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Compute stats after cursar state is updated (so .card-available classes are present)
     computeStats(displayedSubjects);
+    updateSiuImportHint();
+  }
+
+  // Aviso "¿Ya venís cursando? Importá del SIU": solo si la carrera elegida no tiene
+  // ninguna materia cargada y el usuario no lo cerró antes.
+  const SIU_HINT_DISMISSED_KEY = 'utn.siuHintDismissed';
+  function updateSiuImportHint(){
+    const hint = document.getElementById('siu-import-hint');
+    if (!hint) return;
+    let dismissed = false;
+    try{ dismissed = localStorage.getItem(SIU_HINT_DISMISSED_KEY) === '1'; }catch(e){}
+    const modules = (planData && Array.isArray(planData.modules)) ? planData.modules : [];
+    const hasAny = modules.some(m => (m.subjects || []).some(s => s.code && loadSubjectData(s.code)));
+    hint.classList.toggle('d-none', dismissed || !currentCareer || !planData || hasAny);
   }
 
   function createCard(subject, group = null){
@@ -3203,6 +3218,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       try{ computeStats(displayedSubjects); }catch(e){}
       try{ if (planData) renderGroups(planData); }catch(e){}
       return hydrated;
+    },
+  });
+
+  // Importar la historia académica del SIU (assets/js/siuImport.js): carga las
+  // materias con el store activo y después refresca los caches y el tablero.
+  const siuHintClose = document.getElementById('siu-import-hint-close');
+  if (siuHintClose) siuHintClose.addEventListener('click', () => {
+    try{ localStorage.setItem(SIU_HINT_DISMISSED_KEY, '1'); }catch(e){}
+    updateSiuImportHint();
+  });
+  initSiuImport({
+    getStore: () => activeStore,
+    getCurriculum: () => planData,
+    getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
+    getEnrollment: code => loadSubjectData(code),
+    getRetakes: code => retakesCache[code] || 0,
+    getSchemes: async () => (schemesCache.length ? schemesCache : await getEvaluationSchemes()),
+    getElectivePlacements: () => getElectivesForCurrentCareer(),
+    placeElective: async (code, columnIndex) => {
+      await activeStore.setElective(currentCareer, code, columnIndex);
+      const entry = { careerCode: currentCareer, subjectCode: code, columnIndex };
+      const idx = electivesCache.findIndex(e => e.careerCode === currentCareer && e.subjectCode === code);
+      if (idx >= 0) electivesCache[idx] = entry; else electivesCache.push(entry);
+    },
+    onImported: async () => {
+      await Promise.all([refreshEnrollmentCache(), refreshElectivesCache(), refreshRetakesCache()]);
+      if (activeStore === apiStore && currentUser) writeBootCache(currentStateAsBootstrap());
+      renderFromStateWhenIdle();
     },
   });
 
