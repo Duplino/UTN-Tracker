@@ -106,9 +106,10 @@ export function initAuth({ initialUser = null, mockAuthEnabled = false, onLoginS
 
     const snapshot = await buildGuestSnapshot();
     const examDates = await localGuestStore.getExamDates().catch(() => []);
-    if (snapshot.length > 0 || examDates.length > 0) {
+    const classSchedule = await localGuestStore.getClassSchedule().catch(() => []);
+    if (snapshot.length > 0 || examDates.length > 0 || classSchedule.length > 0) {
       try {
-        await api.post('/auth/import-local', { enrollments: snapshot, examDates });
+        await api.post('/auth/import-local', { enrollments: snapshot, examDates, classSchedule });
       } catch (e) {
         console.error('Error importando datos locales al backend', e);
       }

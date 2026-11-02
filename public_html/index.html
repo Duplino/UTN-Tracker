@@ -27,6 +27,7 @@
 		<link rel="modulepreload" href="assets/js/localGuestStore.js">
 		<link rel="modulepreload" href="assets/js/planner.js">
 		<link rel="modulepreload" href="assets/js/agenda.js">
+		<link rel="modulepreload" href="assets/js/schedule.js">
 		<link rel="modulepreload" href="assets/js/statusEngine.js">
 		<link rel="modulepreload" href="assets/js/siuImport.js">
 		<link rel="modulepreload" href="assets/js/pdfText.js">
@@ -55,6 +56,9 @@
 					</button>
 					<button type="button" class="btn btn-outline-secondary" id="btn-agenda" data-bs-toggle="modal" data-bs-target="#agendaModal">
 						<i class="bi bi-calendar-event me-1" aria-hidden="true"></i>Agenda
+					</button>
+					<button type="button" class="btn btn-outline-secondary" id="btn-schedule" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+						<i class="bi bi-clock me-1" aria-hidden="true"></i>Horario
 					</button>
 					<button type="button" class="btn btn-outline-secondary" id="btn-planner" data-bs-toggle="modal" data-bs-target="#plannerModal">
 						<i class="bi bi-calendar-week me-1" aria-hidden="true"></i>Planificar
@@ -609,6 +613,79 @@
 		      </div>
 		      <div class="modal-footer">
 		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- Horario semanal: grilla por bloques, carga manual e importación del comprobante (assets/js/schedule.js) -->
+		<div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-lg-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <div>
+		          <h5 class="modal-title" id="scheduleModalLabel">Horario semanal</h5>
+		          <div class="small text-body-secondary" id="schedule-summary"></div>
+		        </div>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <div id="schedule-main" class="row g-4">
+		          <div class="col-lg-8">
+		            <div id="schedule-grid" class="d-none d-sm-block"></div>
+		            <div id="schedule-days" class="d-sm-none"></div>
+		          </div>
+		          <div class="col-lg-4">
+		            <button type="button" class="btn btn-primary w-100 mb-1" id="schedule-import-btn">
+		              <i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i><span>Importar comprobante de cursada</span>
+		            </button>
+		            <input type="file" id="schedule-file" accept="application/pdf,.pdf" class="d-none">
+		            <p class="small text-body-secondary mb-3">El PDF de inscripción a cursada que descargás del SIU. Se lee en tu navegador, no se sube a ningún lado.</p>
+		            <form id="schedule-form" class="border rounded p-2 mb-3" novalidate>
+		              <div class="small fw-semibold mb-2" id="schedule-form-title">Cargar a mano</div>
+		              <select id="schedule-subject" class="form-select form-select-sm mb-2" aria-label="Materia"></select>
+		              <div class="row g-1 small text-body-secondary mb-1" aria-hidden="true">
+		                <div class="col-3">Día</div><div class="col-4">Desde</div><div class="col-4">Hasta</div>
+		              </div>
+		              <div id="schedule-rows"></div>
+		              <button type="button" class="btn btn-link btn-sm px-0" data-action="add-row"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Otro día</button>
+		              <div class="row g-1 mb-2">
+		                <div class="col-6"><input type="text" id="schedule-commission" class="form-control form-control-sm" placeholder="Comisión" aria-label="Comisión" maxlength="20"></div>
+		                <div class="col-6"><input type="text" id="schedule-campus" class="form-control form-control-sm" placeholder="Sede" aria-label="Sede" maxlength="60" list="schedule-campus-list"></div>
+		                <datalist id="schedule-campus-list"><option value="Medrano"><option value="Campus"></datalist>
+		              </div>
+		              <div id="schedule-form-error" class="small text-danger mb-2 d-none" role="alert"></div>
+		              <div class="d-flex gap-2 flex-wrap">
+		                <button type="submit" class="btn btn-sm btn-primary" id="schedule-save">Guardar</button>
+		                <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="schedule-cancel">Cancelar</button>
+		                <button type="button" class="btn btn-sm btn-outline-danger ms-auto d-none" id="schedule-remove">Quitar del horario</button>
+		              </div>
+		            </form>
+		            <div id="schedule-subjects"></div>
+		          </div>
+		        </div>
+		        <div id="schedule-import" class="d-none">
+		          <div class="small text-body-secondary mb-2" id="schedule-import-file"></div>
+		          <div id="schedule-import-alert" class="alert py-2 small" role="status"></div>
+		          <div class="table-responsive">
+		            <table class="table table-sm align-middle small mb-2">
+		              <thead><tr><th style="width:28px"><span class="visually-hidden">Importar</span></th><th>Materia</th><th>Horario</th></tr></thead>
+		              <tbody id="schedule-import-rows"></tbody>
+		            </table>
+		          </div>
+		          <div class="form-check small">
+		            <input class="form-check-input" type="checkbox" id="schedule-import-replace" checked>
+		            <label class="form-check-label" for="schedule-import-replace">Reemplazar todo el horario que tenía cargado</label>
+		          </div>
+		        </div>
+		      </div>
+		      <div class="modal-footer justify-content-between" id="schedule-footer-main">
+		        <small class="text-body-secondary d-none d-sm-inline">Arrastrá sobre la grilla para elegir los bloques, o tocá una materia para editarla.</small>
+		        <button type="button" class="btn btn-secondary ms-auto" data-bs-dismiss="modal">Cerrar</button>
+		      </div>
+		      <div class="modal-footer d-none" id="schedule-footer-import">
+		        <button type="button" class="btn btn-outline-secondary" id="schedule-import-cancel">Cancelar</button>
+		        <button type="button" class="btn btn-primary" id="schedule-import-save">Guardar</button>
 		      </div>
 		    </div>
 		  </div>

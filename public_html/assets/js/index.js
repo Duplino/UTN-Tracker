@@ -10,6 +10,7 @@ import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
 import { initPlanner } from './planner.js';
 import { initAgenda } from './agenda.js';
+import { initSchedule } from './schedule.js';
 import { initSiuImport } from './siuImport.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -3272,6 +3273,36 @@ document.addEventListener('DOMContentLoaded', async () => {
       try{ computeStats(displayedSubjects); }catch(e){}
       try{ if (planData) renderGroups(planData); }catch(e){}
       return hydrated;
+    },
+  });
+
+  // Horario semanal (assets/js/schedule.js): lo guarda el store activo. Al importar
+  // el comprobante, las materias que se pueden cursar y no estaban empezadas se
+  // marcan en curso con el esquema de evaluación por defecto.
+  initSchedule({
+    getStore: () => activeStore,
+    getEnrollments: () => Object.values(enrollmentCache),
+    getEnrollment: code => loadSubjectData(code),
+    getSubjectName: code => getSubjectNameByCode(code),
+    getCareerSubjects: () => ((planData && planData.modules) || []).flatMap(m =>
+      (m.subjects || []).map(s => ({ code: s.code, name: s.name, elective: m.id === 'electives' }))),
+    getAvailableCodes: () => { try{ return getAvailableSubjectCodes(); }catch(e){ return []; } },
+    startCursada: async (codes) => {
+      const schemes = schemesCache.length ? schemesCache : await getEvaluationSchemes();
+      const scheme = schemes.find(s => s.code === '2-partials') || schemes[0];
+      if (!scheme) return;
+      let prevAvailable = [];
+      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+      for (const code of codes){
+        try{
+          putSubjectDataInCache(code, await activeStore.createEnrollment(code, scheme.code));
+        }catch(err){
+          toastError(`No se pudo marcar en curso ${getSubjectNameByCode(code)}`, err);
+        }
+      }
+      try{ updateAllCardCursarState(); animateNewlyUnlocked(prevAvailable, getAvailableSubjectCodes()); }catch(e){}
+      try{ computeStats(displayedSubjects); }catch(e){}
+      try{ if (planData) renderGroups(planData); }catch(e){}
     },
   });
 

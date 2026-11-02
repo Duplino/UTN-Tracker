@@ -210,6 +210,45 @@ final class ApiTest extends TestCase
         $this->assertSame(401, $this->request('GET', '/api/exam-dates', null, false)['status']);
     }
 
+    public function testClassScheduleLifecycle(): void
+    {
+        $this->login();
+
+        $all = $this->request('PUT', '/api/class-schedule', ['subjects' => [
+            ['subjectCode' => 'AM2', 'commission' => 'Z2005', 'campus' => 'Campus', 'sessions' => [
+                ['weekday' => 0, 'start' => '8:30', 'end' => '12:30'],
+            ]],
+            ['subjectCode' => 'F2', 'sessions' => [
+                ['weekday' => 0, 'start' => '14:15', 'end' => '18:15'],
+                ['weekday' => 2, 'start' => '14:15', 'end' => '16:45'],
+            ]],
+        ]]);
+        $this->assertSame(200, $all['status']);
+        $this->assertCount(3, $all['body']['sessions']);
+        $am2 = array_values(array_filter($all['body']['sessions'], fn ($s) => $s['subjectCode'] === 'AM2'))[0];
+        $this->assertSame(['08:30', '12:30', 'Z2005', 'Campus'], [$am2['start'], $am2['end'], $am2['commission'], $am2['campus']]);
+
+        // Editar una materia reemplaza solo sus filas.
+        $one = $this->request('PUT', '/api/class-schedule/F2', ['commission' => 'Z1643', 'sessions' => [
+            ['weekday' => 3, 'start' => '19:00', 'end' => '22:15'],
+        ]]);
+        $this->assertSame(200, $one['status']);
+        $f2 = array_values(array_filter($one['body']['sessions'], fn ($s) => $s['subjectCode'] === 'F2'));
+        $this->assertCount(1, $f2);
+        $this->assertSame([3, 'Z1643'], [$f2[0]['weekday'], $f2[0]['commission']]);
+        $this->assertCount(2, $this->request('GET', '/api/class-schedule')['body']['sessions']);
+
+        $this->assertSame(422, $this->request('PUT', '/api/class-schedule/F2', ['sessions' => [['weekday' => 6, 'start' => '08:30', 'end' => '09:15']]])['status']);
+        $this->assertSame(422, $this->request('PUT', '/api/class-schedule/F2', ['sessions' => [['weekday' => 1, 'start' => '10:00', 'end' => '09:15']]])['status']);
+        $this->assertSame(422, $this->request('PUT', '/api/class-schedule/NOEXISTE', ['sessions' => []])['status']);
+
+        // Sin filas, la materia sale del horario.
+        $this->request('PUT', '/api/class-schedule/F2', ['sessions' => []]);
+        $this->request('PUT', '/api/class-schedule/AM2', ['sessions' => []]);
+        $this->assertSame([], $this->request('GET', '/api/class-schedule')['body']['sessions']);
+        $this->assertSame(401, $this->request('GET', '/api/class-schedule', null, false)['status']);
+    }
+
     public function testRejectsUnknownSubject(): void
     {
         $this->login();

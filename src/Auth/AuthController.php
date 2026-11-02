@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Config\Env;
+use App\Controllers\ClassScheduleController;
 use App\Controllers\ExamDateController;
 use App\Http\Request;
 use App\Http\Response;
@@ -12,6 +13,7 @@ use App\Http\Session;
 use App\Repositories\CareerRepository;
 use App\Repositories\EnrollmentRepository;
 use App\Repositories\EvaluationSchemeRepository;
+use App\Repositories\ClassScheduleRepository;
 use App\Repositories\ExamDateRepository;
 use App\Repositories\UserCareerRepository;
 use App\Repositories\UserRepository;
@@ -189,7 +191,30 @@ final class AuthController
             $importedDates++;
         }
 
-        Response::json(['imported' => $imported, 'skipped' => $skipped, 'importedExamDates' => $importedDates]);
+        // Horario del invitado: cada materia que trae reemplaza la de la cuenta (las
+        // que no trae quedan como estaban).
+        $schedule = new ClassScheduleRepository($this->pdo);
+        $bySubject = [];
+        foreach ((array) $request->input('classSchedule', []) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $code = (string) ($entry['subjectCode'] ?? '');
+            $bySubject[$code] ??= ['sessions' => [], 'commission' => $entry['commission'] ?? null, 'campus' => $entry['campus'] ?? null];
+            $bySubject[$code]['sessions'][] = ['weekday' => $entry['weekday'] ?? null, 'start' => $entry['start'] ?? null, 'end' => $entry['end'] ?? null];
+        }
+        $importedSchedule = 0;
+        foreach ($bySubject as $code => $input) {
+            $subjectId = $repo->subjectIdByCode((string) $code);
+            $parsed = ClassScheduleController::parseSubject($input);
+            if ($subjectId === null || is_string($parsed)) {
+                continue;
+            }
+            $schedule->replaceSubject((int) $user['id'], $subjectId, $parsed['sessions'], $parsed['commission'], $parsed['campus']);
+            $importedSchedule++;
+        }
+
+        Response::json(['imported' => $imported, 'skipped' => $skipped, 'importedExamDates' => $importedDates, 'importedScheduleSubjects' => $importedSchedule]);
     }
 
     private function publicUser(array $user): array

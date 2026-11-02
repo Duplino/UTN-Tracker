@@ -513,6 +513,133 @@ body{
   min-width: 0;
 }
 
+/* Horario semanal (assets/js/schedule.js) */
+.sch-grid{
+  --sch-row: 24px;
+  display: grid;
+  grid-template-columns: 4.6rem repeat(6, minmax(0, 1fr));
+  column-gap: 4px;
+  row-gap: 2px;
+  user-select: none;
+}
+.sch-day{
+  grid-row: 1;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+  padding-bottom: 2px;
+}
+.sch-label{
+  grid-column: 1;
+  font-size: 0.72rem;
+  color: var(--bs-secondary-color);
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 6px;
+  align-self: center;
+  position: relative;
+}
+.sch-label b{
+  color: var(--bs-body-color);
+  font-weight: 600;
+}
+.sch-shift{
+  position: absolute;
+  right: 6px;
+  bottom: 100%;
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sch-cell{
+  background: var(--bs-tertiary-bg);
+  border-radius: 3px;
+  cursor: cell;
+}
+.sch-cell:hover{
+  outline: 1px dashed var(--bs-primary);
+  outline-offset: -1px;
+}
+.sch-cell.sch-sel{
+  background: var(--bs-primary-bg-subtle);
+  outline: 2px solid var(--bs-primary);
+  outline-offset: -2px;
+}
+.sch-block{
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  border: 0;
+  border-left: 4px solid var(--sch-color);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sch-color) 22%, var(--bs-body-bg));
+  color: var(--bs-body-color);
+  padding: 2px 6px;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+.sch-block:hover,
+.sch-block.sch-editing{
+  box-shadow: 0 0 0 2px var(--sch-color);
+}
+.sch-block-name{
+  font-weight: 600;
+}
+.sch-block-name,
+.sch-block-time{
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sch-block-time{
+  color: var(--bs-secondary-color);
+}
+.sch-dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: var(--sch-color);
+}
+.sch-day-item{
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+  border: 0;
+  border-left: 4px solid var(--sch-color);
+  border-radius: var(--bs-border-radius);
+  background: color-mix(in srgb, var(--sch-color) 18%, var(--bs-body-bg));
+  color: var(--bs-body-color);
+  padding: 0.5rem 0.75rem;
+}
+.sch-day-time{
+  width: 2.8rem;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--bs-secondary-color);
+}
+#schedule-rows .form-select{
+  font-size: 0.8rem;
+  padding-left: 0.4rem;
+  padding-right: 1.4rem;
+  background-position: right 0.3rem center;
+}
+.sch-c0{ --sch-color: #0d6efd; }
+.sch-c1{ --sch-color: #198754; }
+.sch-c2{ --sch-color: #e0a800; }
+.sch-c3{ --sch-color: #dc3545; }
+.sch-c4{ --sch-color: #8b5cf6; }
+.sch-c5{ --sch-color: #0dcaf0; }
+.sch-c6{ --sch-color: #fd7e14; }
+.sch-c7{ --sch-color: #d63384; }
+
 /* Planificador de cuatrimestres (assets/js/planner.js) */
 .planner-summary{
   display: grid;
