@@ -9,6 +9,7 @@ use App\Config\Database;
 use App\Config\Env;
 use App\Controllers\BootstrapController;
 use App\Controllers\CareerController;
+use App\Controllers\ClassScheduleController;
 use App\Controllers\ElectivesController;
 use App\Controllers\EnrollmentController;
 use App\Controllers\EvaluationSchemeController;
@@ -68,6 +69,11 @@ $examDates = new ExamDateController($pdo);
 $router->get('/api/exam-dates', [$examDates, 'index']);
 $router->post('/api/exam-dates', [$examDates, 'save']);
 $router->delete('/api/exam-dates/{id}', [$examDates, 'remove']);
+
+$classSchedule = new ClassScheduleController($pdo);
+$router->get('/api/class-schedule', [$classSchedule, 'index']);
+$router->put('/api/class-schedule', [$classSchedule, 'replaceAll']);
+$router->put('/api/class-schedule/{subjectCode}', [$classSchedule, 'saveSubject']);
 
 $electives = new ElectivesController($pdo);
 $router->get('/api/electives', [$electives, 'index']);

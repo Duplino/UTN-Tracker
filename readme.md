@@ -13,6 +13,7 @@ La aplicación está disponible en **[utntracker.com.ar](https://utntracker.com.
 - Cálculo automático del estado de cada materia, con opción de forzarlo manualmente.
 - Soporte para electivas y para carreras con título intermedio.
 - Estadísticas de progreso (materias aprobadas, promedio, horas semanales en curso).
+- Horario semanal: días y horas de cada materia en una grilla por bloques (lunes a sábado), cargado a mano o importando el comprobante de inscripción a cursada del SIU (PDF, se lee en el navegador).
 - Planificador de cuatrimestres: qué podés cursar el próximo cuatrimestre según tus correlativas, simulación de los cuatrimestres siguientes (qué destraba cada materia) y fecha estimada de egreso, al ritmo actual y con el plan armado.
 - Perfil público opcional, para compartir el progreso propio (ver [API.md](API.md) para consumirlo programáticamente).
 
