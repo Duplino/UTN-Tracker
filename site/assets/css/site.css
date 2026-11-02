@@ -97,4 +97,4 @@ h1,h2,h3{ text-wrap: balance; }
 .faq details p{ padding: 0.85rem 1.25rem 1.1rem; margin: 0; color: var(--bs-secondary-color); }
 @media (prefers-reduced-motion: reduce){ .faq summary::after{ transition: none; } }
 .card-subject .card-body > div{ min-width: 0; }
-.card-subject .card-title{ overflow-wrap: anywhere; hyphens: auto; }
+.card-subject .card-title{ overflow-wrap: break-word; }
