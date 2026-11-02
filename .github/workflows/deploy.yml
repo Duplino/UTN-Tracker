@@ -7,7 +7,7 @@ name: Deploy
 # dev -> staging hace lo mismo, pero solo si la variable de repo
 # AUTO_DEPLOY_STAGING vale "true".
 #
-# Secrets que necesita: ver "Deploy automático" en el readme.
+# Secrets: VPS_HOST (IP), VPS_SSH_KEY, VPS_KNOWN_HOSTS y opcionales VPS_USER, VPS_PORT.
 
 on:
   workflow_run:
@@ -56,13 +56,13 @@ jobs:
           # Sin ningún secret cargado todavía, se saltea el deploy en vez de
           # dejar el CI en rojo (p. ej. justo después de mergear este workflow).
           if [ -z "$VPS_HOST$VPS_SSH_KEY$VPS_KNOWN_HOSTS" ]; then
-            echo "::warning::Deploy salteado: no hay secrets VPS_* configurados. Ver 'Deploy automático' en el readme."
+            echo "::warning::Deploy salteado: no hay secrets VPS_* configurados. El setup está en las notas del proyecto."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           for s in VPS_HOST VPS_SSH_KEY VPS_KNOWN_HOSTS; do
             if [ -z "${!s}" ]; then
-              echo "::error::Falta el secret $s (Settings → Secrets and variables → Actions). Ver 'Deploy automático' en el readme."
+              echo "::error::Falta el secret $s (Settings → Secrets and variables → Actions). El setup está en las notas del proyecto."
               exit 1
             fi
           done
