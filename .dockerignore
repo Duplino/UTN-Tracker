@@ -10,3 +10,4 @@ tests
 .github
 phpunit.xml.dist
 package.json
+site

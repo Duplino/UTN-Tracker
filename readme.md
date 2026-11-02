@@ -117,6 +117,16 @@ El comentario al principio del script tiene el comando para restaurar. Conviene 
 
 Cuando `dev` está probado y se mergea a `main`, el redeploy de prod es el mismo flujo pero en la carpeta de prod (ver sección anterior).
 
+## Landing (`site/`)
+
+`site/` es la landing pública de `utntracker.com.ar`, un sitio estático (HTML + Bootstrap, sin build) pensado para SEO. La app pasa a `app.utntracker.com.ar`. Se despliega en Cloudflare Pages:
+
+- Proyecto de Pages conectado a este repo, rama `main`, sin comando de build, con **Root directory** `site` y **Build watch paths** `site/*`, así un cambio en la app no la redespliega.
+- `site/_redirects` manda los links viejos de perfiles públicos (`/share.html?uid=...`) a la app y `site/_headers` define la caché.
+- `site/` está en `.dockerignore`, así que no entra a la imagen de la app.
+
+Para verla en local: `python3 -m http.server -d site 8081`.
+
 ## Base de datos (migraciones)
 
 El esquema y los datos de carreras viven en `database/migrations/`, en archivos numerados (`0001_initial_schema.sql`, `0002_...`). `php bin/migrate.php` aplica los que todavía no corrieron, en orden, y los anota en la tabla `schema_migrations`. El contenedor lo corre solo al arrancar; `php bin/migrate.php --status` muestra qué está aplicado.

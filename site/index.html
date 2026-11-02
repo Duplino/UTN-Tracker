@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="es-AR">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>UTN Tracker · Seguí tu carrera en la UTN: correlativas, notas y planificador</title>
+		<meta name="description" content="Organizá tu carrera en la UTN: importá tu historia académica del SIU Guaraní, mirá qué materias podés cursar según tus correlativas, planificá los próximos cuatrimestres y calculá cuándo te recibís. Gratis.">
+		<link rel="canonical" href="https://utntracker.com.ar/">
+		<meta name="color-scheme" content="light dark">
+		<meta name="theme-color" content="#f8f9fa" media="(prefers-color-scheme: light)">
+		<meta name="theme-color" content="#16191d" media="(prefers-color-scheme: dark)">
+
+		<!-- Vista previa al compartir (WhatsApp, Telegram, X, etc.) -->
+		<meta property="og:type" content="website">
+		<meta property="og:site_name" content="UTN Tracker">
+		<meta property="og:locale" content="es_AR">
+		<meta property="og:url" content="https://utntracker.com.ar/">
+		<meta property="og:title" content="UTN Tracker · Tu carrera en la UTN, materia por materia">
+		<meta property="og:description" content="Importá tu historia académica del SIU, mirá tus correlativas y planificá cuándo te recibís. Gratis.">
+		<meta property="og:image" content="https://utntracker.com.ar/assets/img/og.png">
+		<meta property="og:image:width" content="1200">
+		<meta property="og:image:height" content="630">
+		<meta name="twitter:card" content="summary_large_image">
+
+		<!-- Sin parpadeo: aplica el tema del sistema (claro/oscuro) antes del primer pintado. -->
+		<script>
+			(function(){var m=window.matchMedia('(prefers-color-scheme: dark)');function a(){document.documentElement.setAttribute('data-bs-theme',m.matches?'dark':'light');}a();try{m.addEventListener('change',a);}catch(e){}})();
+		</script>
+		<link href="/assets/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
+		<link href="/assets/lib/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+		<link href="/assets/css/site.css" rel="stylesheet">
+		<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+		<link rel="manifest" href="/site.webmanifest">
+
+		<script type="application/ld+json">
+		{
+			"@context": "https://schema.org",
+			"@graph": [
+				{
+					"@type": "WebApplication",
+					"name": "UTN Tracker",
+					"url": "https://utntracker.com.ar/",
+					"applicationCategory": "EducationalApplication",
+					"operatingSystem": "Web",
+					"inLanguage": "es-AR",
+					"description": "Panel para estudiantes de la UTN: correlativas, notas, planificador de cuatrimestres, horario y agenda de parciales, con importación de la historia académica del SIU Guaraní.",
+					"offers": { "@type": "Offer", "price": "0", "priceCurrency": "ARS" }
+				},
+				{
+					"@type": "FAQPage",
+					"mainEntity": [
+						{ "@type": "Question", "name": "¿UTN Tracker es gratis?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Entrás con tu cuenta de Google y listo." } },
+						{ "@type": "Question", "name": "¿Es una app oficial de la UTN?", "acceptedAnswer": { "@type": "Answer", "text": "No. Es un proyecto independiente hecho por estudiantes. Tus notas oficiales siguen siendo las del SIU Guaraní." } },
+						{ "@type": "Question", "name": "¿Qué pasa con mi historia académica del SIU?", "acceptedAnswer": { "@type": "Answer", "text": "El PDF se lee en tu navegador y no se sube a ningún servidor. Solo se guardan las materias y notas que confirmás." } },
+						{ "@type": "Question", "name": "¿Sirve para cualquier facultad regional?", "acceptedAnswer": { "@type": "Answer", "text": "Los planes de estudio son los mismos en todas las regionales. La importación del SIU está probada con el autogestión de la FRBA." } },
+						{ "@type": "Question", "name": "¿Cómo sabe qué materias puedo cursar?", "acceptedAnswer": { "@type": "Answer", "text": "Usa las correlativas del plan de estudios. Con lo que tenés aprobado y regularizado, marca qué materias podés cursar el próximo cuatrimestre." } },
+						{ "@type": "Question", "name": "¿Puedo compartir mi progreso?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Podés activar un perfil público con un link para compartir. Viene apagado." } }
+					]
+				}
+			]
+		}
+		</script>
+	</head>
+	<body>
+		<header class="container site-nav d-flex align-items-center justify-content-between gap-3">
+			<a class="app-brand d-flex align-items-center gap-2 text-decoration-none" href="/">
+				<img src="/assets/img/logo.png" alt="" width="32" height="32">
+				<span class="fw-semibold fs-5">UTN Tracker</span>
+			</a>
+			<nav class="d-flex align-items-center gap-1" aria-label="Secciones">
+				<a class="btn btn-link link-secondary text-decoration-none d-none d-md-inline-block" href="#funciones">Funciones</a>
+				<a class="btn btn-link link-secondary text-decoration-none d-none d-md-inline-block" href="#carreras">Carreras</a>
+				<a class="btn btn-link link-secondary text-decoration-none d-none d-md-inline-block" href="#preguntas">Preguntas</a>
+				<a class="btn btn-outline-primary" href="https://app.utntracker.com.ar">Entrar</a>
+			</nav>
+		</header>
+
+		<main>
+			<section class="container hero">
+				<div class="row g-4 g-lg-5 align-items-center">
+					<div class="col-lg-6 d-grid gap-3">
+						<span class="eyebrow">Para estudiantes de la UTN</span>
+						<h1>Tu carrera en la UTN, materia por materia.</h1>
+						<p class="lead text-body-secondary mb-1">Cargá tu historia académica del SIU en un minuto y mirá qué tenés aprobado, qué podés cursar según tus correlativas y cuándo te recibís si seguís a este ritmo.</p>
+						<div class="d-flex flex-wrap gap-2">
+							<a class="btn btn-primary btn-lg" href="https://app.utntracker.com.ar"><i class="bi bi-google me-2" aria-hidden="true"></i>Entrar con Google</a>
+							<a class="btn btn-outline-secondary btn-lg" href="#funciones">Ver cómo funciona</a>
+						</div>
+						<p class="small text-body-secondary mb-0"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Gratis <i class="bi bi-check2 ms-3 me-1" aria-hidden="true"></i>Sin instalar nada <i class="bi bi-check2 ms-3 me-1" aria-hidden="true"></i>Funciona en el celular</p>
+					</div>
+
+					<div class="col-lg-6">
+						<!-- Mini tablero con las mismas tarjetas que la app (ejemplo, no son datos reales). -->
+						<div class="mini-board" role="img" aria-label="Ejemplo del tablero de UTN Tracker: materias de Ingeniería en Sistemas K23 por nivel, con nota y estado">
+							<div>
+								<h2>Primer Nivel <small>7/8</small></h2>
+								<div class="card card-subject card-status-promocionada"><div class="card-body"><div><p class="card-title">Sistemas y Procesos de Negocio</p><span class="code">SyPdN</span><span class="status-label">Promocionada</span></div><span class="badge bg-success">9</span></div></div>
+								<div class="card card-subject card-status-aprobada"><div class="card-body"><div><p class="card-title">Análisis Matemático I</p><span class="code">AM1</span><span class="status-label">Aprobada</span></div><span class="badge bg-success">6</span></div></div>
+								<div class="card card-subject"><div class="card-body"><div><p class="card-title">Física I</p><span class="code">F1</span><span class="status-label">En curso</span></div><span class="badge bg-primary">5 hs - A</span></div></div>
+							</div>
+							<div>
+								<h2>Segundo Nivel <small>3/8</small></h2>
+								<div class="card card-subject card-status-promocionada"><div class="card-body"><div><p class="card-title">Sistemas Operativos</p><span class="code">SSOO</span><span class="status-label">Promocionada</span></div><span class="badge bg-success">9</span></div></div>
+								<div class="card card-subject card-status-regularizada"><div class="card-body"><div><p class="card-title">Análisis Matemático II</p><span class="code">AM2</span><span class="status-label">Regularizada</span></div><span class="badge bg-warning text-dark">Final</span></div></div>
+								<div class="card card-subject card-available"><div class="card-body"><div><p class="card-title">Paradigmas de Programación</p><span class="code">PdP</span><span class="status-label">Podés cursarla</span></div><span class="badge bg-secondary">4 hs - A</span></div></div>
+							</div>
+							<div class="col-3rd">
+								<h2>Tercer Nivel <small>1/8</small></h2>
+								<div class="card card-subject card-status-promocionada"><div class="card-body"><div><p class="card-title">Probabilidad y Estadística</p><span class="code">PyE</span><span class="status-label">Promocionada</span></div><span class="badge bg-success">8</span></div></div>
+								<div class="card card-subject card-disabled"><div class="card-body"><div><p class="card-title">Bases de Datos</p><span class="code">BD</span></div><span class="badge bg-secondary">6 hs - C</span></div></div>
+								<div class="card card-subject card-disabled"><div class="card-body"><div><p class="card-title">Desarrollo de Software</p><span class="code">DdS</span></div><span class="badge bg-secondary">6 hs - C</span></div></div>
+							</div>
+							<div class="mini-stats">
+								<div class="card"><div class="card-body"><div class="small text-body-secondary">Promedio</div><div class="h5">8,09</div></div></div>
+								<div class="card"><div class="card-body"><div class="small text-body-secondary">Aprobadas</div><div class="h5">11 / 42</div></div></div>
+								<div class="card"><div class="card-body"><div class="small text-body-secondary">Horas semanales</div><div class="h5">29 hs</div></div></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section class="section section-band" aria-labelledby="siu-titulo">
+				<div class="container">
+					<div class="row g-4 g-lg-5 align-items-center">
+						<div class="col-lg-5 d-grid gap-3">
+							<span class="eyebrow">Importar del SIU Guaraní</span>
+							<h2 id="siu-titulo" class="fw-bold">No cargues las notas a mano.</h2>
+							<ol class="steps">
+								<li><p class="mb-0"><strong>Descargá tu historia académica</strong> desde el autogestión del SIU, con el filtro en «Todos».</p></li>
+								<li><p class="mb-0"><strong>Subí el PDF</strong> a UTN Tracker. Detecta las materias aprobadas, promocionadas, regularizadas y en curso, con sus notas y recursadas.</p></li>
+								<li><p class="mb-0"><strong>Revisá la vista previa</strong> y confirmá. Tu tablero queda armado.</p></li>
+							</ol>
+							<div class="alert alert-success d-flex gap-2 mb-0" role="note">
+								<i class="bi bi-shield-lock" aria-hidden="true"></i>
+								<div>El PDF se lee en tu navegador. No se sube a ningún servidor.</div>
+							</div>
+						</div>
+						<div class="col-lg-7">
+							<figure class="shot"><img src="/assets/img/siu.webp" width="1200" height="771" loading="lazy" alt="Vista previa de la importación del SIU, con las materias detectadas y su estado antes de confirmar"></figure>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section class="section" id="funciones" aria-labelledby="funciones-titulo">
+				<div class="container">
+					<div class="mb-4" style="max-width: 44rem">
+						<span class="eyebrow">Funciones</span>
+						<h2 id="funciones-titulo" class="fw-bold mt-2">Todo lo que necesitás para planificar la cursada</h2>
+						<p class="text-body-secondary mb-0">Pensado con las reglas de la UTN: correlativas para cursar y para rendir, materias anuales y cuatrimestrales, promoción, recuperatorios y electivas.</p>
+					</div>
+
+					<article class="feature row g-4 align-items-center">
+						<div class="col-lg-5 d-grid gap-2">
+							<span class="feature-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+							<h3 class="h4 fw-semibold mb-0">Correlativas y estado de cada materia</h3>
+							<p class="text-body-secondary mb-0">Cargá parciales, recuperatorios, TPs y finales. UTN Tracker calcula solo si la materia queda promocionada, regularizada o aprobada, y te muestra qué podés cursar el próximo cuatrimestre.</p>
+						</div>
+						<div class="col-lg-7"><figure class="shot"><img src="/assets/img/tablero.webp" width="1200" height="771" loading="lazy" alt="Tablero con las materias de Ingeniería en Sistemas K23 por nivel, con horas semanales, promedio y materias aprobadas"></figure></div>
+					</article>
+
+					<article class="feature row g-4 align-items-center">
+						<div class="col-lg-5 order-lg-2 d-grid gap-2">
+							<span class="feature-icon"><i class="bi bi-calendar-week" aria-hidden="true"></i></span>
+							<h3 class="h4 fw-semibold mb-0">Planificador de cuatrimestres</h3>
+							<p class="text-body-secondary mb-0">Armá los próximos cuatrimestres respetando las correlativas. Te muestra qué destraba cada materia y estima tu fecha de egreso, al ritmo actual y con tu plan.</p>
+						</div>
+						<div class="col-lg-7 order-lg-1"><figure class="shot"><picture><source srcset="/assets/img/planificador-oscuro.webp" media="(prefers-color-scheme: dark)"><img src="/assets/img/planificador.webp" width="1200" height="750" loading="lazy" alt="Planificador con 1C 2027 y 2C 2027, las materias de cada cuatrimestre y cuántas faltan para recibirse"></picture></figure></div>
+					</article>
+
+					<article class="feature row g-4 align-items-center">
+						<div class="col-lg-5 d-grid gap-2">
+							<span class="feature-icon"><i class="bi bi-clock" aria-hidden="true"></i></span>
+							<h3 class="h4 fw-semibold mb-0">Horario semanal</h3>
+							<p class="text-body-secondary mb-0">Tus clases en una grilla de lunes a sábado. Cargalas a mano o importá el comprobante de inscripción a cursada del SIU.</p>
+						</div>
+						<div class="col-lg-7"><figure class="shot"><picture><source srcset="/assets/img/horario-oscuro.webp" media="(prefers-color-scheme: dark)"><img src="/assets/img/horario.webp" width="1200" height="806" loading="lazy" alt="Grilla del horario semanal con las materias en curso"></picture></figure></div>
+					</article>
+
+					<article class="feature row g-4 align-items-center">
+						<div class="col-lg-5 order-lg-2 d-grid gap-2">
+							<span class="feature-icon"><i class="bi bi-calendar-event" aria-hidden="true"></i></span>
+							<h3 class="h4 fw-semibold mb-0">Agenda de parciales y finales</h3>
+							<p class="text-body-secondary mb-0">Todas tus fechas en un solo lugar, con un aviso cuando una fecha ya pasó y todavía no cargaste la nota.</p>
+						</div>
+						<div class="col-lg-7 order-lg-1"><figure class="shot"><picture><source srcset="/assets/img/agenda-oscuro.webp" media="(prefers-color-scheme: dark)"><img src="/assets/img/agenda.webp" width="1200" height="806" loading="lazy" alt="Agenda con los próximos parciales y finales"></picture></figure></div>
+					</article>
+
+					<article class="feature row g-4 align-items-center">
+						<div class="col-lg-5 d-grid gap-2">
+							<span class="feature-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+							<h3 class="h4 fw-semibold mb-0">Cursar con un compañero</h3>
+							<p class="text-body-secondary mb-0">Pegá el link del perfil público de un compañero y mirá qué materias pueden cursar juntos el próximo cuatrimestre, y qué le falta a cada uno. Tu perfil es privado salvo que lo hagas público.</p>
+						</div>
+						<div class="col-lg-7"><figure class="shot"><picture><source srcset="/assets/img/cursar-juntos-oscuro.webp" media="(prefers-color-scheme: dark)"><img src="/assets/img/cursar-juntos.webp" width="1200" height="806" loading="lazy" alt="Comparación de correlativas entre dos estudiantes: materias que pueden cursar juntos, solo vos y solo tu compañero"></picture></figure></div>
+					</article>
+				</div>
+			</section>
+
+			<section class="section section-band" id="carreras" aria-labelledby="carreras-titulo">
+				<div class="container">
+					<span class="eyebrow">Carreras</span>
+					<h2 id="carreras-titulo" class="fw-bold mt-2 mb-4">Planes de estudio disponibles</h2>
+					<div class="row g-3">
+						<div class="col-md-4">
+							<div class="card career-card h-100"><div class="card-body d-grid gap-2 align-content-start">
+								<span><span class="badge text-bg-primary">K23</span></span>
+								<h3 class="h5 fw-semibold mb-0">Ingeniería en Sistemas de Información</h3>
+								<p class="text-body-secondary mb-0">Con el título intermedio de Analista Universitario en Sistemas de Información y las electivas del plan.</p>
+							</div></div>
+						</div>
+						<div class="col-md-4">
+							<div class="card career-card h-100"><div class="card-body d-grid gap-2 align-content-start">
+								<span><span class="badge text-bg-primary">S23</span></span>
+								<h3 class="h5 fw-semibold mb-0">Ingeniería Mecánica</h3>
+								<p class="text-body-secondary mb-0">Con el título intermedio de Técnico Universitario en Mecánica.</p>
+							</div></div>
+						</div>
+						<div class="col-md-4">
+							<div class="card career-card career-soon h-100"><div class="card-body d-grid gap-2 align-content-start">
+								<span><span class="badge text-bg-secondary">Próximamente</span></span>
+								<h3 class="h5 fw-semibold mb-0">¿Tu carrera no está?</h3>
+								<p class="text-body-secondary mb-0">Vamos sumando planes según lo que piden los estudiantes. <a href="https://github.com/Duplino/UTN-Tracker/issues">Dejá tu pedido</a>.</p>
+							</div></div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section class="section" id="preguntas" aria-labelledby="preguntas-titulo">
+				<div class="container">
+					<div class="row g-4">
+						<div class="col-lg-4">
+							<span class="eyebrow">Preguntas frecuentes</span>
+							<h2 id="preguntas-titulo" class="fw-bold mt-2">Antes de entrar</h2>
+						</div>
+						<div class="col-lg-8">
+							<div class="faq">
+								<details open><summary>¿Es gratis?</summary><p>Sí. Entrás con tu cuenta de Google y listo.</p></details>
+								<details><summary>¿Es una app oficial de la UTN?</summary><p>No. Es un proyecto independiente hecho por estudiantes. Tus notas oficiales siguen siendo las del SIU Guaraní.</p></details>
+								<details><summary>¿Qué pasa con mi historia académica del SIU?</summary><p>El PDF se lee en tu navegador y no se sube a ningún servidor. Solo se guardan las materias y notas que confirmás, asociadas a tu cuenta.</p></details>
+								<details><summary>¿Sirve para cualquier facultad regional?</summary><p>Los planes de estudio son los mismos en todas las regionales. La importación del SIU está probada con el autogestión de la FRBA.</p></details>
+								<details><summary>¿Cómo sabe qué materias puedo cursar?</summary><p>Usa las correlativas del plan de estudios. Con lo que tenés aprobado y regularizado, marca qué materias podés cursar el próximo cuatrimestre.</p></details>
+								<details><summary>¿Puedo compartir mi progreso?</summary><p>Sí. Podés activar un perfil público con un link para compartir. Viene apagado.</p></details>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section class="section section-band">
+				<div class="container d-flex flex-wrap align-items-center justify-content-between gap-3">
+					<h2 class="fw-bold mb-0">Armá tu tablero en un minuto.</h2>
+					<a class="btn btn-primary btn-lg" href="https://app.utntracker.com.ar"><i class="bi bi-google me-2" aria-hidden="true"></i>Entrar con Google</a>
+				</div>
+			</section>
+		</main>
+
+		<footer class="site-footer">
+			<div class="container d-flex flex-wrap justify-content-between gap-2 small text-body-secondary">
+				<span>UTN Tracker es un proyecto independiente, sin relación oficial con la Universidad Tecnológica Nacional.</span>
+				<a class="link-secondary" href="https://github.com/Duplino/UTN-Tracker">Código en GitHub</a>
+			</div>
+		</footer>
+	</body>
+</html>
