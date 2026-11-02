@@ -8,6 +8,7 @@ import { initAuth } from './auth.js';
 import { toast, toastError, setBusy, confirmDialog } from './ui.js';
 import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
+import { initPwa } from './pwa.js';
 import { initPlanner } from './planner.js';
 import { initAgenda } from './agenda.js';
 import { initSchedule } from './schedule.js';
@@ -16,6 +17,7 @@ import { initSiuImport } from './siuImport.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
+  initPwa();
 
   // Carrera actualmente mostrada en el tablero. `userCareers` son las carreras en las
   // que el usuario está anotado (controla qué aparece en el dropdown); se puebla en

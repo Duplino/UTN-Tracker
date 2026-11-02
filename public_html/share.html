@@ -5,14 +5,24 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>UTN Tracker - Perfil Público</title>
 		<meta name="color-scheme" content="light dark">
+		<!-- Color de la barra del navegador / de la app instalada. El script de abajo y
+		     theme.js lo ajustan al tema elegido (claro #f8f9fa, oscuro #16191d). -->
+		<meta name="theme-color" content="#f8f9fa">
 		<!-- Mismo tema (claro/oscuro/automático) que eligió el usuario en el tablero. -->
 		<script>
-			(function(){try{var t=localStorage.getItem('utn.theme')||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-bs-theme',d?'dark':'light');}catch(e){}})();
+			(function(){try{var t=localStorage.getItem('utn.theme')||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-bs-theme',d?'dark':'light');var m=document.querySelector('meta[name=theme-color]');if(m)m.content=d?'#16191d':'#f8f9fa';}catch(e){}})();
 		</script>
 		<link href="assets/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
 		<link href="assets/css/index.css" rel="stylesheet">
 		<link href="assets/css/share.css" rel="stylesheet">
-		<link rel="shortcut icon" href="assets/sello_arana.png" type="image/x-icon">
+		<link rel="icon" href="assets/icons/favicon-32.png" type="image/png" sizes="32x32">
+		<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+		<!-- PWA: manifest (instalable) y nombre en la pantalla de inicio de iOS. -->
+		<link rel="manifest" href="manifest.webmanifest">
+		<meta name="apple-mobile-web-app-title" content="UTN Tracker">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="default">
 		<!-- importmap: lo completa docker/version-assets.php en el build (ver index.html). -->
 		<link rel="modulepreload" href="assets/js/share.js">
 	</head>
