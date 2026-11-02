@@ -38,7 +38,7 @@ Esto levanta:
 
 La app queda en [http://localhost:8080](http://localhost:8080), con `MOCK_AUTH_ENABLED=true` por defecto (login de prueba sin pasar por Google, vía `POST /api/auth/mock-login`).
 
-Variables opcionales (ver `docker-compose.yml`): `DB`, `DB_USER`, `DB_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `GOOGLE_CLIENT_ID`, `HOST_APP_PORT`, `HOST_MYSQL_PORT`. Se pueden sobreescribir con un `.env` en la raíz (mismo formato que `.env.example`, docker-compose lo lee para la sustitución de variables).
+Variables opcionales (ver `docker-compose.yml`): `DB`, `DB_USER`, `DB_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `GOOGLE_CLIENT_ID`, `HOST_APP_PORT`, `HOST_MYSQL_PORT`. Se pueden sobreescribir con un `.env` en la raíz: [`.env.example`](.env.example) tiene todas las variables documentadas, agrupadas por entorno.
 
 Para desarrollar sin Docker (PHP + MySQL locales), copiar `.env.example` a `.env`, correr `composer install` y `php bin/migrate.php`, y después `php -S localhost:8000 -t public_html dev-router.php`.
 
@@ -47,19 +47,18 @@ Para desarrollar sin Docker (PHP + MySQL locales), copiar `.env.example` a `.env
 `docker-compose.prod.yml` es la variante para un servidor real, distinta de la de desarrollo:
 
 - No monta el código como bind mount: la imagen se buildea con `COPY . .`, así que **cada deploy requiere `--build`** (no hay live-reload).
-- No publica ningún puerto al host. La app se conecta a la red de Docker donde corre tu Caddy (`caddy_net`, externa) y Caddy la alcanza por nombre de contenedor: `utntracker-app:80`.
+- No publica ningún puerto al host. La app se conecta a la red de Docker donde corre tu Caddy (`CADDY_NETWORK` en el `.env`) y Caddy la alcanza por nombre de contenedor: `utntracker-app:80` (o el que pongas en `APP_CONTAINER_NAME`).
 - `MOCK_AUTH_ENABLED` queda forzado en `"false"` en el propio compose (no se puede prender por accidente vía `.env`).
-- Las variables de `.env` son obligatorias (`DB`, `DB_USER`, `DB_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `GOOGLE_CLIENT_ID`): si falta alguna, `docker compose` corta con un error explícito en vez de arrancar con un default inseguro.
+- Las variables de `.env` son obligatorias (`DB`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `CADDY_NETWORK`): si falta alguna, `docker compose` corta con un error explícito en vez de arrancar con un default inseguro.
 
 ### Deploy inicial
 
-1. En el VPS: `git clone <repo> /opt/utn-tracker && cd /opt/utn-tracker`.
-2. Crear `.env` (no se commitea) con passwords reales generados para este proyecto y el `GOOGLE_CLIENT_ID` de producción.
-3. Editar `docker-compose.prod.yml`: reemplazar `CAMBIAR_nombre_red_de_caddy` por el nombre real de la red de tu Caddy (`docker network ls` para verla).
-4. `docker compose -f docker-compose.prod.yml --env-file .env up -d --build`.
-5. Agregar un bloque al Caddyfile existente y recargar Caddy:
+1. En el VPS: `git clone <repo> /opt/UTN-Tracker/prod && cd /opt/UTN-Tracker/prod`.
+2. `cp .env.example .env` y completarlo (no se commitea): passwords reales generados para este proyecto, el `GOOGLE_CLIENT_ID` de producción y en `CADDY_NETWORK` el nombre de la red de tu Caddy (`docker network ls` para verla). Los archivos del repo no se editan en el VPS, así `git pull` nunca choca.
+3. `docker compose -f docker-compose.prod.yml up -d --build`.
+4. Agregar un bloque al Caddyfile existente y recargar Caddy:
    ```
-   utntracker.com.ar {
+   app.utntracker.com.ar {
        reverse_proxy utntracker-app:80
    }
    ```
@@ -68,8 +67,10 @@ Para desarrollar sin Docker (PHP + MySQL locales), copiar `.env.example` a `.env
 
 ```
 git pull
-docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+Compose lee el `.env` de la carpeta solo, no hace falta `--env-file`.
 
 Las migraciones nuevas se aplican solas al arrancar el contenedor (ver [Base de datos](#base-de-datos-migraciones)). Si una falla, el contenedor `app` no levanta: `docker compose -f docker-compose.prod.yml logs app` muestra cuál y por qué.
 
@@ -93,30 +94,30 @@ No pongas una regla de "Cache Everything" sobre todo `/api/*`: el resto es data 
 `bin/backup-db.sh` hace un `mysqldump` comprimido de la base del compose en `backups/` (ignorada por git) y borra los de más de 14 días. Para correrlo todas las noches, en el VPS (`crontab -e`):
 
 ```
-15 4 * * * /opt/utn-tracker/bin/backup-db.sh >> /var/log/utntracker-backup.log 2>&1
+15 4 * * * /opt/UTN-Tracker/prod/bin/backup-db.sh >> /var/log/utntracker-backup.log 2>&1
 ```
 
 El comentario al principio del script tiene el comando para restaurar. Conviene copiar `backups/` fuera del VPS cada tanto (un backup en el mismo disco no sirve si se pierde el disco).
 
 ## Staging (probar antes de pushear)
 
-`docker-compose.staging.yml` es igual a `docker-compose.prod.yml` (misma imagen, sin bind mount, DB propia) salvo por el nombre del contenedor (`utntracker-app-staging`), para poder correr los dos al mismo tiempo en el mismo VPS sin que choquen.
+Staging usa el mismo `docker-compose.prod.yml` (misma imagen, sin bind mount, DB propia). Lo único que cambia es su `.env`, con `APP_CONTAINER_NAME=utntracker-app-staging` para poder correr los dos al mismo tiempo en el mismo VPS sin que choquen.
 
 1. Clonar en otra carpeta, con `dev` en vez de `main`:
    ```
-   git clone -b dev <repo> /opt/utn-tracker-staging
+   git clone -b dev <repo> /opt/UTN-Tracker/dev
    ```
-   Al ser una carpeta distinta (`utn-tracker-staging` vs. la de prod), Compose ya usa un nombre de proyecto distinto → red y volumen de DB quedan aislados automáticamente, sin tocar nada extra.
-2. Crear un `.env` ahí con **credenciales de DB propias** (usuario/base/password distintos a los de prod — es una instancia de MySQL separada, no la misma). `GOOGLE_CLIENT_ID` puede ser el mismo que en prod, es el mismo OAuth client.
+   Al ser una carpeta distinta (`dev` vs. `prod`), Compose ya usa un nombre de proyecto distinto → red y volumen de DB quedan aislados automáticamente, sin tocar nada extra.
+2. Crear un `.env` ahí (desde `.env.example`) con `APP_CONTAINER_NAME=utntracker-app-staging`, el mismo `CADDY_NETWORK` que prod y **credenciales de DB propias** (usuario/base/password distintos a los de prod — es una instancia de MySQL separada, no la misma). `GOOGLE_CLIENT_ID` puede ser el mismo que en prod, es el mismo OAuth client.
 3. En Google Cloud Console, agregar `https://staging.utntracker.com.ar` a los orígenes de JavaScript autorizados de ese OAuth client (si no, el login real va a fallar solo en staging).
-4. `docker compose -f docker-compose.staging.yml --env-file .env up -d --build`.
+4. `docker compose -f docker-compose.prod.yml up -d --build`.
 5. Sumar otro bloque al Caddyfile:
    ```
    staging.utntracker.com.ar {
        reverse_proxy utntracker-app-staging:80
    }
    ```
-6. Redeploy de staging con cambios nuevos de `dev`: `git pull && docker compose -f docker-compose.staging.yml --env-file .env up -d --build`.
+6. Redeploy de staging con cambios nuevos de `dev`: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
 
 Cuando `dev` está probado y se mergea a `main`, el redeploy de prod es el mismo flujo pero en la carpeta de prod (ver sección anterior).
 

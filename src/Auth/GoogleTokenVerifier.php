@@ -72,7 +72,7 @@ final class GoogleTokenVerifier
 
     private static function cachePath(): string
     {
-        $dir = Env::get('CACHE_DIR', sys_get_temp_dir());
+        $dir = Env::get('CACHE_DIR') ?: sys_get_temp_dir();
         return rtrim($dir, '/') . '/google_jwks_cache.json';
     }
 }

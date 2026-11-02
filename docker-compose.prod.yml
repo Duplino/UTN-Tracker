@@ -22,7 +22,10 @@ services:
 
   app:
     build: .
-    container_name: utntracker-app
+    # Nombre con el que Caddy alcanza la app (reverse_proxy <nombre>:80).
+    # Staging usa este mismo archivo con APP_CONTAINER_NAME=utntracker-app-staging
+    # en su .env, para poder correr los dos en el mismo VPS sin que choquen.
+    container_name: ${APP_CONTAINER_NAME:-utntracker-app}
     restart: unless-stopped
     depends_on:
       db:
@@ -41,14 +44,13 @@ services:
       - default
       - caddy_net
     # No se publica ningún puerto al host: Caddy llega por la red compartida
-    # "caddy_net" usando el nombre del contenedor (utntracker-app:80).
+    # usando el nombre del contenedor (APP_CONTAINER_NAME:80).
 
 networks:
   caddy_net:
     external: true
-    # Reemplazar por el nombre real de la red donde corre tu Caddy
-    # (`docker network ls` en el VPS para verla).
-    name: CAMBIAR_nombre_red_de_caddy
+    # Red donde corre Caddy, definida en el .env (`docker network ls` en el VPS).
+    name: ${CADDY_NETWORK:?falta CADDY_NETWORK en .env (docker network ls para ver la red de Caddy)}
 
 volumes:
   db_data:
