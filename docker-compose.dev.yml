@@ -1,0 +1,46 @@
+# Compose de desarrollo local: bind mount del código, MySQL publicado en el host
+# y login de prueba prendido. Uso: docker compose -f docker-compose.dev.yml up -d --build
+# (o COMPOSE_FILE=docker-compose.dev.yml en tu .env local para no escribir el -f).
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB:-utn_tracker}
+      MYSQL_USER: ${DB_USER:-utn_tracker}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-utn_tracker}
+    ports:
+      - "${HOST_MYSQL_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      # El esquema y los datos iniciales los carga la app al arrancar
+      # (bin/migrate.php con database/migrations/), no el entrypoint de MySQL.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQL_IP: db
+      MYSQL_PORT: 3306
+      DB: ${DB:-utn_tracker}
+      DB_USER: ${DB_USER:-utn_tracker}
+      DB_PASSWORD: ${DB_PASSWORD:-utn_tracker}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      MOCK_AUTH_ENABLED: ${MOCK_AUTH_ENABLED:-true}
+    ports:
+      - "${HOST_APP_PORT:-8080}:80"
+    volumes:
+      - .:/var/www/html
+      - /var/www/html/vendor
+
+volumes:
+  db_data:

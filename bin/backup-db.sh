@@ -4,16 +4,16 @@
 #   15 4 * * * /opt/UTN-Tracker/prod/bin/backup-db.sh >> /var/log/utntracker-backup.log 2>&1
 #
 # Variables (todas opcionales):
-#   COMPOSE_FILE    compose a usar (default: docker-compose.prod.yml)
+#   COMPOSE_FILE    compose a usar (default: docker-compose.yml)
 #   BACKUP_DIR      dónde dejar los .sql.gz (default: <repo>/backups)
 #   RETENTION_DAYS  cuántos días conservar (default: 14)
 #
 # Usa DB / DB_USER / DB_PASSWORD del .env del repo. Para restaurar:
-#   gunzip -c backups/utn_tracker-AAAAMMDD-HHMM.sql.gz | docker compose -f docker-compose.prod.yml exec -T db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'
+#   gunzip -c backups/utn_tracker-AAAAMMDD-HHMM.sql.gz | docker compose exec -T db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'
 set -eu
 
 cd "$(dirname "$0")/.."
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 BACKUP_DIR="${BACKUP_DIR:-$(pwd)/backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 
