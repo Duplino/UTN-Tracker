@@ -44,142 +44,41 @@ Variables opcionales (ver `docker-compose.dev.yml`): `DB`, `DB_USER`, `DB_PASSWO
 
 Para desarrollar sin Docker (PHP + MySQL locales), copiar `.env.example` a `.env`, correr `composer install` y `php bin/migrate.php`, y después `php -S localhost:8000 -t public_html dev-router.php`.
 
-## Producción (VPS con Docker + Caddy)
+## Producción
 
 `docker-compose.yml` (el default de `docker compose`) es el de servidor, distinto del de desarrollo:
 
-- No monta el código como bind mount: la imagen se buildea con `COPY . .`, así que **cada deploy requiere `--build`** (no hay live-reload).
-- No publica ningún puerto al host. La app se conecta a la red de Docker donde corre tu Caddy (`CADDY_NETWORK` en el `.env`) y Caddy la alcanza por nombre de contenedor: `utntracker-app:80` (o el que pongas en `APP_CONTAINER_NAME`).
-- `MOCK_AUTH_ENABLED` está apagado salvo que el `.env` diga `true` (se usa en staging; en producción no se pone).
-- Las variables de `.env` son obligatorias (`DB`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `CADDY_NETWORK`): si falta alguna, `docker compose` corta con un error explícito en vez de arrancar con un default inseguro.
+- No monta el código como bind mount: la imagen se buildea con `COPY . .`, así que **cada deploy requiere `--build`**.
+- No publica ningún puerto al host: la app se suma a una red de Docker externa (`CADDY_NETWORK`) donde corre el reverse proxy, que la alcanza por nombre de contenedor (`APP_CONTAINER_NAME`, default `utntracker-app`, puerto 80).
+- `MOCK_AUTH_ENABLED` está apagado salvo que el `.env` diga `true`. Nunca prenderlo en producción.
+- Las variables del `.env` son obligatorias (`DB`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `CADDY_NETWORK`): si falta alguna, `docker compose` corta con un error en vez de arrancar con un default inseguro. [`.env.example`](.env.example) las documenta.
 
-### Deploy inicial
-
-1. En el VPS: `git clone <repo> /opt/UTN-Tracker/prod && cd /opt/UTN-Tracker/prod`.
-2. `cp .env.example .env` y completarlo (no se commitea): passwords reales generados para este proyecto, el `GOOGLE_CLIENT_ID` de producción y en `CADDY_NETWORK` el nombre de la red de tu Caddy (`docker network ls` para verla). Los archivos del repo no se editan en el VPS, así `git pull` nunca choca.
-3. `docker compose up -d --build`.
-4. Agregar un bloque al Caddyfile existente y recargar Caddy:
-   ```
-   app.utntracker.com.ar {
-       reverse_proxy utntracker-app:80
-   }
-   ```
-
-### Redeploy (cambios de código)
-
-Con el [deploy automático](#deploy-automático-github-actions) configurado no hace falta: pasa solo al mergear a `main`. A mano:
+Deploy y redeploy:
 
 ```
+cp .env.example .env   # la primera vez, y completarlo
 git pull
 docker compose up -d --build
 ```
 
-Compose lee el `.env` de la carpeta solo, no hace falta `--env-file`.
+Las migraciones nuevas se aplican solas al arrancar el contenedor (ver [Base de datos](#base-de-datos-migraciones)). Si una falla, el contenedor `app` no levanta y `docker compose logs app` muestra cuál y por qué.
 
-Las migraciones nuevas se aplican solas al arrancar el contenedor (ver [Base de datos](#base-de-datos-migraciones)). Si una falla, el contenedor `app` no levanta: `docker compose logs app` muestra cuál y por qué.
+No corras `docker-compose.dev.yml` y `docker-compose.yml` a la vez en la misma carpeta: Compose deriva el nombre del proyecto de la carpeta, así que terminarían compartiendo red y volumen de DB.
 
-No corras `docker-compose.dev.yml` y `docker-compose.yml` a la vez en el mismo directorio: Compose deriva el nombre del proyecto del nombre de la carpeta, así que sin `-p` distinto terminarían compartiendo red y volumen de DB.
+Scripts para el servidor (cada uno explica su uso en el comentario del principio):
 
-### Deploy automático (GitHub Actions)
+- `bin/deploy.sh`: pull, backup, build y chequeo de que la app responda. Lo usa `.github/workflows/deploy.yml` para deployar solo cuando el CI de `main` pasa.
+- `bin/backup-db.sh`: `mysqldump` comprimido en `backups/`, con retención de 14 días.
 
-Cada push a `main` corre el CI; si termina en verde, `.github/workflows/deploy.yml` entra por SSH al VPS y corre `bin/deploy.sh prod`, que hace lo mismo que el redeploy a mano y un poco más:
-
-1. `git fetch` + `git merge --ff-only origin/main` (si alguien tocó archivos del repo en el VPS, corta en vez de pisarlos; el `.env` no se toca).
-2. Backup de la base con `bin/backup-db.sh` (antes de que corran migraciones nuevas).
-3. `docker compose up -d --build`.
-4. Espera hasta 90 s a que `/api/careers` responda desde adentro del contenedor (eso prueba Apache, migraciones y conexión a MySQL). Si no responde, el job queda en rojo con los últimos logs de `app`, y GitHub te manda un mail.
-5. `docker image prune -f` para que las imágenes viejas no llenen el disco.
-
-Si el CI falla, no se deploya. Para redeployar a mano sin pushear: pestaña **Actions → Deploy → Run workflow**. En el VPS también se puede correr directo: `/opt/UTN-Tracker/prod/bin/deploy.sh prod`.
-
-La clave SSH que usa GitHub está limitada en el VPS con un *forced command*: aunque se filtre, lo único que permite es correr `deploy.sh prod` o `deploy.sh staging`, no abrir una shell.
-
-#### Setup (una sola vez)
-
-En el VPS, con el usuario que deploya (`debian`):
-
-1. Traer el script por primera vez a mano: `cd /opt/UTN-Tracker/prod && git pull`.
-2. Verificar que ese usuario puede usar Docker sin `sudo`: `docker ps`. Si da *permission denied*: `sudo usermod -aG docker debian` y volver a entrar por SSH.
-3. Crear una clave solo para el deploy (sin passphrase):
-   ```
-   ssh-keygen -t ed25519 -N "" -C github-deploy -f ~/github-deploy
-   ```
-4. Autorizarla con el forced command. Agregar **una línea** a `~/.ssh/authorized_keys`, con `restrict,command="..."` adelante del contenido de `~/github-deploy.pub`:
-   ```
-   echo "restrict,command=\"/opt/UTN-Tracker/prod/bin/deploy.sh\" $(cat ~/github-deploy.pub)" >> ~/.ssh/authorized_keys
-   ```
-5. Copiar la clave privada (`cat ~/github-deploy`, todo incluidas las líneas `-----BEGIN/END-----`) para el secret de abajo, y después borrarla del VPS: `rm ~/github-deploy ~/github-deploy.pub`.
-
-Desde tu compu (no desde el VPS), sacar la huella del servidor para fijarla: `ssh-keyscan -t ed25519 <IP-del-VPS>`. Copiar la línea que empieza con la IP.
-
-En GitHub, **Settings → Secrets and variables → Actions → New repository secret**:
-
-| Secret | Valor |
-|---|---|
-| `VPS_HOST` | La **IP** del VPS. No el dominio: `utntracker.com.ar` apunta a Cloudflare, que no deja pasar SSH. |
-| `VPS_SSH_KEY` | La clave privada del paso 5. |
-| `VPS_KNOWN_HOSTS` | La línea de `ssh-keyscan`. |
-| `VPS_USER` | Opcional, default `debian`. |
-| `VPS_PORT` | Opcional, default `22`. |
-
-Probarlo con **Actions → Deploy → Run workflow → prod**. Si el SSH del VPS está limitado por firewall a ciertas IPs, hay que abrirlo: los runners de GitHub no tienen IP fija.
-
-Mientras no haya ningún secret `VPS_*` cargado, el workflow se saltea con un aviso en vez de fallar.
-
-**Staging automático (opcional):** para que cada push a `dev` con CI verde se deploye en `/opt/UTN-Tracker/dev`, crear la *variable* (no secret) `AUTO_DEPLOY_STAGING` = `true` en la misma pantalla, pestaña *Variables*. Usa la misma clave. Ojo: si tenías una rama de PR checkouteada en staging para probarla, el siguiente push a `dev` la vuelve a `dev`.
-
-### Caché (navegador y Cloudflare)
+### Caché
 
 - **HTML**: `Cache-Control: no-cache` (siempre revalida, un deploy se ve al instante).
-- **Assets** (`/assets/*`): en el build de la imagen, `docker/version-assets.php` agrega `?v=<hash>` a cada CSS/JS/imagen referenciado desde los HTML y genera un import map para los módulos JS. Apache sirve esas URLs versionadas con `max-age=31536000, immutable` (ver `docker/apache-vhost.conf`). En desarrollo (bind mount o `php -S`) no se versiona nada y no pasa nada.
+- **Assets** (`/assets/*`): en el build de la imagen, `docker/version-assets.php` agrega `?v=<hash>` a cada CSS/JS/imagen referenciado desde los HTML y genera un import map para los módulos JS. Apache sirve esas URLs con `max-age=31536000, immutable` (ver `docker/apache-vhost.conf`). En desarrollo no se versiona nada.
 - **API**: todo `/api/*` sale con `no-store`, salvo el catálogo que es igual para todos (`/api/careers`, `/api/careers/{code}/curriculum`, `/api/evaluation-schemes`), que sale con `public, max-age=300, s-maxage=86400`.
-
-Cloudflare no cachea rutas sin extensión por defecto, así que para que el catálogo se sirva desde el borde hace falta una **Cache Rule** (Caching → Cache Rules → Create rule):
-
-- Si: `URI Path` empieza con `/api/careers` **o** `URI Path` es igual a `/api/evaluation-schemes`, y el método es `GET`.
-- Entonces: *Eligible for cache*, con *Edge TTL* = "Use cache-control header if present" y *Browser TTL* = "Respect origin".
-
-No pongas una regla de "Cache Everything" sobre todo `/api/*`: el resto es data por usuario (igual sale con `no-store`, pero mejor no depender de eso). Después de cambiar los seeds de carreras o esquemas, purgá esas URLs en Cloudflare (o esperá hasta un día).
-
-### Backups
-
-`bin/backup-db.sh` hace un `mysqldump` comprimido de la base del compose en `backups/` (ignorada por git) y borra los de más de 14 días. Para correrlo todas las noches, en el VPS (`crontab -e`):
-
-```
-15 4 * * * /opt/UTN-Tracker/prod/bin/backup-db.sh >> /var/log/utntracker-backup.log 2>&1
-```
-
-El comentario al principio del script tiene el comando para restaurar. Conviene copiar `backups/` fuera del VPS cada tanto (un backup en el mismo disco no sirve si se pierde el disco).
-
-## Staging (probar antes de pushear)
-
-Staging usa el mismo `docker-compose.yml` (misma imagen, sin bind mount, DB propia). Lo único que cambia es su `.env`: `APP_CONTAINER_NAME=utntracker-app-staging` para poder correr los dos al mismo tiempo en el mismo VPS sin que choquen, y `MOCK_AUTH_ENABLED=true` para poder entrar como invitado.
-
-1. Clonar en otra carpeta, con `dev` en vez de `main`:
-   ```
-   git clone -b dev <repo> /opt/UTN-Tracker/dev
-   ```
-   Al ser una carpeta distinta (`dev` vs. `prod`), Compose ya usa un nombre de proyecto distinto → red y volumen de DB quedan aislados automáticamente, sin tocar nada extra.
-2. Crear un `.env` ahí (desde `.env.example`) con `APP_CONTAINER_NAME=utntracker-app-staging`, el mismo `CADDY_NETWORK` que prod y **credenciales de DB propias** (usuario/base/password distintos a los de prod — es una instancia de MySQL separada, no la misma). `GOOGLE_CLIENT_ID` puede ser el mismo que en prod, es el mismo OAuth client.
-3. En Google Cloud Console, agregar `https://staging.utntracker.com.ar` a los orígenes de JavaScript autorizados de ese OAuth client (si no, el login real va a fallar solo en staging).
-4. `docker compose up -d --build`.
-5. Sumar otro bloque al Caddyfile:
-   ```
-   staging.utntracker.com.ar {
-       reverse_proxy utntracker-app-staging:80
-   }
-   ```
-6. Redeploy de staging con cambios nuevos de `dev`: `git pull && docker compose up -d --build`.
-
-Cuando `dev` está probado y se mergea a `main`, el redeploy de prod es el mismo flujo pero en la carpeta de prod (ver sección anterior).
 
 ## Landing (`site/`)
 
-`site/` es la landing pública de `utntracker.com.ar`, un sitio estático (HTML + Bootstrap, sin build) pensado para SEO. La app pasa a `app.utntracker.com.ar`. Se despliega en Cloudflare Pages:
-
-- Proyecto de Pages conectado a este repo, rama `main`, sin comando de build, con **Root directory** `site` y **Build watch paths** `site/*`, así un cambio en la app no la redespliega.
-- `site/_redirects` manda los links viejos de perfiles públicos (`/share.html?uid=...`) a la app y `site/_headers` define la caché.
-- `site/` está en `.dockerignore`, así que no entra a la imagen de la app.
+`site/` es la landing pública, un sitio estático (HTML + Bootstrap, sin build) que se despliega aparte de la app. `site/_redirects` y `site/_headers` son la configuración de redirecciones y caché del hosting. Está en `.dockerignore`, así que no entra a la imagen de la app.
 
 Para verla en local: `python3 -m http.server -d site 8081`.
 
@@ -191,11 +90,9 @@ Para cambiar el esquema o los datos de una carrera:
 
 1. Crear el archivo siguiente, por ejemplo `0008_agrega_columna_x.sql`. Nunca editar uno ya aplicado: no se vuelve a correr.
 2. Probarlo localmente (`php bin/migrate.php`) y commitearlo.
-3. Al redeployar se aplica solo, en staging y después en prod.
+3. Al redeployar se aplica sola.
 
 MySQL no permite deshacer un `ALTER TABLE` dentro de una transacción, así que si una migración falla a la mitad hay que revisar la base a mano antes de reintentar. Escribirlas idempotentes cuando se pueda (ver `0007_semester_plans.sql`).
-
-Bases creadas antes de este sistema (prod y staging): la primera vez que corre, si encuentra la tabla `users` pero no `schema_migrations`, da por aplicadas las migraciones hasta la `0006` (esquema y seeds que ya estaban cargados a mano) sin ejecutarlas, y aplica de la `0007` en adelante.
 
 ## Tests
 
