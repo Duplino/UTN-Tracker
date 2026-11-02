@@ -11,6 +11,7 @@ import { initThemeToggle } from './theme.js';
 import { initPlanner } from './planner.js';
 import { initAgenda } from './agenda.js';
 import { initSchedule } from './schedule.js';
+import { initTogether } from './together.js';
 import { initSiuImport } from './siuImport.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -3267,6 +3268,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       try{ computeStats(displayedSubjects); }catch(e){}
       try{ if (planData) renderGroups(planData); }catch(e){}
       return hydrated;
+    },
+  });
+
+  // ¿Qué podemos cursar juntos? (assets/js/together.js): compara con el perfil
+  // público de un compañero; "Al plan" usa el mismo plan que el planificador.
+  initTogether({
+    getCurriculum: () => planData,
+    getCareerCode: () => currentCareer,
+    getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
+    getEnrollment: code => loadSubjectData(code),
+    fetchPublic: token => api.get(`/public/${encodeURIComponent(token)}`),
+    loadPlans: async () => {
+      const prefs = activeStore === apiStore ? lastPreferences : await activeStore.getPreferences();
+      return (prefs && prefs.semesterPlans) || {};
+    },
+    savePlans: async (semesterPlans) => {
+      await activeStore.updatePreferences({ semesterPlans });
+      if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
     },
   });
 

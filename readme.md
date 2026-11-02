@@ -15,6 +15,7 @@ La aplicación está disponible en **[utntracker.com.ar](https://utntracker.com.
 - Importación de la historia académica del SIU Guaraní (PDF): carga de una vez las materias aprobadas, promocionadas, regularizadas y en curso, con sus notas y recursadas. El PDF se lee en el navegador, no se sube al servidor (se descarga de [Historia académica](https://guarani.frba.utn.edu.ar/autogestion/grado/historia_academica) con el filtro en «Todos»).
 - Estadísticas de progreso (materias aprobadas, promedio, horas semanales en curso).
 - Horario semanal: días y horas de cada materia en una grilla por bloques (lunes a sábado), cargado a mano o importando el comprobante de inscripción a cursada del SIU (PDF, se lee en el navegador).
+- Cursar con un compañero: pegá el link de su perfil público y te muestra qué materias pueden cursar juntos el próximo cuatrimestre, cuáles solo vos y cuáles solo él o ella.
 - Planificador de cuatrimestres: qué podés cursar el próximo cuatrimestre según tus correlativas, simulación de los cuatrimestres siguientes (qué destraba cada materia) y fecha estimada de egreso, al ritmo actual y con el plan armado.
 - Perfil público opcional, para compartir el progreso propio (ver [API.md](API.md) para consumirlo programáticamente).
 

@@ -28,6 +28,7 @@
 		<link rel="modulepreload" href="assets/js/planner.js">
 		<link rel="modulepreload" href="assets/js/agenda.js">
 		<link rel="modulepreload" href="assets/js/schedule.js">
+		<link rel="modulepreload" href="assets/js/together.js">
 		<link rel="modulepreload" href="assets/js/statusEngine.js">
 		<link rel="modulepreload" href="assets/js/siuImport.js">
 		<link rel="modulepreload" href="assets/js/pdfText.js">
@@ -87,6 +88,7 @@
 							<li><hr class="dropdown-divider"></li>
 							<li><button type="button" class="dropdown-item" id="menu-signin" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></i>Iniciar sesión</button></li>
 							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-person me-2" aria-hidden="true"></i>Perfil y carreras</button></li>
+							<li><button type="button" class="dropdown-item" id="menu-together" data-bs-toggle="modal" data-bs-target="#togetherModal"><i class="bi bi-people me-2" aria-hidden="true"></i>Cursar con un compañero</button></li>
 							<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2" aria-hidden="true"></i>Configuración y ayuda</button></li>
 							<li class="menu-signed-in d-none"><hr class="dropdown-divider"></li>
 							<li class="menu-signed-in d-none"><button type="button" class="dropdown-item text-danger" id="menu-signout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión</button></li>
@@ -690,6 +692,42 @@
 		      <div class="modal-footer d-none" id="schedule-footer-import">
 		        <button type="button" class="btn btn-outline-secondary" id="schedule-import-cancel">Cancelar</button>
 		        <button type="button" class="btn btn-primary" id="schedule-import-save">Guardar</button>
+		      </div>
+		    </div>
+		  </div>
+		</div>
+
+		<!-- ¿Qué podemos cursar juntos? Compara con el perfil público de un compañero (assets/js/together.js) -->
+		<div class="modal fade" id="togetherModal" tabindex="-1" aria-labelledby="togetherModalLabel" aria-hidden="true">
+		  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-lg-down">
+		    <div class="modal-content">
+		      <div class="modal-header">
+		        <div>
+		          <h5 class="modal-title" id="togetherModalLabel">¿Qué podemos cursar juntos?</h5>
+		          <div class="small text-body-secondary">Compará tus correlativas con las de un compañero para el próximo cuatrimestre</div>
+		        </div>
+		        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+		      </div>
+		      <div class="modal-body">
+		        <form id="together-form" class="row g-2 align-items-end mb-2" novalidate>
+		          <div class="col-12 col-md">
+		            <label class="form-label small mb-1" for="together-link">Link del perfil público de tu compañero</label>
+		            <input type="text" id="together-link" class="form-control form-control-sm" placeholder="https://…/share.html?uid=…" autocomplete="off">
+		          </div>
+		          <div class="col col-md-3">
+		            <label class="form-label small mb-1" for="together-alias">¿Cómo se llama? (opcional)</label>
+		            <input type="text" id="together-alias" class="form-control form-control-sm" maxlength="30" placeholder="Ej: Juli">
+		          </div>
+		          <div class="col-auto">
+		            <button type="submit" class="btn btn-sm btn-primary" id="together-submit"><i class="bi bi-people me-1" aria-hidden="true"></i><span>Comparar</span></button>
+		          </div>
+		        </form>
+		        <div id="together-friends" class="d-flex flex-wrap gap-2 align-items-center small mb-3"></div>
+		        <div id="together-result"></div>
+		      </div>
+		      <div class="modal-footer justify-content-between">
+		        <small class="text-body-secondary"><i class="bi bi-lock me-1" aria-hidden="true"></i>Solo funciona con perfiles públicos. Tu compañero no ve tus datos salvo que tu perfil también sea público.</small>
+		        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
 		      </div>
 		    </div>
 		  </div>
