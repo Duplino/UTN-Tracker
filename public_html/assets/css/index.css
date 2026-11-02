@@ -112,9 +112,26 @@ body{
   }
   /* Los avisos no quedan tapados por la barra de abajo. */
   .app-toasts,
+  .pwa-install-banner,
   .requirements-toast-container{
     margin-bottom: calc(4.25rem + env(safe-area-inset-bottom));
   }
+}
+
+/* Aviso "Instalá UTN Tracker" (assets/js/pwa.js): abajo, encima de la barra de
+   secciones en celular y debajo de los modales. */
+.pwa-install-banner{
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  z-index: 1035;
+  max-width: 28rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.pwa-install-banner .card-body{
+  padding: 0.85rem;
 }
 
 /* Barra superior */

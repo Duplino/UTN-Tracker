@@ -5,15 +5,25 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>UTN Tracker - Materias</title>
 		<meta name="color-scheme" content="light dark">
+		<!-- Color de la barra del navegador / de la app instalada. El script de abajo y
+		     theme.js lo ajustan al tema elegido (claro #f8f9fa, oscuro #16191d). -->
+		<meta name="theme-color" content="#f8f9fa">
 		<!-- Aplica el tema (claro/oscuro/automático) antes del primer pintado para que no
 		     haya un destello blanco en modo oscuro. La UI para cambiarlo está en theme.js. -->
 		<script>
-			(function(){try{var t=localStorage.getItem('utn.theme')||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-bs-theme',d?'dark':'light');}catch(e){}})();
+			(function(){try{var t=localStorage.getItem('utn.theme')||'auto';var d=t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-bs-theme',d?'dark':'light');var m=document.querySelector('meta[name=theme-color]');if(m)m.content=d?'#16191d':'#f8f9fa';}catch(e){}})();
 		</script>
 		<link href="assets/lib/bootstrap/bootstrap.min.css" rel="stylesheet">
 		<link href="assets/lib/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
 		<link href="assets/css/index.css" rel="stylesheet">
-		<link rel="shortcut icon" href="assets/sello_arana.png" type="image/x-icon">
+		<link rel="icon" href="assets/icons/favicon-32.png" type="image/png" sizes="32x32">
+		<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+		<!-- PWA: manifest (instalable) y nombre en la pantalla de inicio de iOS. -->
+		<link rel="manifest" href="manifest.webmanifest">
+		<meta name="apple-mobile-web-app-title" content="UTN Tracker">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="default">
 		<!-- importmap: en el build de Docker docker/version-assets.php reemplaza este comentario
 		     por un import map con la versión (hash) de cada módulo, para poder cachearlos
 		     por un año sin servir JS viejo después de un deploy. -->
@@ -33,6 +43,7 @@
 		<link rel="modulepreload" href="assets/js/siuImport.js">
 		<link rel="modulepreload" href="assets/js/pdfText.js">
 		<link rel="modulepreload" href="assets/js/theme.js">
+		<link rel="modulepreload" href="assets/js/pwa.js">
 		<link rel="modulepreload" href="assets/js/ui.js">
 	</head>
 	<body>
@@ -43,7 +54,7 @@
 			     Debajo de 992 px las secciones (.app-nav) pasan a una barra fija abajo. -->
 			<header class="toolbar">
 				<a class="app-brand d-flex align-items-center gap-2 text-decoration-none" href="./" aria-label="UTN Tracker">
-					<img src="assets/sello_arana.png" alt="" width="28" height="28">
+					<img src="assets/icons/logo-64.png" alt="" width="28" height="28">
 					<span class="fw-semibold d-none d-xl-inline text-nowrap">UTN Tracker</span>
 				</a>
 				<select id="programSelect" class="form-select program-select" aria-label="Carrera">
@@ -413,6 +424,13 @@
 					<button type="button" class="btn btn-outline-secondary" data-theme-value="auto"><i class="bi bi-circle-half me-1" aria-hidden="true"></i>Automático</button>
 				  </div>
 				</div>
+				<!-- Instalar la app (PWA): lo muestra assets/js/pwa.js solo si el navegador la
+				     puede instalar (botón) o si es iPhone/iPad (instrucciones manuales). -->
+				<div id="settings-install-wrap" class="mb-3 d-none">
+				  <div class="form-label mb-1">App</div>
+				  <button type="button" class="btn btn-outline-primary w-100 d-none" id="settings-install-btn"><i class="bi bi-download me-1" aria-hidden="true"></i>Instalar UTN Tracker</button>
+				  <div class="form-text mt-0 d-none" id="settings-install-ios">Para instalarla en el iPhone o iPad: tocá <i class="bi bi-box-arrow-up" aria-label="Compartir"></i> <strong>Compartir</strong> y después <strong>Agregar a inicio</strong>.</div>
+				</div>
 				<!-- Título intermedio (antes en la barra superior): solo se ve si la carrera
 				     tiene título intermedio (ver syncIntermediateTitleState en index.js). -->
 				<div id="settings-intermediate-title-wrap" class="form-check form-switch mb-3 d-none">
@@ -450,6 +468,24 @@
 				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
 			  </div>
 			</div>
+		  </div>
+		</div>
+
+		<!-- Aviso para instalar la app en el celular (lo maneja assets/js/pwa.js).
+		     data-pwa-mode: "prompt" = botón Instalar (Android/Chrome), "ios" = instrucciones. -->
+		<div id="pwa-install-banner" class="pwa-install-banner card shadow d-none" role="region" aria-labelledby="pwa-install-title">
+		  <div class="card-body d-flex gap-3 align-items-start">
+			<img src="assets/icons/icon-192.png" alt="" width="44" height="44" class="flex-shrink-0">
+			<div class="flex-grow-1">
+			  <div class="fw-semibold" id="pwa-install-title">Instalá UTN Tracker</div>
+			  <div class="small text-body-secondary" data-pwa-mode="prompt">Tenela en la pantalla de inicio y abrila como cualquier app, a pantalla completa.</div>
+			  <div class="small text-body-secondary d-none" data-pwa-mode="ios">Tocá <i class="bi bi-box-arrow-up" aria-label="Compartir"></i> <strong>Compartir</strong> y después <strong>Agregar a inicio</strong>.</div>
+			  <div class="d-flex gap-2 mt-2">
+				<button type="button" class="btn btn-primary btn-sm" data-pwa-mode="prompt" data-pwa-install>Instalar</button>
+				<button type="button" class="btn btn-outline-secondary btn-sm" data-pwa-dismiss><span data-pwa-mode="prompt">Ahora no</span><span data-pwa-mode="ios" class="d-none">Entendido</span></button>
+			  </div>
+			</div>
+			<button type="button" class="btn-close" data-pwa-dismiss aria-label="Cerrar"></button>
 		  </div>
 		</div>
 
