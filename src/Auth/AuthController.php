@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Config\Env;
+use App\Controllers\ExamDateController;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Session;
 use App\Repositories\CareerRepository;
 use App\Repositories\EnrollmentRepository;
 use App\Repositories\EvaluationSchemeRepository;
+use App\Repositories\ExamDateRepository;
 use App\Repositories\UserCareerRepository;
 use App\Repositories\UserRepository;
 use PDO;
@@ -170,7 +172,24 @@ final class AuthController
             $imported++;
         }
 
-        Response::json(['imported' => $imported, 'skipped' => $skipped]);
+        // Agenda del invitado: se suma a la del usuario (los parciales con fecha ya
+        // cargada en la cuenta se pisan con la del navegador, los finales se agregan).
+        $examDates = new ExamDateRepository($this->pdo);
+        $importedDates = 0;
+        foreach ((array) $request->input('examDates', []) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $subjectId = $repo->subjectIdByCode((string) ($entry['subjectCode'] ?? ''));
+            $parsed = ExamDateController::parse($entry);
+            if ($subjectId === null || is_string($parsed)) {
+                continue;
+            }
+            $examDates->save((int) $user['id'], $subjectId, $parsed['kind'], $parsed['partialNumber'], $parsed['attemptNumber'], $parsed['date']);
+            $importedDates++;
+        }
+
+        Response::json(['imported' => $imported, 'skipped' => $skipped, 'importedExamDates' => $importedDates]);
     }
 
     private function publicUser(array $user): array

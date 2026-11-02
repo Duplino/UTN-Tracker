@@ -9,6 +9,7 @@ import { toast, toastError, setBusy, confirmDialog } from './ui.js';
 import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
 import { initPlanner } from './planner.js';
+import { initAgenda } from './agenda.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
@@ -3182,6 +3183,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     savePlans: async (semesterPlans) => {
       await activeStore.updatePreferences({ semesterPlans });
       if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
+    },
+  });
+
+  // Agenda de parciales y finales (assets/js/agenda.js): las fechas las guarda el
+  // store activo; las materias y notas salen del mismo cache que el tablero.
+  initAgenda({
+    getStore: () => activeStore,
+    getEnrollments: () => Object.values(enrollmentCache),
+    getEnrollment: code => loadSubjectData(code),
+    getSubjectName: code => getSubjectNameByCode(code),
+    // Misma secuencia que el botón Guardar del modal de la materia, sin el modal.
+    saveResults: async (code, results) => {
+      let prevAvailable = [];
+      try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
+      const hydrated = await activeStore.saveResults(code, { ...results, clearOverride: true });
+      putSubjectDataInCache(code, hydrated);
+      try{ updateAllCardCursarState(); animateNewlyUnlocked(prevAvailable, getAvailableSubjectCodes()); }catch(e){}
+      try{ computeStats(displayedSubjects); }catch(e){}
+      try{ if (planData) renderGroups(planData); }catch(e){}
+      return hydrated;
     },
   });
 
