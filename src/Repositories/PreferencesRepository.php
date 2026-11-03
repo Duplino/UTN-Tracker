@@ -15,6 +15,7 @@ final class PreferencesRepository
         'viewMode' => 'view_mode',
         'selectedStats' => 'selected_stats',
         'semesterPlans' => 'semester_plans',
+        'subjectLayouts' => 'subject_layouts',
         'yearStarted' => 'year_started',
         'isPublic' => 'is_public',
     ];
@@ -27,6 +28,7 @@ final class PreferencesRepository
     private const BOOLEAN_FIELDS = ['showCorrelativas', 'showStatus', 'isPublic'];
 
     private const MAX_SEMESTER_PLANS_BYTES = 65535;
+    private const MAX_SUBJECT_LAYOUTS_BYTES = 16384;
 
     public function __construct(private PDO $pdo)
     {
@@ -67,7 +69,10 @@ final class PreferencesRepository
                 $value = json_encode($value);
             }
             if ($inputKey === 'semesterPlans') {
-                $value = self::encodeSemesterPlans($value);
+                $value = self::encodeJsonMap($value, self::MAX_SEMESTER_PLANS_BYTES, 'semester_plans');
+            }
+            if ($inputKey === 'subjectLayouts') {
+                $value = self::encodeJsonMap($value, self::MAX_SUBJECT_LAYOUTS_BYTES, 'subject_layouts');
             }
             $sets[] = "{$column} = :{$column}";
             $params[$column] = $value;
@@ -127,23 +132,26 @@ final class PreferencesRepository
             // vuelva a salir como {} y no como []. `?? null` por si la base todavía no
             // tiene la columna (ver database/migrate_semester_plans.sql).
             'semesterPlans' => ($row['semester_plans'] ?? null) ? json_decode((string) $row['semester_plans']) : new \stdClass(),
+            // Orden de materias elegido por carrera (ver assets/js/subjectLayouts.js).
+            'subjectLayouts' => ($row['subject_layouts'] ?? null) ? json_decode((string) $row['subject_layouts']) : new \stdClass(),
             'yearStarted' => $row['year_started'] !== null ? (int) $row['year_started'] : null,
             'isPublic' => (bool) $row['is_public'],
             'shareToken' => $row['share_token'],
         ];
     }
 
-    // Planificador de cuatrimestres: un mapa { codigoCarrera: plan } que arma y lee
-    // el front (ver assets/js/planner.js). El backend no interpreta el contenido,
-    // solo controla que sea un objeto JSON de tamaño razonable.
-    private static function encodeSemesterPlans(mixed $value): string
+    // Mapas { codigoCarrera: ... } que arma y lee el front: el planificador de
+    // cuatrimestres (semesterPlans, ver assets/js/planner.js) y el orden de materias
+    // (subjectLayouts, ver assets/js/subjectLayouts.js). El backend no interpreta el
+    // contenido, solo controla que sea un objeto JSON de tamaño razonable.
+    private static function encodeJsonMap(mixed $value, int $maxBytes, string $errorKey): string
     {
         if (!is_array($value)) {
-            Response::error('invalid_semester_plans', 422);
+            Response::error("invalid_{$errorKey}", 422);
         }
         $json = json_encode($value === [] ? new \stdClass() : $value, JSON_UNESCAPED_UNICODE);
-        if ($json === false || strlen($json) > self::MAX_SEMESTER_PLANS_BYTES) {
-            Response::error('semester_plans_too_large', 422);
+        if ($json === false || strlen($json) > $maxBytes) {
+            Response::error("{$errorKey}_too_large", 422);
         }
         return $json;
     }

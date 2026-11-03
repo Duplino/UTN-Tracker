@@ -3,6 +3,7 @@
 import { api } from './apiClient.js';
 import { promotionRecoveryCandidates } from './statusEngine.js';
 import { getCareers, getCareerCurriculum } from './careers.js';
+import { applySubjectLayout, layoutPrefFor } from './subjectLayouts.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // El share view no tiene selector de carrera ni toggle de título intermedio (a
@@ -10,6 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // (preferences.activeCareerCode) y nunca las materias onlyForIntermediate.
   let currentCareer = null;
   let planData = null;
+  // Orden de materias que eligió el dueño del perfil (ver subjectLayouts.js).
+  let ownerSubjectLayouts = {};
   let electivasList = [];
   let columns = 5;
 
@@ -693,11 +696,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     getCareerCurriculum(currentCareer)
       .then(d => {
         if (!d) throw new Error('curriculum_not_found');
-        planData = d;
+        planData = applySubjectLayout(d, layoutPrefFor(ownerSubjectLayouts, currentCareer, d, { withPlan: false }));
         const modules = Array.isArray(d.modules) ? d.modules : [];
         const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
         electivasList = electModule && Array.isArray(electModule.subjects) ? electModule.subjects : [];
-        try { renderGroups(d); } catch (e) { console.error('Error renderizando grupos', e); }
+        try { renderGroups(planData); } catch (e) { console.error('Error renderizando grupos', e); }
       })
       .catch(err => {
         console.error('Error cargando el curriculum de la carrera', err);
@@ -719,6 +722,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     enrollmentsByCode = {};
     (data.enrollments || []).forEach(e => { enrollmentsByCode[e.subjectCode] = e; });
     electivesList = data.electives || [];
+    const layouts = data.preferences && data.preferences.subjectLayouts;
+    ownerSubjectLayouts = (layouts && typeof layouts === 'object' && !Array.isArray(layouts)) ? layouts : {};
 
     const userCareers = Array.isArray(data.userCareers) ? data.userCareers : [];
     const activeCareerCode = data.preferences && data.preferences.activeCareerCode;

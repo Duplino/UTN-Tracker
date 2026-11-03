@@ -15,6 +15,9 @@ import { initSchedule } from './schedule.js';
 import { initTogether } from './together.js';
 import { initSiuImport } from './siuImport.js';
 import { initRouter } from './router.js';
+import {
+  OFFICIAL_LAYOUT, PLAN_LAYOUT, applySubjectLayout, layoutOptions, layoutPrefFor, withLayoutPref,
+} from './subjectLayouts.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
@@ -60,7 +63,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (toggle) toggle.checked = showIntermediateTitleEnabled;
   }
 
+  // planData es el curriculum con el orden de materias elegido ya aplicado (es lo que
+  // usan el tablero, el planificador y "cursar juntos"); rawPlanData, el que vino de
+  // la API, con los niveles del plan oficial.
   let planData = null;
+  let rawPlanData = null;
+  let subjectLayoutsMap = {};
   let electivasList = [];
   let columns = 5;
 
@@ -175,6 +183,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       localStorage.setItem('mostrarCorrelativas', preferences.showCorrelativas ? '1' : '0');
       correlativasEnabled = preferences.showCorrelativas;
       if (correlativasToggle) correlativasToggle.checked = correlativasEnabled;
+    }
+    if (preferences.subjectLayouts && typeof preferences.subjectLayouts === 'object' && !Array.isArray(preferences.subjectLayouts)){
+      if (JSON.stringify(preferences.subjectLayouts) !== JSON.stringify(subjectLayoutsMap)) changed = true;
+      subjectLayoutsMap = preferences.subjectLayouts;
     }
     if (typeof preferences.showStatus === 'boolean'){
       if (showStatusEnabled !== preferences.showStatus) changed = true;
@@ -414,21 +426,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   function loadPlanData() {
     if (!currentCareer) {
       planData = null;
+      rawPlanData = null;
       electivasList = [];
+      syncSubjectLayoutControls();
       if (columnsContainer) columnsContainer.removeAttribute('aria-busy');
       try{ renderCareerEnrollmentPrompt(); }catch(e){ console.error('Error mostrando el listado de carreras', e); }
       try{ computeStats([]); }catch(e){}
       return;
     }
     getCareerCurriculum(currentCareer)
-      .then(d => {
+      .then(async d => {
         if (!d) throw new Error('curriculum_not_found');
-        planData = d;
+        rawPlanData = d;
+        subjectLayoutsMap = await loadSubjectLayoutsMap();
+        applyCurrentSubjectLayout();
         const modules = Array.isArray(d.modules) ? d.modules : [];
         // electivas module typically has id 'electives' and render: false
         const electModule = modules.find(m => m && m.id === 'electives') || modules.find(m => m && m.render === false && Array.isArray(m.subjects));
         electivasList = electModule && Array.isArray(electModule.subjects) ? electModule.subjects : [];
-        try{ renderGroups(d); }catch(e){ console.error('Error renderizando grupos', e); }
+        syncSubjectLayoutControls();
+        try{ renderGroups(planData); }catch(e){ console.error('Error renderizando grupos', e); }
       })
       .catch(err => {
         console.error('Error cargando el curriculum de la carrera', err);
@@ -447,6 +464,109 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   initProgramSelector();
+
+  // --- Orden de materias (assets/js/subjectLayouts.js) ---
+  // La preferencia se guarda por carrera en `subjectLayouts`: con sesión, en el
+  // servidor y en lastPreferences; como invitado, en localStorage. "Mi plan" arma
+  // las columnas con el planificador (`semesterPlans`), así que se guarda una copia
+  // de los planes para poder aplicarlo sin esperar.
+  let semesterPlansMap = {};
+
+  async function loadSubjectLayoutsMap(){
+    let prefs = null;
+    try{ prefs = activeStore === apiStore ? lastPreferences : await activeStore.getPreferences(); }catch(e){ prefs = null; }
+    const plans = prefs && prefs.semesterPlans;
+    semesterPlansMap = (plans && typeof plans === 'object' && !Array.isArray(plans)) ? plans : {};
+    const map = prefs && prefs.subjectLayouts;
+    return (map && typeof map === 'object' && !Array.isArray(map)) ? map : {};
+  }
+
+  function currentSubjectLayoutPref(){
+    return layoutPrefFor(subjectLayoutsMap, currentCareer, rawPlanData);
+  }
+
+  function applyCurrentSubjectLayout(){
+    if (!rawPlanData){ planData = null; return; }
+    planData = applySubjectLayout(rawPlanData, currentSubjectLayoutPref(), {
+      plan: (currentCareer && semesterPlansMap[currentCareer]) || null,
+      getEnrollment: code => loadSubjectData(code),
+      electiveCodes: getElectivesForCurrentCareer().map(e => e.subjectCode),
+    });
+  }
+
+  // Vuelve a armar el tablero con el orden elegido (ej. después de cambiar el
+  // planificador con "Mi plan" elegido).
+  function rerenderSubjectLayout(){
+    if (!rawPlanData) return;
+    applyCurrentSubjectLayout();
+    try{ renderGroups(planData); }catch(e){ console.error('Error renderizando grupos', e); }
+  }
+
+  async function saveSubjectLayoutPref(pref){
+    if (!currentCareer) return;
+    const previous = subjectLayoutsMap;
+    subjectLayoutsMap = withLayoutPref(subjectLayoutsMap, currentCareer, pref);
+    syncSubjectLayoutControls();
+    rerenderSubjectLayout();
+    try{
+      await activeStore.updatePreferences({ subjectLayouts: subjectLayoutsMap });
+      if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, subjectLayouts: subjectLayoutsMap };
+    }catch(e){
+      console.error('Error guardando el orden de materias', e);
+      toastError('No se pudo guardar el orden de materias', e);
+      subjectLayoutsMap = previous;
+      syncSubjectLayoutControls();
+      rerenderSubjectLayout();
+    }
+  }
+
+  function syncSubjectLayoutControls(){
+    const wrap = document.getElementById('settings-subject-layout-wrap');
+    const select = document.getElementById('settings-subject-layout');
+    const planBtn = document.getElementById('settings-subject-layout-planner');
+    if (!wrap || !select) return;
+    if (!rawPlanData){
+      wrap.classList.add('d-none');
+      return;
+    }
+    const pref = currentSubjectLayoutPref();
+    select.innerHTML = layoutOptions(rawPlanData)
+      .map(o => `<option value="${escapeHtml(o.id)}"${o.description ? ` title="${escapeHtml(o.description)}"` : ''}>${escapeHtml(o.name)}</option>`)
+      .join('');
+    select.value = pref.selected;
+    wrap.classList.remove('d-none');
+    if (planBtn) planBtn.classList.toggle('d-none', pref.selected !== PLAN_LAYOUT);
+  }
+
+  const subjectLayoutSelect = document.getElementById('settings-subject-layout');
+  if (subjectLayoutSelect){
+    subjectLayoutSelect.addEventListener('change', () => {
+      if (!rawPlanData) return;
+      saveSubjectLayoutPref({ selected: subjectLayoutSelect.value || OFFICIAL_LAYOUT });
+    });
+  }
+  // Con "Mi plan", empezar, dar de baja o cambiar el año de una materia la puede
+  // cambiar de columna: se rearma el tablero al cerrar su ficha.
+  const subjectModalForLayout = document.getElementById('subjectModal');
+  if (subjectModalForLayout){
+    subjectModalForLayout.addEventListener('hidden.bs.modal', () => {
+      if (rawPlanData && currentSubjectLayoutPref().selected === PLAN_LAYOUT) rerenderSubjectLayout();
+    });
+  }
+
+  // "Abrir planificador": cierra Configuración y abre el planificador.
+  const subjectLayoutPlannerBtn = document.getElementById('settings-subject-layout-planner');
+  if (subjectLayoutPlannerBtn){
+    subjectLayoutPlannerBtn.addEventListener('click', () => {
+      try{
+        const settingsEl = document.getElementById('settingsModal');
+        const settings = settingsEl && bootstrap.Modal.getInstance(settingsEl);
+        if (settings) settings.hide();
+      }catch(e){ /* ignore */ }
+      const plannerBtn = document.getElementById('btn-planner');
+      if (plannerBtn) plannerBtn.click();
+    });
+  }
 
   // Electivas button: open modal and load electivas from separate file
   const electivasBtn = document.getElementById('btn-electivas');
@@ -814,6 +934,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Update all cards to mark as disabled if they don't meet cursar requirements
   function renderGroups(data){
+    // "Mi plan" depende de las inscripciones y del planificador: se rearma en cada
+    // render para que una materia recién empezada pase a la columna de su año.
+    if (data && data.planView && rawPlanData){
+      applyCurrentSubjectLayout();
+      data = planData;
+    }
     const modules = Array.isArray(data.modules) ? data.modules : [];
     // filter out modules that should not be rendered as columns
     const visibleModules = modules.filter(m => m && m.render !== false);
@@ -868,7 +994,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Las electivas no son parte del título intermedio (el título intermedio nunca las
       // pidió históricamente), así que se ocultan por completo con el toggle prendido.
       const electivasCount = showIntermediateTitleEnabled ? 0 : (Number.isFinite(Number(module.electivas)) ? Number(module.electivas) : 0);
-      const modulePassed = countPassedSubjects(countBaseSubjects) + (showIntermediateTitleEnabled ? 0 : countPassedElectivasForColumn(visIdx));
+      const modulePassed = countPassedSubjects(countBaseSubjects) + ((showIntermediateTitleEnabled || data.planView) ? 0 : countPassedElectivasForColumn(visIdx));
       header.innerHTML = `<strong>${escapeHtml(module.name)}</strong> <span class="text-muted small">${modulePassed}/${countBaseSubjects.length + electivasCount}</span>`;
       col.appendChild(header);
 
@@ -887,8 +1013,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Las estadísticas / barra de progreso siempre se calculan sobre el total completo de
     // la carrera (sin importar el toggle), para que ambos tramos del progreso se puedan
     // mostrar aunque el tablero esté mostrando solo el recorrido del título intermedio.
+    // Sobre el curriculum original (rawPlanData): "Mi plan" mezcla electivas en las
+    // columnas y no tiene cupos, y eso no tiene que cambiar el progreso.
     displayedSubjects = [];
-    visibleModules.forEach(m => {
+    const statsModules = (rawPlanData && Array.isArray(rawPlanData.modules) ? rawPlanData.modules : modules).filter(m => m && m.render !== false);
+    statsModules.forEach(m => {
       const allSubjects = Array.isArray(m.subjects) ? m.subjects : [];
       displayedSubjects.push(...allSubjects.filter(s => !s.onlyForIntermediate));
     });
@@ -898,7 +1027,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // restore any previously added electivas from localStorage (will replace placeholders).
     // Se saltea con el toggle prendido: los índices de columna no corresponden a la vista
     // filtrada y las electivas no son parte del título intermedio de todos modos.
-    if (!showIntermediateTitleEnabled){
+    // En "Mi plan" las electivas elegidas ya vienen ubicadas como una materia más.
+    if (!showIntermediateTitleEnabled && !data.planView){
       try{ restoreElectivesFromStorage(); }catch(e){/* ignore */}
     }
     // Compute stats after cursar state is updated (so .card-available classes are present)
@@ -2328,8 +2458,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Las electivas nunca son parte del título intermedio (ver comentario arriba).
     let electivasRequired = 0;
     try{
-      if (planData && Array.isArray(planData.modules)){
-        const visibleModules = planData.modules.filter(m => m && m.render !== false);
+      const statsPlan = rawPlanData || planData;
+      if (statsPlan && Array.isArray(statsPlan.modules)){
+        const visibleModules = statsPlan.modules.filter(m => m && m.render !== false);
         visibleModules.forEach(m => {
           const n = Number.isFinite(Number(m.electivas)) ? Number(m.electivas) : 0;
           electivasRequired += n;
@@ -2902,8 +3033,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Compute total including electivas required
     let electivasRequired = 0;
     try{
-      if (planData && Array.isArray(planData.modules)){
-        const visibleModules = planData.modules.filter(m => m && m.render !== false);
+      const statsPlan = rawPlanData || planData;
+      if (statsPlan && Array.isArray(statsPlan.modules)){
+        const visibleModules = statsPlan.modules.filter(m => m && m.render !== false);
         visibleModules.forEach(m => {
           const n = Number.isFinite(Number(m.electivas)) ? Number(m.electivas) : 0;
           electivasRequired += n;
@@ -3406,12 +3538,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Con "Mi plan" elegido, el tablero se rearma cada vez que cambia el planificador.
+  function onSemesterPlansSaved(semesterPlans){
+    semesterPlansMap = (semesterPlans && typeof semesterPlans === 'object' && !Array.isArray(semesterPlans)) ? semesterPlans : {};
+    if (currentSubjectLayoutPref().selected === PLAN_LAYOUT) rerenderSubjectLayout();
+  }
+
   // Planificador de cuatrimestres (assets/js/planner.js). El plan se guarda por
   // carrera en las preferencias (`semesterPlans`): con sesión, en el servidor y
   // en lastPreferences (así entra en la copia local del arranque); como invitado,
   // en localStorage.
   initPlanner({
-    getCurriculum: () => planData,
+    getCurriculum: () => rawPlanData,
     getCareerCode: () => currentCareer,
     getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
     getEnrollment: code => loadSubjectData(code),
@@ -3424,6 +3562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     savePlans: async (semesterPlans) => {
       await activeStore.updatePreferences({ semesterPlans });
       if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
+      onSemesterPlansSaved(semesterPlans);
     },
   });
 
@@ -3450,7 +3589,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ¿Qué podemos cursar juntos? (assets/js/together.js): compara con el perfil
   // público de un compañero; "Al plan" usa el mismo plan que el planificador.
   initTogether({
-    getCurriculum: () => planData,
+    getCurriculum: () => rawPlanData,
     getCareerCode: () => currentCareer,
     getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
     getEnrollment: code => loadSubjectData(code),
@@ -3462,6 +3601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     savePlans: async (semesterPlans) => {
       await activeStore.updatePreferences({ semesterPlans });
       if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
+      onSemesterPlansSaved(semesterPlans);
     },
   });
 
@@ -3534,7 +3674,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   initSiuImport({
     getStore: () => activeStore,
-    getCurriculum: () => planData,
+    // El curriculum original: las electivas se ubican por columna del plan oficial.
+    getCurriculum: () => rawPlanData,
     getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
     getEnrollment: code => loadSubjectData(code),
     getRetakes: code => retakesCache[code] || 0,

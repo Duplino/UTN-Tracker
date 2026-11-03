@@ -36,6 +36,7 @@
 		<link rel="modulepreload" href="assets/js/evaluationSchemes.js">
 		<link rel="modulepreload" href="assets/js/localGuestStore.js">
 		<link rel="modulepreload" href="assets/js/planner.js">
+		<link rel="modulepreload" href="assets/js/subjectLayouts.js">
 		<link rel="modulepreload" href="assets/js/agenda.js">
 		<link rel="modulepreload" href="assets/js/schedule.js">
 		<link rel="modulepreload" href="assets/js/together.js">
@@ -438,6 +439,16 @@
 				  <input class="form-check-input" type="checkbox" id="settings-intermediate-title" role="switch">
 				  <label class="form-check-label" for="settings-intermediate-title">Ver solo hasta el título intermedio</label>
 				  <div class="form-text">Muestra el tablero hasta el título intermedio de la carrera.</div>
+				</div>
+				<!-- Orden de materias: plan oficial, órdenes sugeridos de la carrera (ej. Franja
+				     Morada) o "Mi plan" (una columna por año según el planificador). Ver subjectLayouts.js y syncSubjectLayoutControls en index.js. -->
+				<div id="settings-subject-layout-wrap" class="mb-3 d-none">
+				  <label class="form-label mb-1" for="settings-subject-layout">Orden de materias</label>
+				  <div class="d-flex gap-2">
+					<select class="form-select" id="settings-subject-layout"></select>
+					<button type="button" class="btn btn-outline-secondary text-nowrap d-none" id="settings-subject-layout-planner"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Abrir planificador</button>
+				  </div>
+				  <div class="form-text" id="settings-subject-layout-note">Solo cambia en qué columna se ve cada materia. Con "Mi plan", una columna por año según lo que armaste en el planificador. Las correlativas y el título intermedio no cambian.</div>
 				</div>
 				<!-- Mostrar correlativas toggle -->
 				<div class="form-check form-switch mb-3">

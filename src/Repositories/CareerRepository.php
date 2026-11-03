@@ -52,6 +52,10 @@ final class CareerRepository
         }
         $careerId = $career['id'];
 
+        $stmt = $this->pdo->prepare('SELECT base_layout_name FROM careers WHERE id = :cid');
+        $stmt->execute(['cid' => $careerId]);
+        $baseLayoutName = (string) ($stmt->fetchColumn() ?: 'Plan oficial');
+
         $stmt = $this->pdo->prepare(
             'SELECT id, code, name, display_order, electives_slots
              FROM career_modules WHERE career_id = :cid ORDER BY display_order'
@@ -140,8 +144,57 @@ final class CareerRepository
             'metadata' => [
                 'hasIntermediateTitle' => $career['hasIntermediateTitle'],
                 'intermediateTitle' => $career['intermediateTitle'],
+                // Nombre del orden de los módulos de arriba en el selector del tablero.
+                'baseLayoutName' => $baseLayoutName,
             ],
             'modules' => $modules,
+            'layouts' => $this->layouts($careerId),
         ];
+    }
+
+    // Órdenes alternativos del tablero (además del plan oficial, que son los módulos
+    // de arriba): [{ id, name, description, placements: { codigoMateria: { module,
+    // order } } }]. Es solo visual, ver database/migrations/0013_subject_layouts.sql.
+    private function layouts(int $careerId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT l.code AS layout_code, l.name, l.description,
+                    s.code AS subject_code, m.code AS module_code, p.display_order
+             FROM career_layouts l
+             LEFT JOIN career_layout_placements p ON p.layout_id = l.id
+             LEFT JOIN career_subjects cs ON cs.id = p.career_subject_id
+             LEFT JOIN subjects s ON s.id = cs.subject_id
+             LEFT JOIN career_modules m ON m.id = p.module_id
+             WHERE l.career_id = :cid
+             ORDER BY l.display_order, l.id, p.display_order'
+        );
+        $stmt->execute(['cid' => $careerId]);
+
+        $layouts = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $code = $row['layout_code'];
+            if (!isset($layouts[$code])) {
+                $layouts[$code] = [
+                    'id' => $code,
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'placements' => [],
+                ];
+            }
+            if ($row['subject_code'] !== null && $row['module_code'] !== null) {
+                $layouts[$code]['placements'][$row['subject_code']] = [
+                    'module' => $row['module_code'],
+                    'order' => (int) $row['display_order'],
+                ];
+            }
+        }
+
+        return array_map(static function (array $layout): array {
+            // {} y no [] cuando no hay ninguna, para que el front siempre reciba un objeto.
+            if ($layout['placements'] === []) {
+                $layout['placements'] = new \stdClass();
+            }
+            return $layout;
+        }, array_values($layouts));
     }
 }
