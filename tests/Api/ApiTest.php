@@ -104,6 +104,16 @@ final class ApiTest extends TestCase
         $aga = array_values(array_filter($subjects, fn ($s) => $s['code'] === 'AGA'))[0] ?? null;
         $this->assertNotNull($aga);
         $this->assertSame(950701, $aga['siuCode']);
+
+        // Sistemas trae el orden de Franja Morada además del oficial; Mecánica no trae
+        // otro, y su orden base se llama como el plan que tiene cargado.
+        $this->assertSame('Plan oficial', $sistemas['body']['metadata']['baseLayoutName']);
+        $layouts = array_column($sistemas['body']['layouts'], null, 'id');
+        $this->assertArrayHasKey('franja-morada', $layouts);
+        $this->assertSame(['module' => 'g2', 'order' => 11], $layouts['franja-morada']['placements']['IyS']);
+        $this->assertCount(35, $layouts['franja-morada']['placements']);
+        $this->assertSame([], $curriculum['body']['layouts']);
+        $this->assertSame('Franja Morada', $curriculum['body']['metadata']['baseLayoutName']);
     }
 
     public function testPrivateEndpointsRequireSession(): void
@@ -298,5 +308,19 @@ final class ApiTest extends TestCase
         $this->assertSame(422, $invalid['status']);
 
         $this->request('PATCH', '/api/preferences', ['showCorrelativas' => true, 'showStatus' => true]);
+    }
+
+    public function testSubjectLayoutsPreferenceRoundTrip(): void
+    {
+        $this->login();
+        $layouts = ['sistemas' => ['selected' => 'franja-morada'], 'S23' => ['selected' => 'propio']];
+        $res = $this->request('PATCH', '/api/preferences', ['subjectLayouts' => $layouts]);
+        $this->assertSame(200, $res['status']);
+        $this->assertSame($layouts, $res['body']['subjectLayouts']);
+
+        $invalid = $this->request('PATCH', '/api/preferences', ['subjectLayouts' => 'oficial']);
+        $this->assertSame(422, $invalid['status']);
+
+        $this->request('PATCH', '/api/preferences', ['subjectLayouts' => []]);
     }
 }

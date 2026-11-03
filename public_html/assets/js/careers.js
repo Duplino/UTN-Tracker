@@ -36,7 +36,8 @@ export function findCareerByCode(careers, code) {
 // dibujar el tablero sin esperar a la red (stale-while-revalidate: se devuelve la
 // copia local y se refresca en segundo plano para la próxima vez). Se cachea la
 // Promise, no el resultado, para que dos llamadas simultáneas compartan el fetch.
-const CURRICULUM_STORAGE_PREFIX = 'utn.curriculum.v1.';
+// v2: el curriculum suma `layouts` (órdenes alternativos, ver subjectLayouts.js).
+const CURRICULUM_STORAGE_PREFIX = 'utn.curriculum.v2.';
 
 function readStoredCurriculum(code) {
   try {
