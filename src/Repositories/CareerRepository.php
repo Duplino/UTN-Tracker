@@ -64,7 +64,8 @@ final class CareerRepository
                     cs.required_for_intermediate_title, cs.display_order,
                     s.id AS subject_id, s.code, s.name,
                     COALESCE(cs.week_hours, s.week_hours) AS week_hours,
-                    COALESCE(cs.duration, s.duration) AS duration
+                    COALESCE(cs.duration, s.duration) AS duration,
+                    s.kind, s.clock_hours
              FROM career_subjects cs
              JOIN subjects s ON s.id = cs.subject_id
              WHERE cs.career_id = :cid
@@ -102,6 +103,9 @@ final class CareerRepository
                 'name' => $row['name'],
                 'weekHours' => (int) $row['week_hours'],
                 'duration' => $row['duration'],
+                // 'materia', 'proyecto_final' o 'pps' (ver 0013_pps_proyecto_final.sql).
+                'kind' => $row['kind'] ?? 'materia',
+                'clockHours' => $row['clock_hours'] !== null ? (int) $row['clock_hours'] : null,
                 'requirements' => [
                     'cursar' => $reqs['cursar'] ?? [],
                     'aprobar' => $reqs['aprobar'] ?? [],

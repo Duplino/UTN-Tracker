@@ -293,6 +293,7 @@ function fullChecklist(config) {
 // cursada ni promoción), el estándar en el resto de los casos.
 export function schemeFor(summary, schemes) {
   const codes = (schemes || []).map(s => s.code);
+  if (summary.subject?.kind === 'pps' && codes.includes('pps')) return 'pps';
   if (summary.status === 'Aprobada' && summary.regularGrade === null && codes.includes('libre')) return 'libre';
   if (codes.includes('2-partials')) return '2-partials';
   return codes[0] || null;
@@ -305,6 +306,10 @@ export function schemeFor(summary, schemes) {
 export function buildResults(summary, config) {
   const target = summary.status;
   if (!['Promocionada', 'Aprobada', 'Regularizada'].includes(target)) return null;
+  // PPS: sin notas. Si el SIU la da por aprobada, se marca Aprobada; si no, queda en curso.
+  if (config?.kind === 'pps') {
+    return { partials: {}, finals: {}, checklist: {}, override: target === 'Regularizada' ? null : 'Aprobada' };
+  }
   const n = config?.partials ?? 2;
   const partialGrade = target === 'Promocionada' ? summary.grade : summary.regularGrade;
   const partials = {};

@@ -137,7 +137,10 @@ final class EnrollmentController
             (array) $request->input('partials', []),
             (array) $request->input('finals', []),
             (array) $request->input('checklist', []),
-            $request->input('clearOverride', true) !== false
+            $request->input('clearOverride', true) !== false,
+            array_key_exists('clockHoursDone', $request->all())
+                ? EnrollmentRepository::toClockHours($request->input('clockHoursDone'))
+                : false
         );
 
         Response::json($repo->findHydrated((int) $user['id'], $params['subjectCode']));

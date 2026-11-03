@@ -22,6 +22,12 @@ final class StatusCalculator
             return $override;
         }
 
+        // PPS: no tiene parciales ni notas. Queda "en curso" hasta que el usuario la
+        // marca como Aprobada (override): acreditarla depende del informe, no de las horas.
+        if (($config['kind'] ?? null) === 'pps') {
+            return 'Faltan notas';
+        }
+
         $partialCount = (int) ($config['partials'] ?? 2);
         $regularizationMinNote = (int) ($config['regularization']['min_note'] ?? 6);
         $approveMinNote = (int) ($config['approve']['min_note'] ?? 6);

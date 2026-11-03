@@ -412,7 +412,8 @@ export function initSchedule(ctx) {
   function subjectChoices() {
     const scheduled = new Set(sessions.map(s => s.subjectCode));
     const cursando = (ctx.getEnrollments() || [])
-      .filter(e => e && e.subjectCode && !NOT_CURSANDO.includes(e.status))
+      // La PPS no tiene horario de cursada.
+      .filter(e => e && e.subjectCode && !NOT_CURSANDO.includes(e.status) && e.schemeConfig?.kind !== 'pps')
       .map(e => e.subjectCode);
     const codes = [...new Set([...cursando, ...scheduled])];
     return codes.map(code => ({ code, name: nameOf(code) })).sort((a, b) => a.name.localeCompare(b.name, 'es'));

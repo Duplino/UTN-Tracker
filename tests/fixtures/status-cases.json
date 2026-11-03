@@ -1620,5 +1620,69 @@
     },
     "override": null,
     "expected": "Aprobada"
+  },
+  {
+    "name": "pps sin aprobar: en curso aunque tenga un final cargado",
+    "scheme": "pps",
+    "config": {
+      "kind": "pps",
+      "partials": 0,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 0,
+        "low_note": null,
+        "max_recovery": 0
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {},
+    "finals": [
+      {
+        "attemptNumber": 1,
+        "grade": 9,
+        "examDate": null
+      }
+    ],
+    "checklist": {},
+    "override": null,
+    "expected": "Faltan notas"
+  },
+  {
+    "name": "pps aprobada a mano",
+    "scheme": "pps",
+    "config": {
+      "kind": "pps",
+      "partials": 0,
+      "tp": 0,
+      "labs": 0,
+      "tp_required_for": [],
+      "labs_required_for": [],
+      "promotion": {
+        "high_note": 8,
+        "high_count": 0,
+        "low_note": null,
+        "max_recovery": 0
+      },
+      "regularization": {
+        "min_note": 6
+      },
+      "approve": {
+        "min_note": 6
+      }
+    },
+    "partials": {},
+    "finals": [],
+    "checklist": {},
+    "override": "Aprobada",
+    "expected": "Aprobada"
   }
 ]
