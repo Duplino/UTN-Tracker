@@ -88,8 +88,15 @@ final class EnrollmentRepository
         $this->pdo->prepare('DELETE FROM enrollment_checklist WHERE enrollment_id = :id')->execute(['id' => $enrollmentId]);
     }
 
-    public function saveResults(int $enrollmentId, array $partials, array $finals, array $checklist, bool $clearOverride): void
+    // $clockHoursDone: horas reloj hechas de la PPS. false = no tocarlas (el resto de
+    // las materias no las manda); null = borrarlas.
+    public function saveResults(int $enrollmentId, array $partials, array $finals, array $checklist, bool $clearOverride, int|null|false $clockHoursDone = false): void
     {
+        if ($clockHoursDone !== false) {
+            $this->pdo->prepare('UPDATE enrollments SET clock_hours_done = :hours WHERE id = :id')
+                ->execute(['hours' => $clockHoursDone, 'id' => $enrollmentId]);
+        }
+
         foreach ($partials as $partialNumber => $attempts) {
             foreach ($attempts as $attemptNumber => $grade) {
                 $this->upsertPartial($enrollmentId, (int) $partialNumber, (int) $attemptNumber, $this->toGrade($grade));
@@ -115,6 +122,14 @@ final class EnrollmentRepository
             $this->pdo->prepare('UPDATE enrollments SET status_override = NULL WHERE id = :id')
                 ->execute(['id' => $enrollmentId]);
         }
+    }
+
+    public static function toClockHours(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return null;
+        }
+        return max(0, min(65535, (int) $value));
     }
 
     private function toGrade(mixed $value): ?int
@@ -261,6 +276,7 @@ final class EnrollmentRepository
                 'recursedCount' => $retakes[$row['subject_code']] ?? 0,
                 'statusOverride' => $row['status_override'],
                 'status' => $status,
+                'clockHoursDone' => isset($row['clock_hours_done']) ? (int) $row['clock_hours_done'] : null,
                 'partials' => $partials,
                 'finals' => array_values($finals),
                 'checklist' => $checklist,
@@ -328,7 +344,8 @@ final class EnrollmentRepository
             $entry['partials'] ?? [],
             $this->indexFinalsByAttempt($entry['finals'] ?? []),
             $entry['checklist'] ?? [],
-            false
+            false,
+            self::toClockHours($entry['clockHoursDone'] ?? null)
         );
     }
 

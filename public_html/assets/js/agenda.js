@@ -80,10 +80,10 @@ export function gradeFor(entry, enrollment) {
 }
 
 // Materias que se pueden elegir: las que tienen inscripción y todavía no están
-// aprobadas (cursando o con el final pendiente).
+// aprobadas (cursando o con el final pendiente). La PPS no tiene parciales ni finales.
 export function subjectOptions(enrollments, nameOf = c => c) {
   return (Array.isArray(enrollments) ? enrollments : [])
-    .filter(e => e && e.subjectCode && !APPROVED.includes(e.status))
+    .filter(e => e && e.subjectCode && !APPROVED.includes(e.status) && e.schemeConfig?.kind !== 'pps')
     .map(e => ({ code: e.subjectCode, name: nameOf(e.subjectCode) || e.subjectCode, partials: partialCount(e) }))
     .sort((a, b) => a.name.localeCompare(b.name, 'es'));
 }

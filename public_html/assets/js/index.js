@@ -567,6 +567,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     return Math.max(0, 4 - used);
   }
 
+  // 'materia', 'proyecto_final' o 'pps' (subjects.kind en el backend).
+  function subjectKind(card){
+    return (card && card.dataset && card.dataset.kind) || 'materia';
+  }
+
+  function isPpsScheme(scheme){
+    return !!(scheme && scheme.config && scheme.config.kind === 'pps');
+  }
+
+  // "Última Exigencia Académica": el final del Proyecto Final (y acreditar la PPS)
+  // pide tener aprobadas todas las materias de la carrera, electivas incluidas. Fuera
+  // quedan las del título intermedio solamente y el propio PF/PPS. Devuelve lo que falta.
+  function missingForLastExam(selfCode){
+    const ok = (code) => {
+      const st = (loadSubjectData(code) || {}).status;
+      return st === 'Aprobada' || st === 'Promocionada';
+    };
+    const subjects = [];
+    let electivesRequired = 0;
+    const modules = (planData && Array.isArray(planData.modules)) ? planData.modules : [];
+    modules.filter(m => m && m.render !== false).forEach(m => {
+      electivesRequired += Number(m.electivas) || 0;
+      (Array.isArray(m.subjects) ? m.subjects : []).forEach(subj => {
+        if (!subj || !subj.code || subj.code === selfCode) return;
+        if (subj.onlyForIntermediate) return;
+        if (subj.kind && subj.kind !== 'materia') return;
+        if (!ok(subj.code)) subjects.push(subj.name || subj.code);
+      });
+    });
+    let electivesApproved = 0;
+    try{ getElectivesForCurrentCareer().forEach(e => { if (ok(e.subjectCode)) electivesApproved++; }); }catch(e){}
+    return { subjects, electives: Math.max(0, electivesRequired - electivesApproved) };
+  }
+
+  function describeMissingForLastExam(missing){
+    const parts = [];
+    const n = missing.subjects.length;
+    if (n){
+      const shown = missing.subjects.slice(0, 4);
+      const rest = n - shown.length;
+      parts.push(rest > 0 ? `${shown.join(', ')} y ${rest} más` : formatSpanishList(shown));
+    }
+    if (missing.electives) parts.push(missing.electives === 1 ? '1 electiva' : `${missing.electives} electivas`);
+    return parts.join(n && missing.electives ? ', además de ' : '');
+  }
+
+  function isLastExamBlocked(card){
+    if (subjectKind(card) !== 'proyecto_final') return false;
+    const m = missingForLastExam(card.dataset.code);
+    return m.subjects.length > 0 || m.electives > 0;
+  }
+
   // Apply a very light status background class to a card (except 'Faltan notas')
   function applyCardStatusStyle(card, status){
     if (!card) return;
@@ -649,6 +701,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else if (status === 'Regularizada'){
         // Do not show any badge for Regularizada subjects (user requested no badge)
         // Intentionally left blank: no badge appended for this status.
+      } else if (subjectKind(card) === 'pps'){
+        // PPS: horas reloj (hechas/requeridas si ya empezó), no horas semanales.
+        const span = document.createElement('span');
+        span.className = 'badge bg-primary';
+        span.style.fontSize = '0.8rem';
+        const required = Number(card.dataset.clockHours) || null;
+        const done = stored && Number.isFinite(stored.clockHoursDone) ? stored.clockHoursDone : (stored ? 0 : null);
+        span.textContent = required
+          ? (done !== null ? `${done}/${required} hs` : `${required} hs reloj`)
+          : 'Horas reloj';
+        bc.appendChild(span);
       } else {
         // not approved -> show weekHours badge (blue) with C/A indicator
         const span = document.createElement('span');
@@ -865,6 +928,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     card.dataset.weekHours = typeof subject.weekHours === 'number' ? String(subject.weekHours) : '6';
     // store duration for badge display (cuatrimestral or anual, default to anual)
     card.dataset.duration = subject.duration || 'anual';
+    // Proyecto Final y PPS no son materias comunes (ver subjectKind() y missingForLastExam()).
+    card.dataset.kind = subject.kind || 'materia';
+    if (typeof subject.clockHours === 'number') card.dataset.clockHours = String(subject.clockHours);
     // store requirements object (cursar/aprobar)
     const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
     card.dataset.requirements = JSON.stringify(reqsObj);
@@ -1048,7 +1114,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (modalFooter) modalFooter.style.display = 'none';
     if (settingsToggleBtn) settingsToggleBtn.classList.add('d-none');
 
-    const schemes = schemesCache.length ? schemesCache : await getEvaluationSchemes();
+    const allSchemes = schemesCache.length ? schemesCache : await getEvaluationSchemes();
+    // La PPS va siempre con su esquema (sin notas); el resto de las materias no puede elegirlo.
+    const isPps = subjectKind(currentCard) === 'pps';
+    const schemes = allSchemes.filter(s => isPps ? isPpsScheme(s) : !isPpsScheme(s));
     const wrap = document.createElement('div');
     wrap.id = 'subject-start-wrap';
     wrap.className = 'd-flex flex-column justify-content-center align-items-center';
@@ -1145,6 +1214,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!stored) return;
     const schemeConfig = stored.schemeConfig || {};
 
+    if (subjectKind(currentCard) === 'pps'){
+      renderPpsSubject(code, stored);
+      return;
+    }
+
     renderDynamicFields(schemeConfig);
     populateDynamicFields(schemeConfig, stored);
     bindLiveInputs(schemeConfig);
@@ -1156,6 +1230,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     wireSaveButton(code, schemeConfig);
     bindEnterToSave();
     updateAprobarWarning();
+  }
+
+  // PPS: sin parciales ni finales. Se cargan las horas reloj hechas y, cuando aprueban
+  // el informe, se marca Aprobada desde el menú del estado (override).
+  function renderPpsSubject(code, stored){
+    const container = document.getElementById('subject-dynamic-fields');
+    if (container){
+      const required = Number(currentCard && currentCard.dataset.clockHours) || null;
+      const done = Number.isFinite(stored.clockHoursDone) ? stored.clockHoursDone : '';
+      container.innerHTML = `
+        <div class="mb-2">
+          <label class="form-label small" for="pps_hours">Horas reloj hechas</label>
+          <div class="input-group input-group-sm">
+            <input type="number" inputmode="numeric" enterkeyhint="done" min="0" step="1" class="form-control" id="pps_hours" placeholder="0" value="${escapeHtml(String(done))}">
+            ${required ? `<span class="input-group-text">de ${required} hs</span>` : ''}
+          </div>
+          ${required ? '<div class="progress mt-2" style="height:6px" role="presentation"><div class="progress-bar" id="pps_hours_bar"></div></div>' : ''}
+          <div class="form-text">La PPS no tiene parciales ni notas. Cuando te aprueben el informe, marcala como Aprobada desde el estado.</div>
+        </div>`;
+      const input = document.getElementById('pps_hours');
+      const bar = document.getElementById('pps_hours_bar');
+      const paint = () => {
+        if (!bar || !required) return;
+        const v = parseNum(input.value);
+        const pct = Number.isNaN(v) ? 0 : Math.max(0, Math.min(100, Math.round(v * 100 / required)));
+        bar.style.width = `${pct}%`;
+        bar.classList.toggle('bg-success', pct >= 100);
+      };
+      if (input) input.addEventListener('input', paint);
+      paint();
+    }
+    bindSubjectSettingsPanel(code, stored);
+    setStatusBanner(stored.status);
+
+    const saveBtn = document.getElementById('subject-save');
+    if (saveBtn){
+      const newSave = saveBtn.cloneNode(true);
+      saveBtn.parentNode.replaceChild(newSave, saveBtn);
+      newSave.addEventListener('click', async () => {
+        setBusy(newSave, true);
+        try{
+          const hydrated = await savePpsHours(code);
+          putSubjectDataInCache(code, hydrated);
+          currentEnrollment = hydrated;
+          applyCardStatusStyle(currentCard, hydrated.status);
+          try{ computeStats(displayedSubjects); }catch(e){}
+          const modalEl = document.getElementById('subjectModal');
+          if (modalEl){ const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); inst.hide(); }
+        }catch(err){
+          console.error('Error guardando horas de la PPS', err);
+          toastError('No se pudieron guardar las horas', err);
+        }finally{
+          setBusy(newSave, false);
+        }
+      });
+    }
+    bindEnterToSave();
+    updateAprobarWarning();
+  }
+
+  // Guarda las horas del input de la PPS sin tocar el estado (override) que tenga.
+  async function savePpsHours(code){
+    const input = document.getElementById('pps_hours');
+    const v = input ? parseNum(input.value) : NaN;
+    const clockHoursDone = Number.isNaN(v) ? null : Math.max(0, Math.round(v));
+    return activeStore.saveResults(code, { partials: {}, finals: {}, checklist: {}, clearOverride: false, clockHoursDone });
   }
 
   // En escritorio (mouse/trackpad), al abrir la materia el foco va a la primera nota
@@ -1235,6 +1375,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!warnEl || !currentCard) return;
     const reqObj = currentCard.dataset.requirements ? JSON.parse(currentCard.dataset.requirements) : { cursar: [], aprobar: [] };
     const aprobar = reqObj.aprobar || [];
+    const kind = subjectKind(currentCard);
+    if (kind === 'proyecto_final' || kind === 'pps'){
+      const stored = loadSubjectData(currentCard.dataset.code);
+      const done = stored && (stored.status === 'Aprobada' || stored.status === 'Promocionada');
+      const missingAll = missingForLastExam(currentCard.dataset.code);
+      if (!done && (missingAll.subjects.length || missingAll.electives)){
+        const what = kind === 'pps' ? 'Para acreditar la PPS' : 'Para rendir el final del Proyecto Final';
+        warnEl.textContent = `${what} tenés que tener aprobadas todas las materias de la carrera. Te faltan: ${describeMissingForLastExam(missingAll)}.`;
+        warnEl.classList.remove('d-none');
+      } else {
+        warnEl.classList.add('d-none');
+        warnEl.textContent = '';
+      }
+      return;
+    }
     if (!aprobar.length){ warnEl.classList.add('d-none'); warnEl.textContent = ''; return; }
     const missing = [];
     aprobar.forEach(r => {
@@ -1283,15 +1438,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert ${cls} py-1 px-2 mb-0 d-flex justify-content-between align-items-center`;
     alertDiv.setAttribute('role','status');
+    const isPps = subjectKind(currentCard) === 'pps';
     const left = document.createElement('div');
     left.id = 'subject-status-text';
-    left.textContent = promotable && status ? `${status} • Puede promocionar` : (status || '');
+    if (isPps) left.textContent = status === 'Aprobada' ? 'Aprobada' : 'En curso';
+    else left.textContent = promotable && status ? `${status} • Puede promocionar` : (status || '');
     alertDiv.appendChild(left);
 
     // Add Bootstrap dropdown for override actions
     const dropdownDiv = document.createElement('div');
     dropdownDiv.className = 'dropdown';
-    dropdownDiv.innerHTML = `
+    if (isPps) dropdownDiv.innerHTML = `
+      <button class="btn ${btnCls} dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false"></button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="#" data-override="computed">En curso</a></li>
+        <li><a class="dropdown-item" href="#" data-override="Aprobada">Aprobada</a></li>
+      </ul>
+    `;
+    else dropdownDiv.innerHTML = `
       <button class="btn ${btnCls} dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false"></button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li><a class="dropdown-item" href="#" data-override="computed">Usar calculado</a></li>
@@ -1347,6 +1511,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status = overrideValue === 'computed' ? null : overrideValue;
     let hydrated;
     try{
+      // PPS: que no se pierdan las horas cargadas y todavía no guardadas.
+      if (subjectKind(currentCard) === 'pps' && document.getElementById('pps_hours')) await savePpsHours(effectiveCode);
       hydrated = await activeStore.setOverride(effectiveCode, status);
     }catch(err){
       console.error('Error aplicando override', err);
@@ -1577,6 +1743,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!f || f.grade === null || f.grade === undefined) break;
         if (f.grade < 6) attemptsToShow = i + 1; else { attemptsToShow = i; break; }
       }
+      // Proyecto Final: el final es la última exigencia, se rinde con todo lo demás
+      // aprobado. Mientras tanto no se ofrece cargarlo (sí se muestra lo ya cargado).
+      if (isLastExamBlocked(currentCard)){
+        attemptsToShow = Object.keys(finalsRaw).filter(k => finalsRaw[k] && finalsRaw[k].grade !== null && finalsRaw[k].grade !== undefined).length;
+      }
       showFinalsUpTo(Math.min(attemptsToShow, 4));
     } else {
       showFinalsUpTo(0);
@@ -1666,7 +1837,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       newCancel.addEventListener('click', () => panel.classList.add('d-none'));
     }
 
-    const schemes = schemesCache.length ? schemesCache : [];
+    const isPpsSubject = subjectKind(currentCard) === 'pps';
+    const schemes = (schemesCache.length ? schemesCache : []).filter(s => isPpsSubject ? isPpsScheme(s) : !isPpsScheme(s));
     if (schemeSelect){
       schemeSelect.innerHTML = schemes.map(s => `<option value="${escapeHtml(s.code)}">${escapeHtml(s.name)}</option>`).join('');
       schemeSelect.value = stored.schemeCode || '';
