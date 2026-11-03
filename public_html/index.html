@@ -119,6 +119,10 @@
 				<button type="button" class="btn-close" id="siu-import-hint-close" aria-label="No mostrar más"></button>
 			</div>
 
+			<!-- Plan de cursada en el inicio: lo dibuja assets/js/planner.js (initHomePlan)
+			     cuando el plan de la carrera tiene "Mostrar en el inicio" activado. -->
+			<section id="home-plan" class="home-plan card d-none" aria-labelledby="home-plan-title"></section>
+
 			<!-- Columns with subject cards -->
 			<section class="columns-grid" aria-label="Materias" aria-busy="true">
 				<!-- Skeleton de carga: se ve hasta que index.js dibuja el tablero (renderGroups

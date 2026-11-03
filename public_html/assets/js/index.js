@@ -9,7 +9,7 @@ import { toast, toastError, setBusy, confirmDialog } from './ui.js';
 import { readBootCache, writeBootCache, clearBootCache } from './bootCache.js';
 import { initThemeToggle } from './theme.js';
 import { initPwa } from './pwa.js';
-import { initPlanner } from './planner.js';
+import { initPlanner, initHomePlan } from './planner.js';
 import { initAgenda } from './agenda.js';
 import { initSchedule } from './schedule.js';
 import { initTogether } from './together.js';
@@ -88,6 +88,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // del servidor, para poder guardar la copia local del arranque (ver bootCache.js).
   let currentUser = null;
   let lastPreferences = null;
+  // Plan de cursada en el inicio (ver initHomePlan más abajo); hasta entonces no hace nada.
+  let homePlan = { refresh(){} };
 
   async function refreshEnrollmentCache(){
     const list = await activeStore.getEnrollments();
@@ -2239,6 +2241,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Render dynamic stats row cards
     try{ renderStatsRowCards(); }catch(e){ console.error('Error rendering stats row', e); }
+    // El plan del inicio muestra si lo planificado ya se aprobó o si faltan correlativas.
+    try{ homePlan.refresh(); }catch(e){}
   }
 
   // Simple escape to avoid HTML injection in sample
@@ -3238,20 +3242,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   // carrera en las preferencias (`semesterPlans`): con sesión, en el servidor y
   // en lastPreferences (así entra en la copia local del arranque); como invitado,
   // en localStorage.
+  // Cada vez que se guarda el plan (planificador, "Al plan" de Cursar juntos o
+  // el botón de ocultar del inicio) se vuelve a dibujar el plan del inicio.
+  const loadSemesterPlans = async () => {
+    const prefs = activeStore === apiStore ? lastPreferences : await activeStore.getPreferences();
+    return (prefs && prefs.semesterPlans) || {};
+  };
+  const saveSemesterPlans = async (semesterPlans) => {
+    await activeStore.updatePreferences({ semesterPlans });
+    if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
+    homePlan.refresh();
+  };
+  homePlan = initHomePlan({
+    getCurriculum: () => planData,
+    getCareerCode: () => currentCareer,
+    getEnrollment: code => loadSubjectData(code),
+    loadPlans: loadSemesterPlans,
+    savePlans: saveSemesterPlans,
+  });
+  homePlan.refresh();
   initPlanner({
     getCurriculum: () => planData,
     getCareerCode: () => currentCareer,
     getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
     getEnrollment: code => loadSubjectData(code),
     getYearStarted: () => getYearStarted(),
-    loadPlans: async () => {
-      const prefs = activeStore === apiStore ? lastPreferences : await activeStore.getPreferences();
-      return (prefs && prefs.semesterPlans) || {};
-    },
-    savePlans: async (semesterPlans) => {
-      await activeStore.updatePreferences({ semesterPlans });
-      if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
-    },
+    loadPlans: loadSemesterPlans,
+    savePlans: saveSemesterPlans,
   });
 
   // Agenda de parciales y finales (assets/js/agenda.js): las fechas las guarda el
@@ -3282,14 +3299,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
     getEnrollment: code => loadSubjectData(code),
     fetchPublic: token => api.get(`/public/${encodeURIComponent(token)}`),
-    loadPlans: async () => {
-      const prefs = activeStore === apiStore ? lastPreferences : await activeStore.getPreferences();
-      return (prefs && prefs.semesterPlans) || {};
-    },
-    savePlans: async (semesterPlans) => {
-      await activeStore.updatePreferences({ semesterPlans });
-      if (activeStore === apiStore && lastPreferences) lastPreferences = { ...lastPreferences, semesterPlans };
-    },
+    loadPlans: loadSemesterPlans,
+    savePlans: saveSemesterPlans,
   });
 
   // Horario semanal (assets/js/schedule.js): lo guarda el store activo. Al importar

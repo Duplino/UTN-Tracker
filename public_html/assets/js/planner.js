@@ -12,9 +12,10 @@
 // simulación funciona aunque el plan tenga huecos entre cuatrimestres.
 //
 // El plan se guarda por carrera en las preferencias del usuario (`semesterPlans`,
-// un mapa { codigoCarrera: { lag, terms: [{ year, half, subjects: [codigos] }] } }).
+// un mapa { codigoCarrera: { lag, terms: [{ year, half, subjects: [codigos] }], showOnHome } }).
+// Con `showOnHome` el plan se ve en la pantalla de inicio, arriba del tablero.
 
-import { toastError, confirmDialog } from './ui.js';
+import { toast, toastError, confirmDialog } from './ui.js';
 
 const APPROVED = ['Aprobada', 'Promocionada'];
 const NEVER = Infinity;
@@ -59,7 +60,7 @@ export function nextTerm(date = new Date()) {
 }
 
 // --- Plan guardado ---
-// { lag, terms: [{ year, half, subjects }], current: { codigo: 'approved' | 'failed' } }
+// { lag, terms: [{ year, half, subjects }], current: { codigo: 'approved' | 'failed' }, showOnHome }
 
 export function normalizePlan(raw) {
   const plan = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -81,7 +82,7 @@ export function normalizePlan(raw) {
       if (OUTCOMES.includes(outcome) && outcome !== DEFAULT_OUTCOME) current[code] = outcome;
     });
   }
-  return { lag, terms, current };
+  return { lag, terms, current, showOnHome: plan.showOnHome === true };
 }
 
 // --- Simulación ---
@@ -373,7 +374,11 @@ export function initPlanner(ctx) {
           ${LAG_OPTIONS.map(o => `<option value="${o.value}" ${o.value === plan.lag ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
         </select>
         <span class="text-body-secondary">Afecta las correlativas que piden la materia aprobada.</span>
-        ${plan.terms.length ? '<button type="button" class="btn btn-sm btn-link text-danger ms-auto" data-action="clear">Vaciar plan</button>' : ''}
+        <div class="form-check form-switch mb-0 ms-md-auto">
+          <input class="form-check-input" type="checkbox" role="switch" id="planner-show-home" ${plan.showOnHome ? 'checked' : ''}>
+          <label class="form-check-label" for="planner-show-home">Mostrar en el inicio</label>
+        </div>
+        ${plan.terms.length ? '<button type="button" class="btn btn-sm btn-link text-danger" data-action="clear">Vaciar plan</button>' : ''}
       </div>`;
   }
 
@@ -557,6 +562,8 @@ export function initPlanner(ctx) {
 
     const lagSelect = bodyEl.querySelector('#planner-lag');
     if (lagSelect) lagSelect.addEventListener('change', () => update(() => { plan.lag = Number(lagSelect.value); }));
+    const homeSwitch = bodyEl.querySelector('#planner-show-home');
+    if (homeSwitch) homeSwitch.addEventListener('change', () => update(() => { plan.showOnHome = homeSwitch.checked; }));
   }
 
   function findTerm(t) {
@@ -648,4 +655,192 @@ export function initPlanner(ctx) {
   }
 
   modalEl.addEventListener('show.bs.modal', open);
+}
+
+// --- Plan en la pantalla de inicio ---
+//
+// Resumen del plan arriba del tablero cuando el plan de la carrera tiene
+// `showOnHome`: los próximos cuatrimestres planificados (desde el próximo a
+// cursar) con sus materias, y el egreso estimado con el plan.
+
+const HOME_TERMS = 2;
+
+// Datos del resumen, sin HTML (así se puede testear).
+export function homePlanView({ universe, plan, getEnrollment, start, maxTerms = HOME_TERMS }) {
+  const sim = simulate({ universe, plan, getEnrollment, start });
+  const upcoming = plan.terms
+    .map(term => termNumber(term.year, term.half))
+    .filter(t => t >= start);
+  // También cuenta un cuatrimestre sin materias propias pero con una anual que sigue.
+  const subjectsAt = t => {
+    const items = [];
+    plan.terms.forEach(term => {
+      const ot = termNumber(term.year, term.half);
+      term.subjects.forEach(code => {
+        const subject = universe.byCode[code];
+        if (!subject || sim.plannedAt[code] !== ot) return;
+        const carried = subject.duration === 'anual' && ot + 1 === t;
+        if (ot !== t && !carried) return;
+        const state = sim.real[code];
+        let note = null;
+        let kind = 'planned';
+        if (state !== 'none') {
+          kind = 'done';
+          note = state === 'approved' ? 'Ya la aprobaste' : state === 'regular' ? 'Ya la regularizaste' : 'Ya la estás cursando';
+        } else if (carried) {
+          kind = 'carried';
+          note = `Sigue de ${termLabel(ot)}`;
+        } else {
+          const missing = sim.missingAt(subject, t);
+          if (missing.length) {
+            kind = 'warning';
+            note = `Te falta ${formatList(missing.map(c => (universe.byCode[c] ? universe.byCode[c].name : c)))}`;
+          }
+        }
+        items.push({
+          code, name: subject.name, kind, note,
+          anual: subject.duration === 'anual',
+          hours: kind === 'planned' || kind === 'warning' || kind === 'carried'
+            ? (typeof subject.weekHours === 'number' ? subject.weekHours : 0) : 0,
+        });
+      });
+    });
+    // Primero lo que sigue de antes, después lo nuevo.
+    return items.sort((a, b) => (b.kind === 'carried') - (a.kind === 'carried'));
+  };
+  const terms = upcoming
+    .map(t => {
+      const subjects = subjectsAt(t);
+      return { term: t, label: termLabel(t), longLabel: termLongLabel(t), subjects, hours: subjects.reduce((acc, s) => acc + s.hours, 0) };
+    })
+    .filter(t => t.subjects.length)
+    .slice(0, maxTerms);
+  const more = Math.max(0, upcoming.filter(t => subjectsAt(t).length).length - terms.length);
+  return {
+    terms,
+    more,
+    pendingToPlan: sim.pendingToPlan,
+    graduationTerm: sim.pendingToPlan === 0 ? termLabel(sim.graduationTerm) : null,
+  };
+}
+
+// ctx: getCurriculum(), getCareerCode(), getEnrollment(code), loadPlans() -> Promise<mapa>,
+// savePlans(mapa) -> Promise. Devuelve { refresh() } para volver a dibujarlo cuando
+// cambian las notas, la carrera o el plan.
+export function initHomePlan(ctx) {
+  const el = document.getElementById('home-plan');
+  if (!el) return { refresh() {} };
+  let token = 0;
+  let queued = false;
+
+  function hide() {
+    el.classList.add('d-none');
+    el.innerHTML = '';
+  }
+
+  function subjectHtml(s) {
+    const icon = s.kind === 'warning' ? '<i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>'
+      : s.kind === 'done' ? '<i class="bi bi-check2 me-1" aria-hidden="true"></i>' : '';
+    const title = s.note ? ` title="${escapeHtml(s.note)}"` : '';
+    return `
+      <li class="home-plan-subject home-plan-subject-${s.kind}"${title}>
+        <span class="home-plan-subject-name">${icon}${escapeHtml(s.name)}</span>
+        ${s.anual ? '<span class="badge planner-badge">Anual</span>' : ''}
+        ${s.note ? `<span class="visually-hidden">. ${escapeHtml(s.note)}</span>` : ''}
+      </li>`;
+  }
+
+  // Las anuales que siguen del cuatrimestre anterior van en una línea, no como
+  // materias nuevas (ya se ven en el cuatrimestre en que empiezan).
+  function carriedHtml(t) {
+    const carried = t.subjects.filter(s => s.kind === 'carried');
+    if (!carried.length) return '';
+    const names = carried.map(s => s.name);
+    const from = termLabel(t.term - 1);
+    const text = carried.length === 1 ? `Sigue ${names[0]} (anual, de ${from})` : `Siguen ${carried.length} anuales de ${from}`;
+    return `<div class="home-plan-carried" title="${escapeHtml(formatList(names))}"><i class="bi bi-arrow-return-right me-1" aria-hidden="true"></i>${escapeHtml(text)}<span class="visually-hidden">: ${escapeHtml(formatList(names))}</span></div>`;
+  }
+
+  function render(view) {
+    const hasTerms = view.terms.length > 0;
+    const summary = view.graduationTerm
+      ? `Egreso con este plan: <strong>${escapeHtml(view.graduationTerm)}</strong>`
+      : `Te ${view.pendingToPlan === 1 ? 'falta ubicar 1 materia' : `faltan ubicar ${view.pendingToPlan} materias`} para ver cuándo te recibís`;
+    el.innerHTML = `
+      <div class="home-plan-header">
+        <div class="d-flex align-items-center gap-2 min-w-0">
+          <i class="bi bi-calendar-week text-primary" aria-hidden="true"></i>
+          <h2 class="home-plan-title mb-0 text-truncate" id="home-plan-title">Tu plan de cursada</h2>
+          <span class="small text-body-secondary d-none d-sm-inline">${summary}</span>
+        </div>
+        <div class="d-flex align-items-center gap-1 flex-shrink-0">
+          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#plannerModal">
+            <i class="bi bi-pencil" aria-hidden="true"></i><span class="ms-1">Editar</span>
+          </button>
+          <button type="button" class="btn btn-sm btn-icon" data-action="hide-home-plan" title="Ocultar del inicio" aria-label="Ocultar el plan del inicio">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+      <div class="small text-body-secondary d-sm-none mb-2">${summary}</div>
+      ${hasTerms ? `
+        <div class="home-plan-terms">
+          ${view.terms.map(t => `
+            <section class="home-plan-term" aria-label="${escapeHtml(t.longLabel)}">
+              <div class="home-plan-term-header">
+                <span class="fw-semibold">${escapeHtml(t.label)}</span>
+                <span class="small text-body-secondary">${t.hours} h semanales</span>
+              </div>
+              ${carriedHtml(t)}
+              <ul class="list-unstyled mb-0 home-plan-subjects">${t.subjects.filter(s => s.kind !== 'carried').map(subjectHtml).join('')}</ul>
+            </section>`).join('')}
+        </div>
+        ${view.more ? `<div class="small text-body-secondary mt-2">Y ${view.more} ${view.more === 1 ? 'cuatrimestre más' : 'cuatrimestres más'} en el planificador.</div>` : ''}`
+      : '<div class="small text-body-secondary">Todavía no planificaste materias para los próximos cuatrimestres. Tocá <strong>Editar</strong> para armar tu plan.</div>'}`;
+    el.classList.remove('d-none');
+  }
+
+  async function draw() {
+    const mine = ++token;
+    const curriculum = ctx.getCurriculum();
+    const careerCode = ctx.getCareerCode();
+    if (!curriculum || !careerCode) { hide(); return; }
+    let plans;
+    try {
+      plans = await ctx.loadPlans();
+    } catch (err) {
+      plans = null;
+    }
+    if (mine !== token) return;
+    const plan = normalizePlan(plans && plans[careerCode]);
+    if (!plan.showOnHome) { hide(); return; }
+    const universe = curriculumUniverse(curriculum);
+    render(homePlanView({ universe, plan, getEnrollment: ctx.getEnrollment, start: nextTerm() }));
+  }
+
+  el.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action="hide-home-plan"]');
+    if (!btn) return;
+    const careerCode = ctx.getCareerCode();
+    btn.disabled = true;
+    try {
+      const plans = { ...((await ctx.loadPlans()) || {}) };
+      plans[careerCode] = { ...(plans[careerCode] || {}), showOnHome: false };
+      await ctx.savePlans(plans);
+      hide();
+      toast('Listo. Lo podés volver a mostrar desde el planificador.', { variant: 'info' });
+    } catch (err) {
+      btn.disabled = false;
+      toastError('No se pudo ocultar el plan', err);
+    }
+  });
+
+  return {
+    // Se llama mucho (cada vez que cambian las estadísticas): se junta en un solo dibujo.
+    refresh() {
+      if (queued) return;
+      queued = true;
+      Promise.resolve().then(() => { queued = false; draw(); });
+    },
+  };
 }
