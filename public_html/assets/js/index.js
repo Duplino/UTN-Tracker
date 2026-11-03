@@ -14,6 +14,7 @@ import { initAgenda } from './agenda.js';
 import { initSchedule } from './schedule.js';
 import { initTogether } from './together.js';
 import { initSiuImport } from './siuImport.js';
+import { initRouter } from './router.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initThemeToggle();
@@ -3379,5 +3380,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
   });
 
-  initApp();
+  // Rutas con hash para los modales grandes (assets/js/router.js). El modal de un
+  // link directo (`/#agenda`) se abre después de cargar el tablero.
+  const router = initRouter();
+  initApp().catch(e => console.error('Error iniciando la app', e)).finally(() => router.openFromUrl());
 });
