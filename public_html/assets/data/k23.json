@@ -290,7 +290,7 @@
               }
             ]
           },
-          "weekHours": 6,
+          "weekHours": 8,
           "duration": "cuatrimestral"
         },
         {
@@ -316,7 +316,7 @@
               }
             ]
           },
-          "weekHours": 6,
+          "weekHours": 8,
           "duration": "cuatrimestral"
         },
         {
@@ -334,7 +334,7 @@
               }
             ]
           },
-          "weekHours": 6,
+          "weekHours": 8,
           "duration": "cuatrimestral"
         },
         {
@@ -401,8 +401,8 @@
             ],
             "aprobar": []
           },
-          "weekHours": 6,
-          "duration": "anual"
+          "weekHours": 4,
+          "duration": "cuatrimestral"
         },
         {
           "code": "IyCS",
@@ -451,7 +451,7 @@
             ],
             "aprobar": []
           },
-          "weekHours": 6,
+          "weekHours": 8,
           "duration": "cuatrimestral"
         },
         {
@@ -470,7 +470,7 @@
             ],
             "aprobar": []
           },
-          "weekHours": 6,
+          "weekHours": 8,
           "duration": "cuatrimestral"
         },
         {
@@ -612,7 +612,7 @@
             "aprobar": []
           },
           "weekHours": 6,
-          "duration": "anual"
+          "duration": "cuatrimestral"
         },
         {
           "code": "SSI",
