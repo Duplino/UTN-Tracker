@@ -962,7 +962,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const intermediateExtras = allSubjects.filter(s => s.onlyForIntermediate);
         return { module, normalSubjects, intermediateRequired, intermediateExtras };
       })
-      .filter(v => !showIntermediateTitleEnabled || v.intermediateRequired.length > 0 || v.intermediateExtras.length > 0);
+      .filter(v => !showIntermediateTitleEnabled || v.intermediateRequired.length > 0 || v.intermediateExtras.length > 0)
+      // En "Mi plan" no se muestran columnas que quedarían vacías (ej. "Sin
+      // planificar" con solo materias del título intermedio y el toggle apagado).
+      .filter(v => !data.planView || (showIntermediateTitleEnabled
+        ? v.intermediateRequired.length + v.intermediateExtras.length
+        : v.normalSubjects.length) > 0);
 
     if (moduleViews.length === 0) {
       columnsContainer.innerHTML = '<div class="alert alert-info">Esta carrera no tiene materias definidas para el título intermedio.</div>';
