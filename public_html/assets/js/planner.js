@@ -436,13 +436,19 @@ export function initPlanner(ctx) {
         </button>
       </li>`;
     const required = candidates.filter(c => !c.elective);
-    const electives = candidates.filter(c => c.elective);
+    // Solo se ofrecen las electivas que el usuario eligió (las que agregó al tablero).
+    const chosen = new Set(typeof ctx.getChosenElectives === 'function' ? ctx.getChosenElectives() : []);
+    const allElectives = candidates.filter(c => c.elective);
+    const electives = allElectives.filter(c => chosen.has(c.subject.code));
+    const electivesHint = allElectives.length && !electives.length
+      ? '<div class="small text-body-secondary px-2 pb-2">Agregá electivas desde la sección Electivas para poder planificarlas.</div>'
+      : '';
     return `
       <div class="planner-picker">
         ${required.length ? `<ul class="list-unstyled mb-0">${required.map(item).join('')}</ul>` : ''}
-        ${electives.length ? `
+        ${allElectives.length ? `
           <div class="planner-picker-heading">Electivas (te ${sim.electivesOpen === 1 ? 'falta 1' : `faltan ${sim.electivesOpen}`})</div>
-          <ul class="list-unstyled mb-0">${electives.map(item).join('')}</ul>` : ''}
+          ${electives.length ? `<ul class="list-unstyled mb-0">${electives.map(item).join('')}</ul>` : electivesHint}` : ''}
       </div>`;
   }
 

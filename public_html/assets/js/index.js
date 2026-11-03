@@ -3244,6 +3244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     getCareerName: () => { const c = currentCareerEntry(); return c ? c.name : ''; },
     getEnrollment: code => loadSubjectData(code),
     getYearStarted: () => getYearStarted(),
+    getChosenElectives: () => getElectivesForCurrentCareer().map(e => e.subjectCode),
     loadPlans: async () => {
       const prefs = activeStore === apiStore ? lastPreferences : await activeStore.getPreferences();
       return (prefs && prefs.semesterPlans) || {};
