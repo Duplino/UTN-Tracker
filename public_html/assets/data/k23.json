@@ -52,16 +52,16 @@
           "duration": "anual"
         },
         {
-          "code": "InglesI",
-          "name": "Inglés Técnico Nivel I",
-          "weekHours": 2,
-          "duration": "anual"
-        },
-        {
           "code": "LyED",
           "name": "Lógica y Estructuras Discretas",
           "weekHours": 3,
           "duration": "anual"
+        },
+        {
+          "code": "IyS",
+          "name": "Ingeniería y Sociedad",
+          "weekHours": 4,
+          "duration": "cuatrimestral"
         }
       ]
     },
@@ -123,12 +123,6 @@
           },
           "weekHours": 5,
           "duration": "anual"
-        },
-        {
-          "code": "IyS",
-          "name": "Ingeniería y Sociedad",
-          "weekHours": 4,
-          "duration": "cuatrimestral"
         },
         {
           "code": "SySL",
@@ -193,6 +187,30 @@
           },
           "weekHours": 2,
           "duration": "anual"
+        },
+        {
+          "code": "InglesI",
+          "name": "Inglés Técnico Nivel I",
+          "weekHours": 2,
+          "duration": "anual"
+        },
+        {
+          "code": "PyE",
+          "name": "Probabilidad y Estadística",
+          "requirements": {
+            "cursar": [
+              {
+                "id": "AGA",
+                "type": "regularizada"
+              },
+              {
+                "id": "AM1",
+                "type": "regularizada"
+              }
+            ]
+          },
+          "weekHours": 6,
+          "duration": "cuatrimestral"
         }
       ]
     },
@@ -230,24 +248,6 @@
           },
           "weekHours": 6,
           "duration": "anual"
-        },
-        {
-          "code": "PyE",
-          "name": "Probabilidad y Estadística",
-          "requirements": {
-            "cursar": [
-              {
-                "id": "AGA",
-                "type": "regularizada"
-              },
-              {
-                "id": "AM1",
-                "type": "regularizada"
-              }
-            ]
-          },
-          "weekHours": 6,
-          "duration": "cuatrimestral"
         },
         {
           "code": "ECO",
@@ -338,25 +338,22 @@
           "duration": "cuatrimestral"
         },
         {
-          "code": "AN",
-          "name": "Análisis Numérico",
+          "code": "RD",
+          "name": "Redes de Datos",
           "requirements": {
             "cursar": [
               {
-                "id": "AM2",
+                "id": "SSOO",
                 "type": "regularizada"
               },
               {
-                "id": "AM1",
-                "type": "aprobada"
-              },
-              {
-                "id": "AGA",
-                "type": "aprobada"
+                "id": "CD",
+                "type": "regularizada"
               }
-            ]
+            ],
+            "aprobar": []
           },
-          "weekHours": 6,
+          "weekHours": 8,
           "duration": "cuatrimestral"
         }
       ]
@@ -436,25 +433,6 @@
           "duration": "cuatrimestral"
         },
         {
-          "code": "RD",
-          "name": "Redes de Datos",
-          "requirements": {
-            "cursar": [
-              {
-                "id": "SSOO",
-                "type": "regularizada"
-              },
-              {
-                "id": "CD",
-                "type": "regularizada"
-              }
-            ],
-            "aprobar": []
-          },
-          "weekHours": 8,
-          "duration": "cuatrimestral"
-        },
-        {
           "code": "IO",
           "name": "Investigación Operativa",
           "requirements": {
@@ -514,6 +492,51 @@
           },
           "weekHours": 6,
           "duration": "cuatrimestral"
+        },
+        {
+          "code": "AN",
+          "name": "Análisis Numérico",
+          "requirements": {
+            "cursar": [
+              {
+                "id": "AM2",
+                "type": "regularizada"
+              },
+              {
+                "id": "AM1",
+                "type": "aprobada"
+              },
+              {
+                "id": "AGA",
+                "type": "aprobada"
+              }
+            ]
+          },
+          "weekHours": 6,
+          "duration": "cuatrimestral"
+        },
+        {
+          "code": "CdC",
+          "name": "Ciencia de Datos",
+          "requirements": {
+            "cursar": [
+              {
+                "id": "Sim",
+                "type": "regularizada"
+              },
+              {
+                "id": "PyE",
+                "type": "aprobada"
+              },
+              {
+                "id": "BD",
+                "type": "aprobada"
+              }
+            ],
+            "aprobar": []
+          },
+          "weekHours": 6,
+          "duration": "cuatrimestral"
         }
       ]
     },
@@ -537,29 +560,6 @@
               },
               {
                 "id": "AN",
-                "type": "aprobada"
-              }
-            ],
-            "aprobar": []
-          },
-          "weekHours": 6,
-          "duration": "cuatrimestral"
-        },
-        {
-          "code": "CdC",
-          "name": "Ciencia de Datos",
-          "requirements": {
-            "cursar": [
-              {
-                "id": "Sim",
-                "type": "regularizada"
-              },
-              {
-                "id": "PyE",
-                "type": "aprobada"
-              },
-              {
-                "id": "BD",
                 "type": "aprobada"
               }
             ],
