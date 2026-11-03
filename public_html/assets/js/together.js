@@ -279,7 +279,7 @@ export function initTogether(ctx) {
       let term = plan.terms.find(t => t.year === year && t.half === half);
       if (!term) { term = { year, half, subjects: [] }; plan.terms.push(term); }
       if (!term.subjects.includes(btn.dataset.code)) term.subjects.push(btn.dataset.code);
-      plans[career] = { ...(plans[career] || {}), lag: plan.lag, terms: plan.terms };
+      plans[career] = { ...(plans[career] || {}), terms: plan.terms };
       await ctx.savePlans(plans);
       await renderResult();
     } catch (e) {

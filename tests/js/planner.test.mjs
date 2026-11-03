@@ -38,11 +38,28 @@ test('suponer desaprobada una materia en curso la vuelve a dejar para cursar', (
   assert.deepEqual(cursable({ current: { A: 'failed' } }, { A: { status: 'Faltan notas' } }), ['A', 'B']);
 });
 
-test('una regularizada se aprueba según cuándo se rinde el final', () => {
+test('una regularizada se aprueba en el cuatrimestre elegido y destraba ese mismo cuatrimestre', () => {
   const enr = { A: { status: 'Faltan notas' } };
-  assert.ok(!cursable({ lag: 1 }, enr).includes('D'));
-  assert.ok(cursable({ lag: 1 }, enr, start + 1).includes('D'));
-  assert.ok(cursable({ lag: 0 }, enr).includes('D'));
+  // Por defecto se supone aprobada un cuatrimestre después del primero posible.
+  assert.ok(!cursable({}, enr).includes('D'));
+  assert.ok(cursable({}, enr, start + 1).includes('D'));
+  // Si se elige aprobarla en 1C 2027, D ya se puede cursar en 1C 2027.
+  assert.ok(cursable({ finals: { A: start } }, enr).includes('D'));
+});
+
+test('una regularizada real usa el cuatrimestre elegido', () => {
+  const enr = { A: { status: 'Regularizada' } };
+  assert.ok(cursable({ finals: { A: start } }, enr).includes('D'));
+  assert.ok(!cursable({ finals: { A: start + 2 } }, enr, start + 1).includes('D'));
+  assert.ok(cursable({ finals: { A: start + 2 } }, enr, start + 2).includes('D'));
+});
+
+test('no se puede aprobar antes de terminar de cursarla', () => {
+  // A planificada en 1C 2027 queda regularizada para 2C 2027: elegir 1C 2027 no cuenta.
+  const plan = { terms: [{ year: 2027, half: 1, subjects: ['A'] }], finals: { A: start } };
+  const sim = simulate({ universe, plan: normalizePlan(plan), getEnrollment: () => null, start });
+  assert.equal(sim.aprobAt.A, start + 1);
+  assert.equal(sim.finalMin.A, start + 1);
 });
 
 test('una anual planificada habilita recién dos cuatrimestres después', () => {
@@ -53,6 +70,10 @@ test('una anual planificada habilita recién dos cuatrimestres después', () => 
 
 test('normalizePlan descarta resultados inválidos y el valor por defecto', () => {
   assert.deepEqual(normalizePlan({ current: { A: 'approved', B: 'regular', C: 'x' } }).current, { A: 'approved' });
+});
+
+test('normalizePlan descarta cuatrimestres de aprobación inválidos', () => {
+  assert.deepEqual(normalizePlan({ finals: { A: start, B: 'x', C: 1.5 } }).finals, { A: start });
 });
 
 test('el ritmo cuenta el año en curso como entero', () => {

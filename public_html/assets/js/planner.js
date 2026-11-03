@@ -6,29 +6,32 @@
 //    a planificar;
 //  - lo planificado en un cuatrimestre queda regularizado al terminarlo (las anuales
 //    ocupan ese cuatrimestre y el siguiente);
-//  - el final se aprueba `lag` cuatrimestres después de regularizar (configurable).
+//  - cada regularizada (real, en curso o planificada) se aprueba en el cuatrimestre
+//    que se elige en su desplegable ("Apruebo en"). Aprobarla en un cuatrimestre
+//    quiere decir rendir el final en las mesas previas, así que las materias que
+//    piden esa aprobada ya se pueden cursar en ese mismo cuatrimestre. Si no se
+//    eligió nada, se supone el cuatrimestre siguiente al primero posible.
 //
 // Los cuatrimestres se manejan como un número absoluto (año*2 + 0/1), así la
 // simulación funciona aunque el plan tenga huecos entre cuatrimestres.
 //
 // El plan se guarda por carrera en las preferencias del usuario (`semesterPlans`,
-// un mapa { codigoCarrera: { lag, terms: [{ year, half, subjects: [codigos] }] } }).
+// un mapa { codigoCarrera: { terms: [{ year, half, subjects: [codigos] }], current, finals } }).
 
 import { toastError, confirmDialog } from './ui.js';
 
 const APPROVED = ['Aprobada', 'Promocionada'];
 const NEVER = Infinity;
-const DEFAULT_LAG = 1;
+// Cuatrimestres después del primero posible en que se supone aprobado el final
+// cuando no se eligió otro.
+const DEFAULT_FINAL_DELAY = 1;
+// Cuántos cuatrimestres se ofrecen en el desplegable de aprobación.
+const FINAL_OPTIONS = 6;
 // Resultado supuesto de una materia que se está cursando ahora. Al hacer click se
 // pasa al siguiente; 'regular' es el valor por defecto (no se guarda).
 const OUTCOMES = ['approved', 'regular', 'failed'];
 const DEFAULT_OUTCOME = 'regular';
 const OUTCOME_LABELS = { approved: 'Aprobada', regular: 'Regularizada', failed: 'Desaprobada' };
-const LAG_OPTIONS = [
-  { value: 0, label: 'al terminar de cursarlas' },
-  { value: 1, label: 'un cuatrimestre después' },
-  { value: 2, label: 'dos cuatrimestres después' },
-];
 
 // --- Cuatrimestres ---
 
@@ -59,11 +62,11 @@ export function nextTerm(date = new Date()) {
 }
 
 // --- Plan guardado ---
-// { lag, terms: [{ year, half, subjects }], current: { codigo: 'approved' | 'failed' } }
+// { terms: [{ year, half, subjects }], current: { codigo: 'approved' | 'failed' },
+//   finals: { codigo: cuatrimestre (número absoluto) en que se aprueba } }
 
 export function normalizePlan(raw) {
   const plan = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  const lag = LAG_OPTIONS.some(o => o.value === plan.lag) ? plan.lag : DEFAULT_LAG;
   const seen = new Set();
   const terms = (Array.isArray(plan.terms) ? plan.terms : [])
     .filter(t => t && Number.isInteger(t.year) && (t.half === 1 || t.half === 2))
@@ -81,7 +84,13 @@ export function normalizePlan(raw) {
       if (OUTCOMES.includes(outcome) && outcome !== DEFAULT_OUTCOME) current[code] = outcome;
     });
   }
-  return { lag, terms, current };
+  const finals = {};
+  if (plan.finals && typeof plan.finals === 'object' && !Array.isArray(plan.finals)) {
+    Object.entries(plan.finals).forEach(([code, t]) => {
+      if (Number.isInteger(t) && t > 0) finals[code] = t;
+    });
+  }
+  return { terms, current, finals };
 }
 
 // --- Simulación ---
@@ -138,6 +147,16 @@ export function simulate({ universe, plan, getEnrollment, start }) {
   const plannedAt = {};
   const inProgress = [];
   const current = plan.current || {};
+  const finals = plan.finals || {};
+  // Primer cuatrimestre en que se puede aprobar una materia regularizada al
+  // empezar `reg`, y el que se eligió (o el supuesto por defecto).
+  const finalMin = {};
+  function approvalAt(code, reg) {
+    const min = Math.max(reg, start);
+    finalMin[code] = min;
+    const chosen = finals[code];
+    return Number.isInteger(chosen) ? Math.max(chosen, min) : min + DEFAULT_FINAL_DELAY;
+  }
 
   Object.keys(byCode).forEach(code => {
     let state = realState(getEnrollment(code));
@@ -147,12 +166,12 @@ export function simulate({ universe, plan, getEnrollment, start }) {
       // planificar, con el resultado que se eligió en la columna "En curso".
       const outcome = current[code] || DEFAULT_OUTCOME;
       if (outcome === 'approved') { regAt[code] = start; aprobAt[code] = start; }
-      else if (outcome === 'regular') { regAt[code] = start; aprobAt[code] = start + plan.lag; }
+      else if (outcome === 'regular') { regAt[code] = start; aprobAt[code] = approvalAt(code, start); }
       else state = 'none';
     }
     real[code] = state;
     if (state === 'approved') { regAt[code] = -NEVER; aprobAt[code] = -NEVER; }
-    else if (state === 'regular') { regAt[code] = -NEVER; aprobAt[code] = start + plan.lag; }
+    else if (state === 'regular') { regAt[code] = -NEVER; aprobAt[code] = approvalAt(code, start); }
     else if (state === 'none') { regAt[code] = NEVER; aprobAt[code] = NEVER; }
   });
 
@@ -165,7 +184,7 @@ export function simulate({ universe, plan, getEnrollment, start }) {
       if (real[code] !== 'none') return;
       const done = t + durationOf(subject);
       regAt[code] = Math.min(regAt[code], done);
-      aprobAt[code] = Math.min(aprobAt[code], done + plan.lag);
+      aprobAt[code] = Math.min(aprobAt[code], approvalAt(code, done));
     });
   });
 
@@ -212,12 +231,13 @@ export function simulate({ universe, plan, getEnrollment, start }) {
     ...universe.electives.map(s => aprobAt[s.code]).filter(Number.isFinite));
 
   return {
-    real, plannedAt, regAt, aprobAt, missingAt, candidatesAt, inProgress,
+    real, plannedAt, regAt, aprobAt, finalMin, missingAt, candidatesAt, inProgress,
     pendingToPlan: requiredOpen + electivesOpen,
     requiredOpen, electivesOpen,
-    // regAt/aprobAt marcan el inicio del cuatrimestre siguiente al que se termina.
+    // regAt marca el inicio del cuatrimestre siguiente al que se termina de
+    // cursar; aprobAt, el cuatrimestre en que se aprueba (finales previos a cursarlo).
     finishCursadaTerm: endReg - 1,
-    graduationTerm: endAprob - 1,
+    graduationTerm: endAprob,
   };
 }
 
@@ -368,13 +388,35 @@ export function initPlanner(ctx) {
         </div>
       </div>
       <div class="d-flex flex-wrap align-items-center gap-2 small mb-3">
-        <label for="planner-lag" class="text-body-secondary mb-0">Los finales los rindo</label>
-        <select id="planner-lag" class="form-select form-select-sm w-auto">
-          ${LAG_OPTIONS.map(o => `<option value="${o.value}" ${o.value === plan.lag ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
-        </select>
-        <span class="text-body-secondary">Afecta las correlativas que piden la materia aprobada.</span>
+        <span class="text-body-secondary">En cada regularizada elegí en qué cuatrimestre la aprobás: desde ese cuatrimestre ya podés cursar las que la piden aprobada.</span>
         ${plan.terms.length ? '<button type="button" class="btn btn-sm btn-link text-danger ms-auto" data-action="clear">Vaciar plan</button>' : ''}
       </div>`;
+  }
+
+  // Desplegable "Apruebo en" de una materia regularizada (o que se supone que
+  // queda regularizada). Ofrece desde el primer cuatrimestre posible.
+  function finalSelect(code, sim, universe) {
+    const min = sim.finalMin[code];
+    if (!Number.isInteger(min)) return '';
+    const selected = sim.aprobAt[code];
+    const options = [];
+    for (let t = min; t < min + FINAL_OPTIONS || t <= selected; t++) options.push(t);
+    const id = `planner-final-${escapeHtml(code)}`;
+    return `
+      <div class="planner-final">
+        <label for="${id}" class="mb-0">Apruebo en</label>
+        <select id="${id}" class="form-select form-select-sm" data-final="${escapeHtml(code)}" aria-label="Cuatrimestre en que apruebo ${escapeHtml(nameOf(code, universe))}">
+          ${options.map(t => `<option value="${t}" ${t === selected ? 'selected' : ''}>${termLabel(t)}</option>`).join('')}
+        </select>
+      </div>`;
+  }
+
+  // Materias pendientes que piden `code` aprobada para cursarse.
+  function unlockedByApproving(code, universe, sim) {
+    return [...universe.required, ...universe.electives]
+      .filter(s => sim.real[s.code] === 'none'
+        && ((s.requirements && s.requirements.cursar) || []).some(r => requirementId(r) === code && requirementType(r) === 'aprobada'))
+      .map(s => s.name);
   }
 
   function renderPlannedItem(code, t, universe, sim, start) {
@@ -414,6 +456,7 @@ export function initPlanner(ctx) {
             <small class="text-body-secondary me-1">${escapeHtml(subject.code)}</small>${subjectMeta(subject)}
           </div>
           ${note ? `<div class="planner-item-note">${escapeHtml(note)}</div>` : ''}
+          ${state === 'none' && sim.plannedAt[code] === t ? finalSelect(code, sim, universe) : ''}
         </div>
         <button type="button" class="btn btn-sm btn-icon" data-action="remove-subject" data-term="${t}" data-code="${escapeHtml(code)}" aria-label="Quitar ${escapeHtml(subject.name)}"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
       </li>`;
@@ -524,6 +567,7 @@ export function initPlanner(ctx) {
               ${outcome !== 'failed' && unlocks.length ? '<i class="bi bi-unlock me-1" aria-hidden="true"></i>' : ''}${escapeHtml(note)}
             </span>
           </button>
+          ${outcome === 'regular' ? finalSelect(code, sim, universe) : ''}
         </li>`;
     }).join('');
     return `
@@ -532,6 +576,36 @@ export function initPlanner(ctx) {
           <div>
             <div class="fw-semibold">En curso</div>
             <div class="small text-body-secondary">Tocá una para cambiar cómo suponés que termina.</div>
+          </div>
+        </header>
+        <ul class="list-unstyled mb-0 d-flex flex-column gap-2">${items}</ul>
+      </section>`;
+  }
+
+  // Columna "Regularizadas": las que ya regularizaste y te falta el final, con
+  // el cuatrimestre en que planeás aprobarlas.
+  function renderRegular(universe, sim) {
+    const codes = Object.keys(sim.real).filter(code => sim.real[code] === 'regular');
+    if (!codes.length) return '';
+    const items = codes
+      .sort((a, b) => nameOf(a, universe).localeCompare(nameOf(b, universe), 'es'))
+      .map(code => {
+        const unlocks = unlockedByApproving(code, universe, sim);
+        return `
+        <li class="planner-item planner-item-regular">
+          <div class="flex-grow-1 min-w-0">
+            <div class="planner-item-name">${escapeHtml(nameOf(code, universe))}</div>
+            ${unlocks.length ? `<div class="planner-item-note planner-unlocks"><i class="bi bi-unlock me-1" aria-hidden="true"></i>Destraba ${escapeHtml(formatList(unlocks))}</div>` : ''}
+            ${finalSelect(code, sim, universe)}
+          </div>
+        </li>`;
+      }).join('');
+    return `
+      <section class="planner-term planner-term-current" aria-label="Materias regularizadas">
+        <header class="planner-term-header">
+          <div>
+            <div class="fw-semibold">Regularizadas</div>
+            <div class="small text-body-secondary">Elegí en qué cuatrimestre aprobás cada final.</div>
           </div>
         </header>
         <ul class="list-unstyled mb-0 d-flex flex-column gap-2">${items}</ul>
@@ -557,6 +631,7 @@ export function initPlanner(ctx) {
     bodyEl.innerHTML = `
       ${renderSummary(universe, sim, start)}
       <div class="planner-terms">
+        ${renderRegular(universe, sim)}
         ${renderCurrent(universe, sim, start)}
         ${plan.terms.map(term => renderTerm(term, universe, sim, start)).join('')}
         <button type="button" class="planner-add-term" data-action="add-term" data-term="${addTerm}">
@@ -566,9 +641,6 @@ export function initPlanner(ctx) {
       </div>`;
 
     restoreScroll(scroll);
-
-    const lagSelect = bodyEl.querySelector('#planner-lag');
-    if (lagSelect) lagSelect.addEventListener('change', () => update(() => { plan.lag = Number(lagSelect.value); }));
   }
 
   function pickerTerm(picker) {
@@ -599,6 +671,14 @@ export function initPlanner(ctx) {
   function findTerm(t) {
     return plan.terms.find(term => termNumber(term.year, term.half) === t);
   }
+
+  bodyEl.addEventListener('change', (e) => {
+    const select = e.target.closest('select[data-final]');
+    if (!select || !bodyEl.contains(select)) return;
+    const code = select.dataset.final;
+    const t = Number(select.value);
+    update(() => { plan.finals = { ...plan.finals, [code]: t }; });
+  });
 
   bodyEl.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-action]');
@@ -644,13 +724,13 @@ export function initPlanner(ctx) {
       case 'clear': {
         const ok = await confirmDialog({
           title: '¿Vaciar el plan?',
-          message: 'Se borran todos los cuatrimestres planificados de esta carrera y los resultados supuestos de lo que estás cursando. Tus notas e inscripciones no se tocan.',
+          message: 'Se borran todos los cuatrimestres planificados de esta carrera, los resultados supuestos de lo que estás cursando y los cuatrimestres elegidos para aprobar cada final. Tus notas e inscripciones no se tocan.',
           confirmText: 'Vaciar',
           danger: true,
         });
         if (!ok) return;
         openPickers = new Set([nextTerm()]);
-        update(() => { plan.terms = [{ year: termYear(nextTerm()), half: termHalf(nextTerm()), subjects: [] }]; plan.current = {}; });
+        update(() => { plan.terms = [{ year: termYear(nextTerm()), half: termHalf(nextTerm()), subjects: [] }]; plan.current = {}; plan.finals = {}; });
         break;
       }
       default:
