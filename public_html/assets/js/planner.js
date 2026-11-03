@@ -544,6 +544,10 @@ export function initPlanner(ctx) {
     const lastTerm = plan.terms.length ? termNumber(plan.terms[plan.terms.length - 1].year, plan.terms[plan.terms.length - 1].half) : start - 1;
     const addTerm = plan.terms.length ? lastTerm + 1 : start;
 
+    // Re-renderizar con innerHTML recrea los contenedores con scroll: se guarda
+    // la posición horizontal de los cuatrimestres y la de cada lista para
+    // agregar materias, y se restaura después, así no salta al agregar algo.
+    const scroll = saveScroll();
     bodyEl.innerHTML = `
       ${renderSummary(universe, sim, start)}
       <div class="planner-terms">
@@ -555,8 +559,35 @@ export function initPlanner(ctx) {
         </button>
       </div>`;
 
+    restoreScroll(scroll);
+
     const lagSelect = bodyEl.querySelector('#planner-lag');
     if (lagSelect) lagSelect.addEventListener('change', () => update(() => { plan.lag = Number(lagSelect.value); }));
+  }
+
+  function pickerTerm(picker) {
+    const section = picker.closest('.planner-term');
+    const toggle = section && section.querySelector('[data-action="toggle-picker"]');
+    return toggle ? toggle.dataset.term : null;
+  }
+
+  function saveScroll() {
+    const terms = bodyEl.querySelector('.planner-terms');
+    const pickers = {};
+    bodyEl.querySelectorAll('.planner-picker').forEach(picker => {
+      const t = pickerTerm(picker);
+      if (t !== null) pickers[t] = picker.scrollTop;
+    });
+    return { left: terms ? terms.scrollLeft : 0, pickers };
+  }
+
+  function restoreScroll({ left, pickers }) {
+    const terms = bodyEl.querySelector('.planner-terms');
+    if (terms) terms.scrollLeft = left;
+    bodyEl.querySelectorAll('.planner-picker').forEach(picker => {
+      const t = pickerTerm(picker);
+      if (t !== null && pickers[t] !== undefined) picker.scrollTop = pickers[t];
+    });
   }
 
   function findTerm(t) {
