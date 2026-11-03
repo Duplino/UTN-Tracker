@@ -904,6 +904,23 @@ body{
 .planner-current-regular .planner-outcome{ background: var(--bs-warning-bg-subtle); color: var(--bs-warning-text-emphasis); }
 .planner-current-failed{ border-left-color: var(--bs-danger); }
 .planner-current-failed .planner-outcome{ background: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
+.planner-final{
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--bs-secondary-color);
+}
+.planner-final .form-select{
+  width: auto;
+  font-size: 0.78rem;
+  padding-top: 0.1rem;
+  padding-bottom: 0.1rem;
+}
+.planner-term-current li > .planner-final{
+  padding-left: 0.6rem;
+}
 .planner-add-term{
   display: flex;
   flex-direction: column;
