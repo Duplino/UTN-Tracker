@@ -316,7 +316,8 @@ final class ApiTest extends TestCase
         $layouts = ['sistemas' => ['selected' => 'franja-morada'], 'S23' => ['selected' => 'propio']];
         $res = $this->request('PATCH', '/api/preferences', ['subjectLayouts' => $layouts]);
         $this->assertSame(200, $res['status']);
-        $this->assertSame($layouts, $res['body']['subjectLayouts']);
+        // assertEquals: la columna JSON de MySQL devuelve las claves ordenadas.
+        $this->assertEquals($layouts, $res['body']['subjectLayouts']);
 
         $invalid = $this->request('PATCH', '/api/preferences', ['subjectLayouts' => 'oficial']);
         $this->assertSame(422, $invalid['status']);
