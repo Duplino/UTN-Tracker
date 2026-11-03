@@ -92,3 +92,11 @@ test('agrega la nota a los resultados sin tocar el resto', () => {
   const mismaMesa = resultsWithGrade({ ...enrollment, finals: [{ attemptNumber: 1, grade: null, examDate: '2026-07-10' }] }, { kind: 'final', date: '2026-07-10' }, 6);
   assert.deepEqual(mismaMesa.finals, { 1: { grade: 6, examDate: '2026-07-10' } });
 });
+
+test('la PPS no aparece para cargar fechas (no tiene parciales ni finales)', () => {
+  const opts = subjectOptions([
+    { subjectCode: 'AM2', status: 'Faltan notas', schemeConfig: { partials: 2 } },
+    { subjectCode: 'PPS', status: 'Faltan notas', schemeConfig: { kind: 'pps', partials: 0 } },
+  ]);
+  assert.deepEqual(opts.map(o => o.code), ['AM2']);
+});

@@ -96,6 +96,7 @@ async function hydrate(subjectCode, raw) {
     recursedCount: readRetakes()[subjectCode] || 0,
     statusOverride: override,
     status,
+    clockHoursDone: Number.isFinite(raw.clockHoursDone) ? raw.clockHoursDone : null,
     partials,
     finals,
     checklist,
@@ -221,7 +222,7 @@ export const localGuestStore = {
     return hydrate(subjectCode, raw);
   },
 
-  async saveResults(subjectCode, { partials, finals, checklist, clearOverride } = {}) {
+  async saveResults(subjectCode, { partials, finals, checklist, clearOverride, clockHoursDone } = {}) {
     const raw = readRawEnrollment(subjectCode) || {
       schemeCode: null, enrollmentYear: new Date().getFullYear(),
       statusOverride: null, partials: {}, finals: [], checklist: {},
@@ -229,6 +230,7 @@ export const localGuestStore = {
     raw.partials = partials || {};
     raw.finals = normalizeFinalsInput(finals);
     raw.checklist = checklist || {};
+    if (clockHoursDone !== undefined) raw.clockHoursDone = Number.isFinite(clockHoursDone) ? clockHoursDone : null;
     if (clearOverride !== false) raw.statusOverride = null;
     raw.updatedAt = nowIso();
     writeRawEnrollment(subjectCode, raw);

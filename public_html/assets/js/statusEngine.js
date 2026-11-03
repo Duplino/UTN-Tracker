@@ -12,6 +12,12 @@ export function computeStatus(config, partials, finals, checklist, override) {
     return override;
   }
 
+  // PPS: no tiene parciales ni notas. Queda "en curso" hasta que el usuario la
+  // marca como Aprobada (override): acreditarla depende del informe, no de las horas.
+  if (config.kind === 'pps') {
+    return 'Faltan notas';
+  }
+
   const partialCount = config.partials ?? 2;
   const regularizationMinNote = config.regularization?.min_note ?? 6;
   const approveMinNote = config.approve?.min_note ?? 6;

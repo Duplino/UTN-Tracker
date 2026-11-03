@@ -173,7 +173,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         span.style.fontSize = '0.8rem';
         const duration = card.dataset.duration || 'anual';
         const durationIndicator = duration === 'cuatrimestral' ? 'C' : 'A';
-        span.textContent = `${weekHours} hs - ${durationIndicator}`;
+        // PPS: horas reloj, no horas semanales.
+        span.textContent = card.dataset.kind === 'pps'
+          ? (card.dataset.clockHours ? `${card.dataset.clockHours} hs reloj` : 'Horas reloj')
+          : `${weekHours} hs - ${durationIndicator}`;
         bc.appendChild(span);
       }
     } catch (e) {/* ignore badge errors */}
@@ -302,6 +305,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (subject.code) card.dataset.code = subject.code;
     card.dataset.weekHours = typeof subject.weekHours === 'number' ? String(subject.weekHours) : '6';
     card.dataset.duration = subject.duration || 'anual';
+    card.dataset.kind = subject.kind || 'materia';
+    if (typeof subject.clockHours === 'number') card.dataset.clockHours = String(subject.clockHours);
     const reqsObj = subject.requirements || { cursar: [], aprobar: [] };
     card.dataset.requirements = JSON.stringify(reqsObj);
     if (group && group.color) card.dataset.groupColor = group.color;

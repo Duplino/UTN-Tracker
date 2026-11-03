@@ -259,3 +259,15 @@ test('si ya estaba cargada, reusa la inscripción y pisa las notas', async () =>
   await applySubject(store, { code: 'AGA', status: 'Promocionada', grade: 8, regularGrade: 8, enrollmentYear: 2025, retakes: 0, finals: [] }, { existing, schemes: SCHEMES });
   assert.deepEqual(store.calls.map(c => c[0]), ['settings', 'results']);
 });
+
+test('la PPS se importa con su esquema y sin notas', () => {
+  const schemes = [{ code: '2-partials' }, { code: 'libre' }, { code: 'pps' }];
+  assert.equal(schemeFor({ status: 'Aprobada', regularGrade: null, subject: { kind: 'pps' } }, schemes), 'pps');
+  assert.equal(schemeFor({ status: 'Aprobada', regularGrade: null, subject: { kind: 'materia' } }, schemes), 'libre');
+  const ppsConfig = { kind: 'pps', partials: 0 };
+  assert.deepEqual(
+    buildResults({ status: 'Aprobada', grade: 10, regularGrade: null, finals: [{ grade: 10, examDate: '2026-07-01' }] }, ppsConfig),
+    { partials: {}, finals: {}, checklist: {}, override: 'Aprobada' },
+  );
+  assert.equal(buildResults({ status: 'En curso', finals: [] }, ppsConfig), null);
+});

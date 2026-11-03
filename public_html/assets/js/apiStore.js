@@ -58,13 +58,15 @@ export const apiStore = {
     return api.patch(`/enrollments/${enc(subjectCode)}/override`, { status: status ?? null });
   },
 
-  async saveResults(subjectCode, { partials, finals, checklist, clearOverride } = {}) {
+  // clockHoursDone: horas reloj hechas de la PPS. Si no se pasa, no se tocan.
+  async saveResults(subjectCode, { partials, finals, checklist, clearOverride, clockHoursDone } = {}) {
     const body = {
       partials: partials || {},
       finals: finals || {},
       checklist: checklist || {},
     };
     if (clearOverride === false) body.clearOverride = false;
+    if (clockHoursDone !== undefined) body.clockHoursDone = clockHoursDone;
     return api.put(`/enrollments/${enc(subjectCode)}/results`, body);
   },
 
