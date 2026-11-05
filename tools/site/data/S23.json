@@ -1,0 +1,1246 @@
+{
+    "metadata": {
+        "hasIntermediateTitle": true,
+        "intermediateTitle": "Técnico Universitario en Mecánica",
+        "baseLayoutName": "Franja Morada"
+    },
+    "modules": [
+        {
+            "id": "g1",
+            "name": "Primer Nivel",
+            "electivas": 0,
+            "subjects": [
+                {
+                    "code": "IM1",
+                    "siuCode": 940820,
+                    "name": "Ingeniería Mecánica I",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "AGA",
+                    "siuCode": 950701,
+                    "name": "Álgebra y Geometría Analítica",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "AM1",
+                    "siuCode": 950702,
+                    "name": "Análisis Matemático I",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "F1",
+                    "siuCode": 950605,
+                    "name": "Física I",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "FI",
+                    "siuCode": 940861,
+                    "name": "Fundamentos de Informática",
+                    "weekHours": 4,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "IyS",
+                    "siuCode": 951604,
+                    "name": "Ingeniería y Sociedad",
+                    "weekHours": 4,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "QG",
+                    "siuCode": 951407,
+                    "name": "Química General",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "SSRR",
+                    "siuCode": 951610,
+                    "name": "Sistemas de Representación",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                }
+            ]
+        },
+        {
+            "id": "g2",
+            "name": "Segundo Nivel",
+            "electivas": 0,
+            "subjects": [
+                {
+                    "code": "IM2",
+                    "siuCode": 940825,
+                    "name": "Ingeniería Mecánica II",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "F1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "IM1",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "AM2",
+                    "siuCode": 950703,
+                    "name": "Análisis Matemático II",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "E1",
+                    "siuCode": 230821,
+                    "name": "Estabilidad I",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "F2",
+                    "siuCode": 950606,
+                    "name": "Física II",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "IASI",
+                    "siuCode": 940899,
+                    "name": "Ingeniería Ambiental y Seguridad Industrial",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "QG",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "InglesI",
+                    "siuCode": 951602,
+                    "name": "Inglés Técnico Nivel I",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "MM",
+                    "siuCode": 230822,
+                    "name": "Materiales Metálicos",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "QG",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "MNM",
+                    "siuCode": 230820,
+                    "name": "Materiales No Metálicos",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "QG",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                }
+            ]
+        },
+        {
+            "id": "g3",
+            "name": "Tercer Nivel",
+            "electivas": 0,
+            "subjects": [
+                {
+                    "code": "IM3",
+                    "siuCode": 940832,
+                    "name": "Ingeniería Mecánica III",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "MNM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "IM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "QG",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "IM1",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "Termo",
+                    "siuCode": 940898,
+                    "name": "Termodinámica",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "DM",
+                    "siuCode": 230832,
+                    "name": "Diseño Mecánico",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "MNM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "E1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "IM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "SSRR",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "FI",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "E2",
+                    "siuCode": 230830,
+                    "name": "Estabilidad II",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "E1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "InglesII",
+                    "siuCode": 951603,
+                    "name": "Inglés Técnico Nivel II",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "InglesI",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "MyE",
+                    "siuCode": 230831,
+                    "name": "Mediciones y Ensayos",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "E1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "CA",
+                    "siuCode": 940848,
+                    "name": "Cálculo Avanzado",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "FI",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "MR",
+                    "siuCode": 940897,
+                    "name": "Mecánica Racional",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "E1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "PyE",
+                    "siuCode": 950704,
+                    "name": "Probabilidad y Estadística",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                }
+            ]
+        },
+        {
+            "id": "g4",
+            "name": "Cuarto Nivel",
+            "electivas": 0,
+            "subjects": [
+                {
+                    "code": "EM",
+                    "siuCode": 940836,
+                    "name": "Elementos de Máquinas",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "MNM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MR",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "E2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "IM3",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "QG",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "E1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AM2",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "ESC",
+                    "siuCode": 940835,
+                    "name": "Electrónica y Sistemas de Control",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "CA",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "MdF",
+                    "siuCode": 940833,
+                    "name": "Mecánica de los Fluidos",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "Termo",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM2",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "TC",
+                    "siuCode": 940838,
+                    "name": "Tecnología del Calor",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "Termo",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM2",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "ECO",
+                    "siuCode": 950309,
+                    "name": "Economía",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "IM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "IyS",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "MIC",
+                    "siuCode": 940841,
+                    "name": "Metrología e Ingeniería de Calidad",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "MyE",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PyE",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "MM",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "EME",
+                    "siuCode": 940834,
+                    "name": "Electrotecnia y Máquinas Eléctricas",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "E3",
+                    "siuCode": 230840,
+                    "name": "Estabilidad III",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "E2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "E1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "FI",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                }
+            ]
+        },
+        {
+            "id": "g5",
+            "name": "Quinto Nivel",
+            "electivas": 0,
+            "subjects": [
+                {
+                    "code": "PF",
+                    "siuCode": 940894,
+                    "name": "Proyecto Final",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "proyecto_final",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "EM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MIC",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "EME",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "ESC",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MR",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "E2",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "MyE",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DM",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "InsInd",
+                    "siuCode": 940843,
+                    "name": "Instalaciones Industriales",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "MyE",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "TC",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MdF",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "EME",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "ESC",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "E1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "IASI",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "Termo",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "MANT",
+                    "siuCode": 940840,
+                    "name": "Mantenimiento",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "MyE",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "ECO",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "EM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MM",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "MR",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "E2",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "MAT",
+                    "siuCode": 940839,
+                    "name": "Máquinas Alternativas y Turbomáquinas",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "TC",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "Termo",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "TdF",
+                    "siuCode": 230850,
+                    "name": "Tecnología de Fabricación",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "EM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MIC",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MNM",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "E1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "MM",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DM",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "OI",
+                    "siuCode": 940831,
+                    "name": "Organización Industrial",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ECO",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "IM2",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "Leg",
+                    "siuCode": 950310,
+                    "name": "Legislación",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "IM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "IyS",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "PPS",
+                    "siuCode": 2311699,
+                    "name": "Práctica Profesional Supervisada",
+                    "weekHours": 0,
+                    "duration": "anual",
+                    "kind": "pps",
+                    "clockHours": 150,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "EM",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MIC",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "EME",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "ESC",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "MR",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "E2",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "MyE",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DM",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                }
+            ]
+        },
+        {
+            "id": "electives",
+            "name": "Electivas",
+            "render": false,
+            "subjects": []
+        }
+    ],
+    "layouts": []
+}

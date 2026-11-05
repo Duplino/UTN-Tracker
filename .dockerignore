@@ -26,6 +26,7 @@ dbdiagram.txt
 
 # Landing (se publica aparte en Cloudflare Pages, no la sirve esta app)
 site
+tools
 
 # Archivos de deploy que no hacen falta adentro del contenedor
 docker-compose*.yml
