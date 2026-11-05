@@ -3,9 +3,11 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>UTN Tracker · Seguí tu carrera en la UTN: correlativas, notas y planificador</title>
+		<title>UTN Tracker: correlativas, notas y planificador para la UTN</title>
 		<meta name="description" content="Organizá tu carrera en la UTN: cargá tus notas, mirá qué materias podés cursar según tus correlativas, planificá los próximos cuatrimestres y calculá cuándo te recibís. Gratis.">
 		<link rel="canonical" href="https://utntracker.com.ar/">
+		<meta name="application-name" content="UTN Tracker">
+		<meta name="apple-mobile-web-app-title" content="UTN Tracker">
 		<meta name="color-scheme" content="light dark">
 		<meta name="theme-color" content="#f8f9fa" media="(prefers-color-scheme: light)">
 		<meta name="theme-color" content="#16191d" media="(prefers-color-scheme: dark)">
@@ -38,9 +40,27 @@
 			"@context": "https://schema.org",
 			"@graph": [
 				{
-					"@type": "WebApplication",
+					"@type": "WebSite",
+					"@id": "https://utntracker.com.ar/#website",
+					"name": "UTN Tracker",
+					"alternateName": ["UTNTracker", "UTN-Tracker"],
+					"url": "https://utntracker.com.ar/",
+					"inLanguage": "es-AR",
+					"publisher": { "@id": "https://utntracker.com.ar/#organization" }
+				},
+				{
+					"@type": "Organization",
+					"@id": "https://utntracker.com.ar/#organization",
 					"name": "UTN Tracker",
 					"url": "https://utntracker.com.ar/",
+					"logo": "https://utntracker.com.ar/assets/img/icon-512.png",
+					"sameAs": ["https://github.com/Duplino/UTN-Tracker"]
+				},
+				{
+					"@type": "WebApplication",
+					"@id": "https://utntracker.com.ar/#app",
+					"name": "UTN Tracker",
+					"url": "https://app.utntracker.com.ar/",
 					"applicationCategory": "EducationalApplication",
 					"operatingSystem": "Web",
 					"inLanguage": "es-AR",
@@ -69,7 +89,7 @@
 			</a>
 			<nav class="d-flex align-items-center gap-1" aria-label="Secciones">
 				<a class="btn btn-link link-secondary text-decoration-none d-none d-md-inline-block" href="#funciones">Funciones</a>
-				<a class="btn btn-link link-secondary text-decoration-none d-none d-md-inline-block" href="#carreras">Carreras</a>
+				<a class="btn btn-link link-secondary text-decoration-none d-none d-md-inline-block" href="/carreras/">Carreras</a>
 				<a class="btn btn-link link-secondary text-decoration-none d-none d-md-inline-block" href="#preguntas">Preguntas</a>
 				<a class="btn btn-outline-primary" href="https://app.utntracker.com.ar">Entrar</a>
 			</nav>
@@ -79,7 +99,7 @@
 			<section class="container hero">
 				<div class="row g-4 g-lg-5 align-items-center">
 					<div class="col-lg-6 d-grid gap-3">
-						<span class="eyebrow">Para estudiantes de la UTN</span>
+						<span class="eyebrow">UTN Tracker · para estudiantes de la UTN</span>
 						<h1>Tu carrera en la UTN, materia por materia.</h1>
 						<p class="lead text-body-secondary mb-1">Cargá tus materias y notas, y mirá qué tenés aprobado, qué podés cursar según tus correlativas y cuándo te recibís si seguís a este ritmo.</p>
 						<div class="d-flex flex-wrap gap-2">
@@ -178,21 +198,23 @@
 			<section class="section section-band" id="carreras" aria-labelledby="carreras-titulo">
 				<div class="container">
 					<span class="eyebrow">Carreras</span>
-					<h2 id="carreras-titulo" class="fw-bold mt-2 mb-4">Planes de estudio disponibles</h2>
+					<h2 id="carreras-titulo" class="fw-bold mt-2 mb-4">Planes de estudio y correlativas</h2>
 					<div class="row g-3">
 						<div class="col-md-4">
-							<div class="card career-card h-100"><div class="card-body d-grid gap-2 align-content-start">
+							<a class="card career-card h-100 text-decoration-none" href="/carreras/ingenieria-en-sistemas-de-informacion-k23/"><div class="card-body d-grid gap-2 align-content-start">
 								<span><span class="badge text-bg-primary">K23</span></span>
-								<h3 class="h5 fw-semibold mb-0">Ingeniería en Sistemas de Información</h3>
+								<h3 class="h5 fw-semibold mb-0 text-body">Ingeniería en Sistemas de Información</h3>
 								<p class="text-body-secondary mb-0">Con el título intermedio de Analista Universitario en Sistemas de Información y las electivas del plan.</p>
-							</div></div>
+								<span class="small fw-semibold">Ver correlativas <i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+							</div></a>
 						</div>
 						<div class="col-md-4">
-							<div class="card career-card h-100"><div class="card-body d-grid gap-2 align-content-start">
+							<a class="card career-card h-100 text-decoration-none" href="/carreras/ingenieria-mecanica-s23/"><div class="card-body d-grid gap-2 align-content-start">
 								<span><span class="badge text-bg-primary">S23</span></span>
-								<h3 class="h5 fw-semibold mb-0">Ingeniería Mecánica</h3>
+								<h3 class="h5 fw-semibold mb-0 text-body">Ingeniería Mecánica</h3>
 								<p class="text-body-secondary mb-0">Con el título intermedio de Técnico Universitario en Mecánica.</p>
-							</div></div>
+								<span class="small fw-semibold">Ver correlativas <i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+							</div></a>
 						</div>
 						<div class="col-md-4">
 							<div class="card career-card career-soon h-100"><div class="card-body d-grid gap-2 align-content-start">
@@ -234,9 +256,15 @@
 		</main>
 
 		<footer class="site-footer">
-			<div class="container d-flex flex-wrap justify-content-between gap-2 small text-body-secondary">
-				<span>UTN Tracker es un proyecto independiente, sin relación oficial con la Universidad Tecnológica Nacional.</span>
-				<a class="link-secondary" href="https://github.com/Duplino/UTN-Tracker">Código en GitHub</a>
+			<div class="container d-grid gap-3 small text-body-secondary">
+				<nav class="d-flex flex-wrap gap-3" aria-label="Planes de estudio">
+					<a class="link-secondary" href="/carreras/ingenieria-en-sistemas-de-informacion-k23/">Correlativas de Ingeniería en Sistemas (K23)</a>
+					<a class="link-secondary" href="/carreras/ingenieria-mecanica-s23/">Correlativas de Ingeniería Mecánica (S23)</a>
+				</nav>
+				<div class="d-flex flex-wrap justify-content-between gap-2">
+					<span>UTN Tracker es un proyecto independiente, sin relación oficial con la Universidad Tecnológica Nacional.</span>
+					<a class="link-secondary" href="https://github.com/Duplino/UTN-Tracker">Código en GitHub</a>
+				</div>
 			</div>
 		</footer>
 	</body>

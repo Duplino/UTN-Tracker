@@ -1,0 +1,18 @@
+{
+    "careers": [
+        {
+            "id": 1,
+            "code": "sistemas",
+            "name": "Ingeniería en Sistemas de Información - K23",
+            "hasIntermediateTitle": true,
+            "intermediateTitle": "Analista Universitario en Sistemas de Información"
+        },
+        {
+            "id": 2,
+            "code": "S23",
+            "name": "Ingeniería Mecánica - S23",
+            "hasIntermediateTitle": true,
+            "intermediateTitle": "Técnico Universitario en Mecánica"
+        }
+    ]
+}

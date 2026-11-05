@@ -1,0 +1,1631 @@
+{
+    "metadata": {
+        "hasIntermediateTitle": true,
+        "intermediateTitle": "Analista Universitario en Sistemas de Información",
+        "baseLayoutName": "Plan oficial"
+    },
+    "modules": [
+        {
+            "id": "g1",
+            "name": "Primer Nivel",
+            "electivas": 0,
+            "subjects": [
+                {
+                    "code": "SyPdN",
+                    "siuCode": 232011,
+                    "name": "Sistemas y Procesos de Negocio",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "F1",
+                    "siuCode": 950605,
+                    "name": "Física I",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "AM1",
+                    "siuCode": 950702,
+                    "name": "Análisis Matemático I",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "AGA",
+                    "siuCode": 950701,
+                    "name": "Álgebra y Geometría Analítica",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "AyED",
+                    "siuCode": 82021,
+                    "name": "Algoritmos y Estructura de Datos",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "AdC",
+                    "siuCode": 82022,
+                    "name": "Arquitectura de Computadores",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "LyED",
+                    "siuCode": 232010,
+                    "name": "Lógica y Estructuras Discretas",
+                    "weekHours": 3,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "IyS",
+                    "siuCode": 951604,
+                    "name": "Ingeniería y Sociedad",
+                    "weekHours": 4,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                }
+            ]
+        },
+        {
+            "id": "g2",
+            "name": "Segundo Nivel",
+            "electivas": 0,
+            "subjects": [
+                {
+                    "code": "ASI",
+                    "siuCode": 232020,
+                    "name": "Análisis de Sistemas de Información",
+                    "weekHours": 6,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AyED",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SyPdN",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "AM2",
+                    "siuCode": 950703,
+                    "name": "Análisis Matemático II",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AGA",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "F2",
+                    "siuCode": 950606,
+                    "name": "Física II",
+                    "weekHours": 5,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "F1",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "SySL",
+                    "siuCode": 82025,
+                    "name": "Sintaxis y Semántica de los Lenguajes",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "LyED",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AyED",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "PdP",
+                    "siuCode": 82026,
+                    "name": "Paradigmas de Programación",
+                    "weekHours": 4,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "LyED",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AyED",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "SSOO",
+                    "siuCode": 82027,
+                    "name": "Sistemas Operativos",
+                    "weekHours": 8,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AdC",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "InglesII",
+                    "siuCode": 951603,
+                    "name": "Inglés Técnico Nivel II",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "InglesI",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "InglesI",
+                    "siuCode": 951602,
+                    "name": "Inglés Técnico Nivel I",
+                    "weekHours": 2,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "PyE",
+                    "siuCode": 950704,
+                    "name": "Probabilidad y Estadística",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AGA",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                }
+            ]
+        },
+        {
+            "id": "g3",
+            "name": "Tercer Nivel",
+            "electivas": 1,
+            "subjects": [
+                {
+                    "code": "DSI",
+                    "siuCode": 232034,
+                    "name": "Diseño de Sistemas de Información",
+                    "weekHours": 6,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "InglesI",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AyED",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "SyPdN",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "ECO",
+                    "siuCode": 950309,
+                    "name": "Economía",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "BD",
+                    "siuCode": 232030,
+                    "name": "Bases de Datos",
+                    "weekHours": 8,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "LyED",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AyED",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "DdS",
+                    "siuCode": 232031,
+                    "name": "Desarrollo de Software",
+                    "weekHours": 8,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "LyED",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AyED",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "CD",
+                    "siuCode": 232032,
+                    "name": "Comunicación de Datos",
+                    "weekHours": 8,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AdC",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "RD",
+                    "siuCode": 232041,
+                    "name": "Redes de Datos",
+                    "weekHours": 8,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "SSOO",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "CD",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": true
+                },
+                {
+                    "code": "SEMINT",
+                    "siuCode": 51,
+                    "name": "Seminario Integrador",
+                    "weekHours": 8,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "SyPdN",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AyED",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AdC",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "InglesI",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "LyED",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "ASI",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AM2",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "F2",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "IyS",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "SSOO",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "InglesII",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DSI",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "PyE",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "ECO",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "BD",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DdS",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "CD",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AN",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": true,
+                    "requiredForIntermediateTitle": false
+                }
+            ]
+        },
+        {
+            "id": "g4",
+            "name": "Cuarto Nivel",
+            "electivas": 2,
+            "subjects": [
+                {
+                    "code": "AdmSI",
+                    "siuCode": 232045,
+                    "name": "Administración de Sistemas de Información",
+                    "weekHours": 6,
+                    "duration": "anual",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ECO",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "DSI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "ASI",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "Leg",
+                    "siuCode": 950310,
+                    "name": "Legislación",
+                    "weekHours": 4,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "IyS",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "IyCS",
+                    "siuCode": 232040,
+                    "name": "Ingeniería y Calidad de Software",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "BD",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "DdS",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "DSI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "IO",
+                    "siuCode": 232042,
+                    "name": "Investigación Operativa",
+                    "weekHours": 8,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "PyE",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AN",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "Sim",
+                    "siuCode": 232043,
+                    "name": "Simulación",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "PyE",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM2",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "TpA",
+                    "siuCode": 232044,
+                    "name": "Tecnologías para la Automatización",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "F2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AN",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM2",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "AN",
+                    "siuCode": 232033,
+                    "name": "Análisis Numérico",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "AM2",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AM1",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AGA",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "CdC",
+                    "siuCode": 232050,
+                    "name": "Ciencia de Datos",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "Sim",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PyE",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "BD",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                }
+            ]
+        },
+        {
+            "id": "g5",
+            "name": "Quinto Nivel",
+            "electivas": 4,
+            "subjects": [
+                {
+                    "code": "IA",
+                    "siuCode": 82040,
+                    "name": "Inteligencia Artificial",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "Sim",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PyE",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "AN",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "SG",
+                    "siuCode": 82035,
+                    "name": "Sistemas de Gestión",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ECO",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "IO",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "DSI",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "GC",
+                    "siuCode": 232051,
+                    "name": "Gestión Gerencial",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "Leg",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AdmSI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "ECO",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "SSI",
+                    "siuCode": 232052,
+                    "name": "Seguridad en los Sistemas de Información",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "RD",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AdmSI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "DdS",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "CD",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "PF-SI",
+                    "siuCode": 82037,
+                    "name": "Proyecto Final",
+                    "weekHours": 6,
+                    "duration": "anual",
+                    "kind": "proyecto_final",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "IyCS",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AdmSI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "RD",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "InglesII",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DdS",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DSI",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "PPS-SI",
+                    "siuCode": 231699,
+                    "name": "Práctica Profesional Supervisada",
+                    "weekHours": 0,
+                    "duration": "anual",
+                    "kind": "pps",
+                    "clockHours": 200,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "IyCS",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "AdmSI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "RD",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "InglesII",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DdS",
+                                "type": "aprobada"
+                            },
+                            {
+                                "id": "DSI",
+                                "type": "aprobada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                }
+            ]
+        },
+        {
+            "id": "electives",
+            "name": "Electivas",
+            "render": false,
+            "subjects": [
+                {
+                    "code": "082122",
+                    "siuCode": 82122,
+                    "name": "Administración Estratégica del Capital Humano",
+                    "weekHours": 3,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232062",
+                    "siuCode": 232062,
+                    "name": "Ciberseguridad",
+                    "weekHours": 3,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232063",
+                    "siuCode": 232063,
+                    "name": "Experiencia de Usuario y Accesibilidad",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232064",
+                    "siuCode": 232064,
+                    "name": "Gestión del Talento Humano",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232065",
+                    "siuCode": 232065,
+                    "name": "Ingeniería de Requisitos",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232066",
+                    "siuCode": 232066,
+                    "name": "Metodología de la Conducción de Equipos de Trabajo",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232067",
+                    "siuCode": 232067,
+                    "name": "Técnicas Avanzadas de Programación",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232068",
+                    "siuCode": 232068,
+                    "name": "Técnicas de Gráficos por Computadora",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232069",
+                    "siuCode": 232069,
+                    "name": "Tendencias y Escenarios Tecnológicos",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232070",
+                    "siuCode": 232070,
+                    "name": "Transformación Digital",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "082071",
+                    "siuCode": 82071,
+                    "name": "Criptografía",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "082073",
+                    "siuCode": 82073,
+                    "name": "Tecnologías Avanzadas en la Construcción de Software",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232071",
+                    "siuCode": 232071,
+                    "name": "Comunicación Gráfica y Visual",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232072",
+                    "siuCode": 232072,
+                    "name": "Metodología de la Investigación Científico-Tecnológica",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                },
+                {
+                    "code": "232061",
+                    "siuCode": 232061,
+                    "name": "Química Ambiental",
+                    "weekHours": 6,
+                    "duration": "cuatrimestral",
+                    "kind": "materia",
+                    "clockHours": null,
+                    "requirements": {
+                        "cursar": [
+                            {
+                                "id": "ASI",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "SySL",
+                                "type": "regularizada"
+                            },
+                            {
+                                "id": "PdP",
+                                "type": "regularizada"
+                            }
+                        ],
+                        "aprobar": []
+                    },
+                    "onlyForIntermediate": false,
+                    "requiredForIntermediateTitle": false
+                }
+            ]
+        }
+    ],
+    "layouts": [
+        {
+            "id": "franja-morada",
+            "name": "Franja Morada",
+            "description": "Plan sugerido por Franja Morada (correlativas plan 2023)",
+            "placements": {
+                "AM1": {
+                    "module": "g1",
+                    "order": 1
+                },
+                "AGA": {
+                    "module": "g1",
+                    "order": 2
+                },
+                "F1": {
+                    "module": "g1",
+                    "order": 3
+                },
+                "InglesI": {
+                    "module": "g1",
+                    "order": 4
+                },
+                "LyED": {
+                    "module": "g1",
+                    "order": 5
+                },
+                "AyED": {
+                    "module": "g1",
+                    "order": 6
+                },
+                "AdC": {
+                    "module": "g1",
+                    "order": 7
+                },
+                "SyPdN": {
+                    "module": "g1",
+                    "order": 8
+                },
+                "AM2": {
+                    "module": "g2",
+                    "order": 9
+                },
+                "F2": {
+                    "module": "g2",
+                    "order": 10
+                },
+                "IyS": {
+                    "module": "g2",
+                    "order": 11
+                },
+                "InglesII": {
+                    "module": "g2",
+                    "order": 12
+                },
+                "SySL": {
+                    "module": "g2",
+                    "order": 13
+                },
+                "PdP": {
+                    "module": "g2",
+                    "order": 14
+                },
+                "SSOO": {
+                    "module": "g2",
+                    "order": 15
+                },
+                "ASI": {
+                    "module": "g2",
+                    "order": 16
+                },
+                "PyE": {
+                    "module": "g3",
+                    "order": 17
+                },
+                "ECO": {
+                    "module": "g3",
+                    "order": 18
+                },
+                "BD": {
+                    "module": "g3",
+                    "order": 19
+                },
+                "DdS": {
+                    "module": "g3",
+                    "order": 20
+                },
+                "CD": {
+                    "module": "g3",
+                    "order": 21
+                },
+                "AN": {
+                    "module": "g3",
+                    "order": 22
+                },
+                "DSI": {
+                    "module": "g3",
+                    "order": 23
+                },
+                "Leg": {
+                    "module": "g4",
+                    "order": 24
+                },
+                "IyCS": {
+                    "module": "g4",
+                    "order": 25
+                },
+                "RD": {
+                    "module": "g4",
+                    "order": 26
+                },
+                "IO": {
+                    "module": "g4",
+                    "order": 27
+                },
+                "Sim": {
+                    "module": "g4",
+                    "order": 28
+                },
+                "TpA": {
+                    "module": "g4",
+                    "order": 29
+                },
+                "AdmSI": {
+                    "module": "g4",
+                    "order": 30
+                },
+                "IA": {
+                    "module": "g5",
+                    "order": 31
+                },
+                "CdC": {
+                    "module": "g5",
+                    "order": 32
+                },
+                "SG": {
+                    "module": "g5",
+                    "order": 33
+                },
+                "GC": {
+                    "module": "g5",
+                    "order": 34
+                },
+                "SSI": {
+                    "module": "g5",
+                    "order": 35
+                }
+            }
+        }
+    ]
+}

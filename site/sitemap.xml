@@ -2,6 +2,18 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	<url>
 		<loc>https://utntracker.com.ar/</loc>
-		<lastmod>2026-11-02</lastmod>
+		<lastmod>2026-11-05</lastmod>
+	</url>
+	<url>
+		<loc>https://utntracker.com.ar/carreras/</loc>
+		<lastmod>2026-11-05</lastmod>
+	</url>
+	<url>
+		<loc>https://utntracker.com.ar/carreras/ingenieria-en-sistemas-de-informacion-k23/</loc>
+		<lastmod>2026-11-05</lastmod>
+	</url>
+	<url>
+		<loc>https://utntracker.com.ar/carreras/ingenieria-mecanica-s23/</loc>
+		<lastmod>2026-11-05</lastmod>
 	</url>
 </urlset>

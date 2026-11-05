@@ -98,3 +98,19 @@ h1,h2,h3{ text-wrap: balance; }
 @media (prefers-reduced-motion: reduce){ .faq summary::after{ transition: none; } }
 .card-subject .card-body > div{ min-width: 0; }
 .card-subject .card-title{ overflow-wrap: break-word; }
+
+/* Páginas de carrera (generadas por tools/site/build-careers.mjs) */
+.page-title{ font-size: clamp(1.75rem, 3.6vw, 2.6rem); font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.cta-card{ border-color: var(--bs-primary-border-subtle); background: var(--bs-primary-bg-subtle); }
+.facts{ display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: 0.75rem; }
+.facts .card-body{ padding: 0.6rem 0.85rem; }
+.level-nav{ display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.subject-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: 0.75rem; }
+.subject-card{ scroll-margin-top: 1rem; }
+.subject-card .card-body{ align-content: start; }
+.subject-card:target{ border-color: var(--bs-primary); box-shadow: 0 0 0 0.2rem var(--bs-primary-border-subtle); }
+.subject-card .code{ font-size: 0.8rem; color: var(--bs-secondary-color); font-family: var(--bs-font-monospace); }
+.reqs{ display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.15rem 0.6rem; font-size: 0.9rem; }
+.reqs dt{ font-weight: 500; color: var(--bs-secondary-color); }
+.reqs dd{ margin: 0; }
+a.career-card:hover{ border-color: var(--bs-primary); }
