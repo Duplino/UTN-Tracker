@@ -51,6 +51,7 @@ Para desarrollar sin Docker (PHP + MySQL locales), copiar `.env.example` a `.env
 - No monta el código como bind mount: la imagen se buildea con `COPY . .`, así que **cada deploy requiere `--build`**.
 - No publica ningún puerto al host: la app se suma a una red de Docker externa (`CADDY_NETWORK`) donde corre el reverse proxy, que la alcanza por nombre de contenedor (`APP_CONTAINER_NAME`, default `utntracker-app`, puerto 80).
 - `MOCK_AUTH_ENABLED` está apagado salvo que el `.env` diga `true`. Nunca prenderlo en producción.
+- La cookie de sesión sale siempre con `Secure` (`SESSION_COOKIE_SECURE=true` por default): Apache recibe HTTP plano desde Caddy, así que no puede deducirlo solo. Si algún entorno se sirve por HTTP sin TLS, poner `SESSION_COOKIE_SECURE=false` en su `.env`.
 - Las variables del `.env` son obligatorias (`DB`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `CADDY_NETWORK`): si falta alguna, `docker compose` corta con un error en vez de arrancar con un default inseguro. [`.env.example`](.env.example) las documenta.
 
 Deploy y redeploy:

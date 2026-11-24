@@ -43,6 +43,9 @@ services:
       # Login de prueba sin Google (POST /api/auth/mock-login). Apagado salvo que
       # el .env diga "true": se prende en staging, nunca en producción.
       MOCK_AUTH_ENABLED: ${MOCK_AUTH_ENABLED:-false}
+      # La cookie de sesión sale siempre con Secure: el sitio solo se sirve por
+      # HTTPS (Caddy/Cloudflare), aunque Apache reciba HTTP plano.
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
     networks:
       - default
       - caddy_net
