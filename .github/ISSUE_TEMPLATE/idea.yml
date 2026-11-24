@@ -1,0 +1,21 @@
+name: Proponer una mejora
+description: Una funcionalidad nueva, una carrera o un cambio en algo que ya existe.
+labels: [mejora]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué problema resuelve
+      description: Para qué la usarías o qué te cuesta hacer hoy.
+    validations:
+      required: true
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Cómo te imaginás que funcione
+  - type: checkboxes
+    id: contribuir
+    attributes:
+      label: Contribución
+      options:
+        - label: Me gustaría implementarla yo con un pull request

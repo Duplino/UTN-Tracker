@@ -114,6 +114,15 @@ API_TEST_URL=http://127.0.0.1:8001 vendor/bin/phpunit --testsuite api
 
 GitHub Actions (`.github/workflows/ci.yml`) corre todo esto en cada push a `main`/`dev` y en cada PR, incluidas las migraciones sobre un MySQL vacío.
 
+## Contribuir
+
+Las mejoras son bienvenidas: abrí un issue o un pull request siguiendo [CONTRIBUTING.md](CONTRIBUTING.md). Las vulnerabilidades se reportan en privado según [SECURITY.md](SECURITY.md).
+
 ## Uso de inteligencia artificial
 
 Este proyecto usó fuertemente inteligencia artificial en su desarrollo, con intervención humana también.
+
+## Licencia
+
+UTN-Tracker es software libre bajo la [GNU Affero General Public License v3.0](LICENSE). Podés usar, estudiar y modificar el código. Si lo redistribuís o lo ofrecés como servicio en la web, tenés que publicar el código fuente completo, con tus cambios, bajo la misma licencia.
+
