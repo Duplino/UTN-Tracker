@@ -89,7 +89,7 @@ El esquema y los datos de carreras viven en `database/migrations/`, en archivos 
 
 Para cambiar el esquema o los datos de una carrera:
 
-1. Crear el archivo siguiente, por ejemplo `0008_agrega_columna_x.sql`. Nunca editar uno ya aplicado: no se vuelve a correr.
+1. Crear el archivo siguiente, por ejemplo `0015_agrega_columna_x.sql`. Nunca editar uno ya aplicado: no se vuelve a correr. El CI (`bin/check-migrations.sh`) falla si un cambio modifica, borra o renombra una migración existente.
 2. Probarlo localmente (`php bin/migrate.php`) y commitearlo.
 3. Al redeployar se aplica sola.
 

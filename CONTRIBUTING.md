@@ -30,7 +30,7 @@
 
 ## Reglas del código
 
-- **Migraciones**: el esquema y los datos de carreras van en `database/migrations/`. Para cambiar algo, creá el archivo con el número siguiente. **Nunca edites una migración que ya existe**, porque en producción ya corrió y no se vuelve a aplicar.
+- **Migraciones**: el esquema y los datos de carreras van en `database/migrations/`. Para cambiar algo, creá el archivo con el número siguiente. **Nunca edites una migración que ya existe**, porque en producción ya corrió y no se vuelve a aplicar. El CI lo controla con `bin/check-migrations.sh`: falla si un PR modifica, borra o renombra una migración existente, o si una nueva no sigue el formato `NNNN_nombre.sql` con el número siguiente. Podés correrlo en local con `bin/check-migrations.sh origin/main`.
 - **Cálculo de estado**: la lógica existe en PHP (`src/Domain/StatusCalculator.php`) y en JS (`public_html/assets/js/statusEngine.js`). Si cambiás una regla, agregá el caso en `tests/fixtures/status-cases.json` y actualizá los dos lados.
 - **Frontend**: JS vanilla + Bootstrap, sin build step ni dependencias de npm. No sumes frameworks ni bundlers sin acordarlo antes en un issue.
 - **Datos personales**: no commitees datos reales de estudiantes (PDFs del SIU, legajos, nombres). Los fixtures tienen que estar anonimizados.
