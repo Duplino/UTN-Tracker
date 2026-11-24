@@ -149,6 +149,19 @@ final class ApiTest extends TestCase
         $this->assertSame('Promocionada', $byCode['AM2']['status'] ?? null);
         $this->assertSame(['1' => ['1' => 8], '2' => ['1' => 9]], $byCode['AM2']['partials']);
 
+        // Un final guardado y después borrado en el modal llega en null y se elimina.
+        $this->request('PUT', '/api/enrollments/AM2/results', [
+            'partials' => ['1' => ['1' => 6], '2' => ['1' => 6]],
+            'finals' => ['1' => ['grade' => 4, 'examDate' => '2026-07-10']],
+            'checklist' => [],
+        ]);
+        $cleared = $this->request('PUT', '/api/enrollments/AM2/results', [
+            'partials' => ['1' => ['1' => 6], '2' => ['1' => 6]],
+            'finals' => ['1' => ['grade' => null, 'examDate' => null]],
+            'checklist' => [],
+        ]);
+        $this->assertSame([], $cleared['body']['finals']);
+
         $override = $this->request('PATCH', '/api/enrollments/AM2/override', ['status' => 'Regularizada']);
         $this->assertSame('Regularizada', $override['body']['status']);
 

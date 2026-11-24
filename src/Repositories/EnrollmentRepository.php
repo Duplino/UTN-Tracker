@@ -152,6 +152,12 @@ final class EnrollmentRepository
 
     private function upsertFinal(int $enrollmentId, int $attemptNumber, ?int $grade, ?string $examDate): void
     {
+        // Sin nota ni fecha: el intento se borró en el modal, no queda una fila vacía.
+        if ($grade === null && ($examDate === null || $examDate === '')) {
+            $this->pdo->prepare('DELETE FROM enrollment_finals WHERE enrollment_id = :eid AND attempt_number = :an')
+                ->execute(['eid' => $enrollmentId, 'an' => $attemptNumber]);
+            return;
+        }
         $stmt = $this->pdo->prepare(
             'INSERT INTO enrollment_finals (enrollment_id, attempt_number, grade, exam_date)
              VALUES (:eid, :an, :grade, :date)

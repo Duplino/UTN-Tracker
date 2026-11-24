@@ -126,6 +126,8 @@ function normalizeFinalsInput(finals) {
       examDate: obj[k] && obj[k].examDate !== undefined ? obj[k].examDate : null,
     }))
     .filter((f) => Number.isFinite(f.attemptNumber))
+    // Un intento sin nota ni fecha es uno que se borró en el modal.
+    .filter((f) => !((f.grade === null || f.grade === undefined) && !f.examDate))
     .sort((a, b) => a.attemptNumber - b.attemptNumber);
 }
 
