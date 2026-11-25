@@ -6,6 +6,32 @@ on:
   pull_request:
 
 jobs:
+  migrations:
+    name: Migraciones existentes sin cambios
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Solo se permite agregar migraciones nuevas: editar, borrar o renombrar
+      # una que ya existe hace fallar el CI (detalle en bin/check-migrations.sh).
+      - name: Chequeo de database/migrations/
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            base="$PR_BASE"
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            base="$PUSH_BEFORE"
+          else
+            # Rama nueva: se compara contra main.
+            base="$(git merge-base origin/main HEAD)"
+          fi
+          bin/check-migrations.sh "$base" HEAD
+
   checks:
     name: Lint y tests unitarios
     runs-on: ubuntu-latest

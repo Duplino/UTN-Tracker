@@ -1,0 +1,32 @@
+name: Reportar un bug
+description: Algo no funciona como debería.
+labels: [bug]
+body:
+  - type: textarea
+    id: que-paso
+    attributes:
+      label: Qué pasó
+      description: Contá qué hiciste, qué esperabas y qué pasó en cambio.
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. Ir a ...
+        2. Hacer clic en ...
+        3. Ver el error
+  - type: input
+    id: carrera
+    attributes:
+      label: Carrera y plan
+      placeholder: Ej. Ingeniería en Sistemas K23
+  - type: input
+    id: navegador
+    attributes:
+      label: Navegador y dispositivo
+      placeholder: Ej. Chrome en Android, Safari en iPhone
+  - type: markdown
+    attributes:
+      value: "No pegues capturas ni PDFs con tu nombre, legajo o DNI. Si hace falta, tapalos antes de subirlos."

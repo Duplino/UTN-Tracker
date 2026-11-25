@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Reportar una vulnerabilidad
+    url: https://github.com/Duplino/UTN-Tracker/security/advisories/new
+    about: Las fallas de seguridad se reportan en privado, no en un issue público.

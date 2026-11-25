@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http;
 
+use App\Config\Env;
 use DateTimeImmutable;
 use PDO;
 
@@ -89,9 +90,31 @@ final class Session
         setcookie(self::COOKIE_NAME, $value, [
             'expires' => $expires,
             'path' => '/',
-            'secure' => !empty($_SERVER['HTTPS']),
+            'secure' => self::isSecure($_SERVER, Env::get('SESSION_COOKIE_SECURE')),
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
+    }
+
+    // Si la cookie sale con Secure. En el servidor Apache recibe HTTP plano desde
+    // Caddy (que termina el TLS), así que $_SERVER['HTTPS'] nunca está seteado:
+    // por eso se mira también X-Forwarded-Proto. SESSION_COOKIE_SECURE ("true" o
+    // "false") pisa la detección; docker-compose.yml la fija en true.
+    // Un cliente que mande X-Forwarded-Proto: https sobre HTTP solo consigue que
+    // su propio navegador no devuelva la cookie: no abre nada.
+    public static function isSecure(array $server, ?string $override): bool
+    {
+        if ($override === 'true') {
+            return true;
+        }
+        if ($override === 'false') {
+            return false;
+        }
+        $https = strtolower((string) ($server['HTTPS'] ?? ''));
+        if ($https !== '' && $https !== 'off') {
+            return true;
+        }
+        $proto = strtolower(trim(explode(',', (string) ($server['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+        return $proto === 'https';
     }
 }

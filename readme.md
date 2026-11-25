@@ -51,6 +51,7 @@ Para desarrollar sin Docker (PHP + MySQL locales), copiar `.env.example` a `.env
 - No monta el código como bind mount: la imagen se buildea con `COPY . .`, así que **cada deploy requiere `--build`**.
 - No publica ningún puerto al host: la app se suma a una red de Docker externa (`CADDY_NETWORK`) donde corre el reverse proxy, que la alcanza por nombre de contenedor (`APP_CONTAINER_NAME`, default `utntracker-app`, puerto 80).
 - `MOCK_AUTH_ENABLED` está apagado salvo que el `.env` diga `true`. Nunca prenderlo en producción.
+- La cookie de sesión sale siempre con `Secure` (`SESSION_COOKIE_SECURE=true` por default): Apache recibe HTTP plano desde Caddy, así que no puede deducirlo solo. Si algún entorno se sirve por HTTP sin TLS, poner `SESSION_COOKIE_SECURE=false` en su `.env`.
 - Las variables del `.env` son obligatorias (`DB`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLIENT_ID`, `CADDY_NETWORK`): si falta alguna, `docker compose` corta con un error en vez de arrancar con un default inseguro. [`.env.example`](.env.example) las documenta.
 
 Deploy y redeploy:
@@ -88,7 +89,7 @@ El esquema y los datos de carreras viven en `database/migrations/`, en archivos 
 
 Para cambiar el esquema o los datos de una carrera:
 
-1. Crear el archivo siguiente, por ejemplo `0008_agrega_columna_x.sql`. Nunca editar uno ya aplicado: no se vuelve a correr.
+1. Crear el archivo siguiente, por ejemplo `0015_agrega_columna_x.sql`. Nunca editar uno ya aplicado: no se vuelve a correr. El CI (`bin/check-migrations.sh`) falla si un cambio modifica, borra o renombra una migración existente.
 2. Probarlo localmente (`php bin/migrate.php`) y commitearlo.
 3. Al redeployar se aplica sola.
 
@@ -113,6 +114,15 @@ API_TEST_URL=http://127.0.0.1:8001 vendor/bin/phpunit --testsuite api
 
 GitHub Actions (`.github/workflows/ci.yml`) corre todo esto en cada push a `main`/`dev` y en cada PR, incluidas las migraciones sobre un MySQL vacío.
 
+## Contribuir
+
+Las mejoras son bienvenidas: abrí un issue o un pull request siguiendo [CONTRIBUTING.md](CONTRIBUTING.md). Las vulnerabilidades se reportan en privado según [SECURITY.md](SECURITY.md).
+
 ## Uso de inteligencia artificial
 
 Este proyecto usó fuertemente inteligencia artificial en su desarrollo, con intervención humana también.
+
+## Licencia
+
+UTN-Tracker es software libre bajo la [GNU Affero General Public License v3.0](LICENSE). Podés usar, estudiar y modificar el código. Si lo redistribuís o lo ofrecés como servicio en la web, tenés que publicar el código fuente completo, con tus cambios, bajo la misma licencia.
+
