@@ -1,4 +1,4 @@
-import { api } from './apiClient.js';
+import { api, writeState, whenWritesIdle } from './apiClient.js';
 import { computeStatus, promotionRecoveryCandidates } from './statusEngine.js';
 import { getEvaluationSchemes } from './evaluationSchemes.js';
 import { getCareers, getCareerCurriculum } from './careers.js';
@@ -215,18 +215,48 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Trae /api/bootstrap y aplica la respuesta. Devuelve la respuesta (o null si no
-  // hubo red). Usado al arrancar, al iniciar sesión y en "Sincronizar ahora".
-  async function syncFromServer({ forceRender = false } = {}){
+  // hubo red). Usado al arrancar, al iniciar sesión y al volver a la app.
+  //
+  // Si mientras se esperaba la respuesta se guardó algo (ej. una nota cargada con
+  // el tablero recién abierto desde la copia local), esa respuesta ya es vieja:
+  // aplicarla pisaría en memoria y en la copia local lo que se acaba de guardar.
+  // En ese caso se espera a que terminen las escrituras y se vuelve a pedir.
+  let syncInFlight = null;
+  let lastSyncAt = 0;
+  function syncFromServer({ forceRender = false } = {}){
+    // Un solo /bootstrap a la vez; uno con forceRender espera al anterior y pide de nuevo.
+    if (syncInFlight && !forceRender) return syncInFlight;
+    const run = (syncInFlight ? syncInFlight.catch(() => null) : Promise.resolve())
+      .then(() => doSyncFromServer({ forceRender }));
+    syncInFlight = run;
+    run.finally(() => { if (syncInFlight === run) syncInFlight = null; }).catch(() => {});
+    return run;
+  }
+
+  async function doSyncFromServer({ forceRender }){
     setSyncIndicator(true);
     let fresh = null;
+    let stale = false;
     try{
-      fresh = await api.get('/bootstrap');
+      for (let attempt = 0; attempt < 4; attempt++){
+        await whenWritesIdle();
+        const before = writeState().started;
+        fresh = await api.get('/bootstrap');
+        const after = writeState();
+        stale = after.started !== before || after.pending > 0;
+        if (!stale) break;
+      }
     }catch(e){
       console.warn('No se pudo contactar al servidor', e);
+      fresh = null;
     }finally{
       setSyncIndicator(false);
     }
     if (!fresh) return null;
+    // Se siguió guardando durante los cuatro intentos: lo que hay en memoria (que
+    // cada escritura actualiza con la respuesta del servidor) es más nuevo que esto.
+    if (stale) return fresh;
+    lastSyncAt = Date.now();
     if (Array.isArray(fresh.schemes) && fresh.schemes.length) schemesCache = fresh.schemes;
 
     if (fresh.authenticated){
@@ -243,6 +273,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
     return fresh;
+  }
+
+  // Al volver a la app (pestaña en segundo plano, PWA que el celular dejó suspendida,
+  // vuelta de la conexión) el tablero en memoria puede ser de hace horas, y guardar
+  // una materia desde ahí mandaría sus notas viejas y pisaría las cargadas en otro
+  // dispositivo. Se revalida contra el servidor antes de que se pueda editar nada.
+  const RESYNC_AFTER_MS = 30 * 1000;
+  function resyncIfStale(){
+    if (activeStore !== apiStore || !currentUser) return;
+    if (Date.now() - lastSyncAt < RESYNC_AFTER_MS) return;
+    syncFromServer().catch(() => {});
   }
 
   function setSyncIndicator(on){
@@ -1920,6 +1961,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       try{ prevAvailable = getAvailableSubjectCodes(); }catch(e){}
       const partials = readDynamicPartials(schemeConfig);
       const finals = readDynamicFinals();
+      // Un final que estaba guardado y ahora quedó vacío se manda explícito en null:
+      // si no se manda, el servidor lo deja como estaba y el borrado no se guarda.
+      (currentEnrollment && Array.isArray(currentEnrollment.finals) ? currentEnrollment.finals : []).forEach(f => {
+        const k = f && Number(f.attemptNumber);
+        if (k >= 1 && k <= 4 && !finals[k]) finals[k] = { grade: null, examDate: null };
+      });
       const checklist = readDynamicChecklist(schemeConfig);
       setBusy(newSave, true);
       try{
@@ -3521,8 +3568,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Guardar la copia local al salir/ocultar la pestaña, con los cambios de esta sesión.
     const persistState = () => { if (activeStore === apiStore && currentUser) writeBootCache(currentStateAsBootstrap()); };
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistState(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persistState(); else resyncIfStale();
+    });
     window.addEventListener('pagehide', persistState);
+    window.addEventListener('pageshow', (ev) => { if (ev.persisted) resyncIfStale(); });
+    window.addEventListener('online', () => { lastSyncAt = 0; resyncIfStale(); });
 
     initAuth({
       initialUser: activeStore === apiStore ? currentUser : null,

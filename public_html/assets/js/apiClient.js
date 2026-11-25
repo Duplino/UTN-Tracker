@@ -9,7 +9,39 @@ class ApiError extends Error {
   }
 }
 
+// Escrituras (todo lo que no es GET): cuántas hay en vuelo y cuántas empezaron en
+// total. syncFromServer() lo usa para descartar una respuesta de /bootstrap que salió
+// antes de una escritura y por eso trae datos viejos (ver index.js).
+const writes = { pending: 0, started: 0 };
+let writesIdle = [];
+
+export function writeState() {
+  return { pending: writes.pending, started: writes.started };
+}
+
+// Se resuelve cuando no queda ninguna escritura en vuelo.
+export function whenWritesIdle() {
+  if (writes.pending === 0) return Promise.resolve();
+  return new Promise((resolve) => writesIdle.push(resolve));
+}
+
 async function request(method, path, body) {
+  if (method === 'GET') return send(method, path, body);
+  writes.pending++;
+  writes.started++;
+  try {
+    return await send(method, path, body);
+  } finally {
+    writes.pending--;
+    if (writes.pending === 0) {
+      const waiting = writesIdle;
+      writesIdle = [];
+      waiting.forEach((resolve) => resolve());
+    }
+  }
+}
+
+async function send(method, path, body) {
   const res = await fetch(`/api${path}`, {
     method,
     credentials: 'include',
