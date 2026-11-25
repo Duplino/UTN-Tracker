@@ -69,6 +69,19 @@ Scripts para el servidor (cada uno explica su uso en el comentario del principio
 
 - `bin/deploy.sh`: pull, backup, build y chequeo de que la app responda. Lo usa `.github/workflows/deploy.yml` para deployar solo cuando el CI de `main` pasa.
 - `bin/backup-db.sh`: `mysqldump` comprimido en `backups/`, con retención de 14 días.
+- `bin/check-version.sh`: dice si la app desplegada está en el último commit de `main` (ver abajo).
+
+### Versión
+
+La versión de la app es el **número del último PR mergeado a `main`** (más el commit exacto). `bin/deploy.sh` la saca de git y la pasa al build como `APP_VERSION`/`APP_COMMIT`; `docker/version-assets.php` la escribe en `/version.json` y en `index.html`. Un `docker compose up -d --build` a mano no la calcula y queda `dev`, así que para redeployar usá `bin/deploy.sh prod`.
+
+Dónde verla y cómo saber si está al día:
+
+- **En la app**: al pie de Configuración ("Versión 82 (abc1234)"). Si el servidor ya tiene una más nueva que la que cargó la pestaña o la PWA instalada, aparece "Hay una versión nueva: recargar".
+- **Consola del navegador**: `APP_VERSION` es la versión con la que cargó la página, y `await utnVersion()` compara pestaña, servidor y el último commit de `main` en GitHub, y dice si hay que recargar o si el deploy está pendiente.
+- **Terminal**: `bin/check-version.sh` (o `curl -s https://app.utntracker.com.ar/version.json`). Sale con 0 si el servidor sirve el último commit de `main` y con 1 si no.
+
+Después de mergear, el CI y el deploy tardan unos minutos: hasta entonces es normal que diga desactualizada.
 
 ### Caché
 

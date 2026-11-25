@@ -19,8 +19,14 @@ COPY . .
 
 RUN composer dump-autoload --no-dev --optimize
 
-# Versiona los assets (?v=hash + import map) para poder cachearlos por un año.
-RUN php docker/version-assets.php
+# Versión de la app (último PR mergeado a main) y commit: los pasa bin/deploy.sh vía
+# docker-compose.yml. Van recién acá para no invalidar la caché de las capas de arriba.
+ARG APP_VERSION=dev
+ARG APP_COMMIT=
+
+# Versiona los assets (?v=hash + import map) para poder cachearlos por un año, y
+# escribe la versión de la app en /version.json y en index.html.
+RUN APP_VERSION="$APP_VERSION" APP_COMMIT="$APP_COMMIT" php docker/version-assets.php
 
 # Al arrancar aplica las migraciones pendientes (database/migrations/) y recién
 # después levanta Apache. Si una migración falla, el contenedor no arranca.

@@ -24,7 +24,14 @@ services:
       retries: 20
 
   app:
-    build: .
+    build:
+      context: .
+      # Versión que se ve en la app y en /version.json. La calcula bin/deploy.sh con
+      # git (número del último PR mergeado); con un `docker compose up --build` a mano
+      # queda "dev".
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+        APP_COMMIT: ${APP_COMMIT:-}
     # Nombre con el que Caddy alcanza la app (reverse_proxy <nombre>:80).
     # Staging usa este mismo archivo con APP_CONTAINER_NAME=utntracker-app-staging
     # en su .env, para poder correr los dos en el mismo VPS sin que choquen.
