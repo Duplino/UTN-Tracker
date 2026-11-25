@@ -39,9 +39,12 @@ main() {
   cd "$dir"
 
   # Un deploy por entorno a la vez: si llegan dos pushes seguidos, el segundo
-  # espera a que termine el primero en vez de pisarle el build.
-  exec 9>"/tmp/utntracker-deploy-${target}.lock"
-  flock 9
+  # espera a que termine el primero en vez de pisarle el build. Si este script se
+  # relanzó a sí mismo (ver abajo), el lock ya lo tiene tomado en el fd 9.
+  if [ -z "${DEPLOY_REEXEC:-}" ]; then
+    exec 9>"/tmp/utntracker-deploy-${target}.lock"
+    flock 9
+  fi
 
   log "==> $target: $(pwd), rama $branch"
 
@@ -55,6 +58,15 @@ main() {
   # ignorado por git).
   git merge --ff-only -q "origin/$branch"
   after="$(git rev-parse HEAD)"
+
+  # Si el pull trajo cambios en este mismo script, lo que está corriendo es la
+  # versión vieja (bash ya la tenía parseada). Se relanza con la nueva para que el
+  # deploy siga los pasos nuevos (p. ej. cuando se agregó APP_VERSION, el primer
+  # deploy salió como "dev" por esto).
+  if [ -z "${DEPLOY_REEXEC:-}" ] && ! git diff --quiet "$before" "$after" -- bin/deploy.sh; then
+    log "    bin/deploy.sh cambió: relanzando con la versión nueva"
+    DEPLOY_REEXEC=1 exec bash "$dir/bin/deploy.sh" "$target"
+  fi
 
   if [ "$before" = "$after" ]; then
     log "    sin commits nuevos ($(git log -1 --format='%h %s'))"
