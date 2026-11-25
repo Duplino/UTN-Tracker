@@ -39,8 +39,10 @@ jobs:
       - name: Versionado de assets (sobre una copia)
         run: |
           cp -r public_html "$RUNNER_TEMP/public_html"
-          VERSION_ASSETS_ROOT="$RUNNER_TEMP/public_html" php docker/version-assets.php
+          APP_VERSION=123 APP_COMMIT=abc123 VERSION_ASSETS_ROOT="$RUNNER_TEMP/public_html" php docker/version-assets.php
           grep -q '<script type="importmap">' "$RUNNER_TEMP/public_html/index.html"
+          grep -q '<meta name="app-version" content="123" data-commit="abc123">' "$RUNNER_TEMP/public_html/index.html"
+          grep -q '"version":"123"' "$RUNNER_TEMP/public_html/version.json"
 
   api:
     name: Migraciones y API contra MySQL

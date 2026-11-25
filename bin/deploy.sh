@@ -69,11 +69,17 @@ main() {
     bin/backup-db.sh
   fi
 
-  log "==> build y up"
+  # Versión = número del último PR mergeado (se ve en Configuración y en /version.json).
+  export APP_VERSION APP_COMMIT
+  APP_VERSION="$(app_version)"
+  APP_COMMIT="$(git rev-parse HEAD)"
+
+  log "==> build y up (versión $APP_VERSION, ${APP_COMMIT:0:12})"
   docker compose up -d --build --remove-orphans
 
   log "==> esperando que la app responda"
   wait_healthy "${HEALTH_TIMEOUT:-90}"
+  check_version "$APP_COMMIT"
 
   # Cada build deja la imagen anterior sin tag: sin esto el disco se llena solo.
   docker image prune -f > /dev/null
@@ -96,6 +102,28 @@ wait_healthy() {
     sleep 3
     waited=$((waited + 3))
   done
+}
+
+# Número del último PR en la historia de la rama: el subject de un merge ("Merge pull
+# request #81 from ...") o de un squash ("Título (#77)"). Sin ninguno, "0".
+app_version() {
+  local subjects
+  subjects="$(git log --first-parent --format=%s -500)"
+  printf '%s\n' "$subjects" \
+    | sed -nE 's/^Merge pull request #([0-9]+).*/\1/p; t; s/.*\(#([0-9]+)\)[[:space:]]*$/\1/p' \
+    | sed -n 1p | grep . || echo 0
+}
+
+# El contenedor nuevo tiene que estar sirviendo el commit que se acaba de buildear.
+check_version() {
+  local served
+  served="$(docker compose exec -T app php -r \
+      'echo json_decode((string) @file_get_contents("http://127.0.0.1/version.json"), true)["commit"] ?? "";' 2>/dev/null || true)"
+  if [ "$served" != "$1" ]; then
+    echo "deploy: /version.json dice commit '${served}', se esperaba '$1'" >&2
+    exit 1
+  fi
+  log "    /version.json ok"
 }
 
 log() { printf '%s\n' "$*"; }

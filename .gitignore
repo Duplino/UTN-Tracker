@@ -15,3 +15,4 @@ vendor/
 backups/
 node_modules/
 .phpunit.result.cache
+public_html/version.json

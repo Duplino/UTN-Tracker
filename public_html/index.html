@@ -7,6 +7,9 @@
 		<!-- La app no se indexa; la página pública es la landing de utntracker.com.ar (site/). -->
 		<meta name="robots" content="noindex">
 		<meta name="color-scheme" content="light dark">
+		<!-- Versión de la app = número del último PR mergeado a main. En el build de Docker
+		     docker/version-assets.php completa content y data-commit (ver assets/js/version.js). -->
+		<meta name="app-version" content="dev" data-commit="">
 		<!-- Color de la barra del navegador / de la app instalada. El script de abajo y
 		     theme.js lo ajustan al tema elegido (claro #f8f9fa, oscuro #16191d). -->
 		<meta name="theme-color" content="#f8f9fa">
@@ -49,6 +52,7 @@
 		<link rel="modulepreload" href="assets/js/pwa.js">
 		<link rel="modulepreload" href="assets/js/ui.js">
 		<link rel="modulepreload" href="assets/js/router.js">
+		<link rel="modulepreload" href="assets/js/version.js">
 	</head>
 	<body>
 		<div class="container-fluid">
@@ -474,6 +478,12 @@
 					  Enlace público: <a href="#" id="settings-share-link" target="_blank" rel="noopener"></a>
 					</span>
 				  </div>
+				</div>
+				<!-- Versión de la app (la llena assets/js/version.js). Si el servidor ya tiene
+				     una más nueva que la de esta pestaña, aparece el botón para recargar. -->
+				<div class="small text-body-secondary d-flex align-items-center flex-wrap gap-2 border-top pt-2">
+				  <span id="settings-version">Versión dev</span>
+				  <button type="button" class="btn btn-link btn-sm p-0 d-none" id="settings-version-reload"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Hay una versión nueva: recargar</button>
 				</div>
 			  </div>
 			  <div class="modal-footer justify-content-between">
