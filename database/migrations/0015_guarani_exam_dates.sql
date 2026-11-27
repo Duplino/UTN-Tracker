@@ -1,6 +1,6 @@
 -- Mesas de final publicadas en el SIU Guaraní (autogestión > Fechas de examen),
 -- que se ofrecen como sugerencia al cargar la fecha de un final. No son del
--- usuario: las trae bin/fetch-exam-dates.php (cron de los lunes o a mano) y cada
+-- usuario: las trae bin/fetch-exam-dates.php (el scheduler de los lunes o a mano) y cada
 -- corrida reemplaza el contenido entero de la tabla.
 --  - subject_id es el código de la materia en Guaraní (ej. 232073), que en el
 --    catálogo es subjects.id. Las mesas de materias que no están en el catálogo

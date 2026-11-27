@@ -71,7 +71,7 @@ Scripts para el servidor (cada uno explica su uso en el comentario del principio
 - `bin/deploy.sh`: pull, backup, build y chequeo de que la app responda. Lo usa `.github/workflows/deploy.yml` para deployar solo cuando el CI de `main` pasa.
 - `bin/backup-db.sh`: `mysqldump` comprimido en `backups/`, con retención de 14 días.
 - `bin/check-version.sh`: dice si la app desplegada está en el último commit de `main` (ver abajo).
-- `bin/fetch-exam-dates.php`: trae las mesas de final publicadas en el SIU Guaraní (ver [Fechas de final de Guaraní](#fechas-de-final-de-guaraní)). Corre dentro del contenedor.
+- `bin/fetch-exam-dates.php`: trae las mesas de final publicadas en el SIU Guaraní (ver [Fechas de final de Guaraní](#fechas-de-final-de-guaraní)). Corre dentro del contenedor; el servicio `scheduler` lo corre solo los lunes.
 
 ### Fechas de final de Guaraní
 
@@ -79,14 +79,13 @@ Al cargar la fecha de un final (en la agenda o en el modal de la materia) la app
 
 La página es pública (no necesita sesión). `bin/fetch-exam-dates.php` la pide una vez por carrera y plan (`App\Guarani\ExamDateScraper::CAREERS`), toma el código de cada materia del encabezado (`Administración Estratégica del Capital Humano (232073)`, que es `subjects.id`) y reemplaza la tabla `guarani_exam_dates`. Si Guaraní no responde o la página cambió, sale con error sin tocar lo que había. La app las lee de `GET /api/guarani-exam-dates`.
 
-Se corre a mano o por cron en el VPS, los lunes a la mañana:
+Se actualizan solas: el servicio `scheduler` de `docker-compose.yml` (misma imagen que la app, corriendo `bin/exam-dates-scheduler.php`) las trae los lunes a las 9 (hora de Buenos Aires) y también al arrancar si hace más de una semana que no se traen; si Guaraní no responde, reintenta a las 6 horas. Sus logs: `docker compose logs scheduler`. No hace falta cron en el host.
+
+Para traerlas a mano:
 
 ```
 docker compose exec -T app php bin/fetch-exam-dates.php --dry-run   # muestra lo que encuentra, sin guardar
 docker compose exec -T app php bin/fetch-exam-dates.php             # guarda
-
-# crontab -e
-0 9 * * 1 cd /opt/UTN-Tracker/prod && docker compose exec -T app php bin/fetch-exam-dates.php >> /var/log/utntracker-exam-dates.log 2>&1
 ```
 
 Para sumar una carrera, agregar sus ids de propuesta y plan (los `value` de los desplegables de la página) a `ExamDateScraper::CAREERS`.
@@ -107,7 +106,7 @@ Después de mergear, el CI y el deploy tardan unos minutos: hasta entonces es no
 
 - **HTML**: `Cache-Control: no-cache` (siempre revalida, un deploy se ve al instante).
 - **Assets** (`/assets/*`): en el build de la imagen, `docker/version-assets.php` agrega `?v=<hash>` a cada CSS/JS/imagen referenciado desde los HTML y genera un import map para los módulos JS. Apache sirve esas URLs con `max-age=31536000, immutable` (ver `docker/apache-vhost.conf`). En desarrollo no se versiona nada.
-- **API**: todo `/api/*` sale con `no-store`, salvo el catálogo que es igual para todos (`/api/careers`, `/api/careers/{code}/curriculum`, `/api/evaluation-schemes`), que sale con `public, max-age=300, s-maxage=86400`, y `/api/guarani-exam-dates`, con `public, max-age=3600, s-maxage=3600` (cambia cuando corre el cron de los lunes).
+- **API**: todo `/api/*` sale con `no-store`, salvo el catálogo que es igual para todos (`/api/careers`, `/api/careers/{code}/curriculum`, `/api/evaluation-schemes`), que sale con `public, max-age=300, s-maxage=86400`, y `/api/guarani-exam-dates`, con `public, max-age=3600, s-maxage=3600` (cambia cuando corre el scheduler de los lunes).
 
 ## Landing (`site/`)
 

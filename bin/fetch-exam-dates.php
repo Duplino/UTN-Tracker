@@ -9,9 +9,10 @@ declare(strict_types=1);
 //   php bin/fetch-exam-dates.php             trae y reemplaza las mesas guardadas
 //   php bin/fetch-exam-dates.php --dry-run   solo muestra lo que encontró, no guarda
 //
-// Pensado para cron en el VPS (los lunes a la mañana), corriendo dentro del contenedor:
+// Lo corre solo el servicio `scheduler` (bin/exam-dates-scheduler.php) los lunes. A mano,
+// en el servidor:
 //
-//   0 9 * * 1 cd /opt/UTN-Tracker/prod && docker compose exec -T app php bin/fetch-exam-dates.php >> /var/log/utntracker-exam-dates.log 2>&1
+//   docker compose exec -T app php bin/fetch-exam-dates.php
 //
 // Si Guaraní no responde o la página cambió de forma, sale con 1 sin tocar lo guardado.
 
