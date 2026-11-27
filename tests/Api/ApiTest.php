@@ -116,6 +116,17 @@ final class ApiTest extends TestCase
         $this->assertSame('Franja Morada', $curriculum['body']['metadata']['baseLayoutName']);
     }
 
+    public function testGuaraniExamDatesArePublic(): void
+    {
+        // Sin sesión (sirve en modo invitado). En CI la tabla está vacía: no se le
+        // pega a Guaraní desde los tests.
+        $res = $this->request('GET', '/api/guarani-exam-dates', null, false);
+        $this->assertSame(200, $res['status']);
+        $this->assertIsArray($res['body']['examDates']);
+        $this->assertArrayHasKey('fetchedAt', $res['body']);
+        $this->assertStringContainsString('public', $res['headers']['cache-control'] ?? '');
+    }
+
     public function testPrivateEndpointsRequireSession(): void
     {
         $res = $this->request('GET', '/api/enrollments', null, false);

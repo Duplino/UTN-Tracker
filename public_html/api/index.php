@@ -14,6 +14,7 @@ use App\Controllers\ElectivesController;
 use App\Controllers\EnrollmentController;
 use App\Controllers\EvaluationSchemeController;
 use App\Controllers\ExamDateController;
+use App\Controllers\GuaraniExamDateController;
 use App\Controllers\PreferencesController;
 use App\Controllers\PublicController;
 use App\Controllers\SubjectRetakeController;
@@ -69,6 +70,9 @@ $examDates = new ExamDateController($pdo);
 $router->get('/api/exam-dates', [$examDates, 'index']);
 $router->post('/api/exam-dates', [$examDates, 'save']);
 $router->delete('/api/exam-dates/{id}', [$examDates, 'remove']);
+
+$guaraniExamDates = new GuaraniExamDateController($pdo);
+$router->get('/api/guarani-exam-dates', [$guaraniExamDates, 'index']);
 
 $classSchedule = new ClassScheduleController($pdo);
 $router->get('/api/class-schedule', [$classSchedule, 'index']);
