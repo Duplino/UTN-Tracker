@@ -12,6 +12,7 @@ import { initPwa } from './pwa.js';
 import { initVersion } from './version.js';
 import { initPlanner } from './planner.js';
 import { initAgenda } from './agenda.js';
+import { getGuaraniExamDates, suggestionsFor, suggestionsHtml } from './guaraniExamDates.js';
 import { initSchedule } from './schedule.js';
 import { initTogether } from './together.js';
 import { initSiuImport } from './siuImport.js';
@@ -1400,6 +1401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderDynamicFields(schemeConfig);
     populateDynamicFields(schemeConfig, stored);
     bindLiveInputs(schemeConfig);
+    bindFinalSuggestions(code);
     bindSubjectSettingsPanel(code, stored);
 
     updateSubjectStatusLive(schemeConfig);
@@ -1778,6 +1780,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       finalsBody.appendChild(row);
     }
     finalsWrap.appendChild(finalsBody);
+    const finalSuggestions = document.createElement('div');
+    finalSuggestions.id = 'final-suggestions';
+    finalSuggestions.className = 'mt-1 d-none';
+    finalsWrap.appendChild(finalSuggestions);
     container.appendChild(finalsWrap);
   }
 
@@ -1859,6 +1865,42 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
     return checklist;
+  }
+
+  // Mesas de final publicadas en Guaraní para esta materia (solo sugerencias, ver
+  // guaraniExamDates.js). Un click completa la fecha del primer final visible que
+  // no tiene fecha (o la del último, si todos tienen).
+  function bindFinalSuggestions(code){
+    const el = document.getElementById('final-suggestions');
+    if (!el) return;
+    let suggestions = [];
+    const finalDateInputs = () => [1, 2, 3, 4]
+      .filter(i => !document.getElementById(`final-row-${i}`)?.classList.contains('d-none'))
+      .map(i => document.getElementById(`final_${i}_date`))
+      .filter(Boolean);
+    const render = () => {
+      const taken = [1, 2, 3, 4].map(i => document.getElementById(`final_${i}_date`)?.value).filter(Boolean);
+      const html = suggestionsHtml(suggestions, taken);
+      el.innerHTML = html;
+      el.classList.toggle('d-none', !html);
+    };
+    el.addEventListener('click', (ev) => {
+      const chip = ev.target.closest('button.guarani-date');
+      if (!chip || chip.disabled) return;
+      const inputs = finalDateInputs();
+      const target = inputs.find(i => !i.value) || inputs[inputs.length - 1];
+      if (!target) return;
+      target.value = chip.dataset.date;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      target.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const wrap = document.getElementById('finals-container');
+    if (wrap) wrap.addEventListener('change', (ev) => { if (ev.target.type === 'date') render(); });
+    getGuaraniExamDates().then(list => {
+      if (!el.isConnected) return;
+      suggestions = suggestionsFor(list, code);
+      render();
+    });
   }
 
   function showFinalsUpTo(n){

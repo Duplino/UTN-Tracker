@@ -8,8 +8,12 @@
 // Las fechas viven en el store activo (GET/POST/DELETE /api/exam-dates con sesión,
 // localStorage como invitado) y se leen recién al abrir la agenda. Si la nota de
 // esa instancia ya está cargada en la materia, se muestra al lado de la fecha.
+//
+// Al elegir Final se sugieren las mesas publicadas en Guaraní para esa materia
+// (ver guaraniExamDates.js): un click completa la fecha, que se puede cambiar.
 
 import { toastError, setBusy } from './ui.js';
+import { getGuaraniExamDates, suggestionsFor, suggestionsHtml } from './guaraniExamDates.js';
 
 const APPROVED = ['Aprobada', 'Promocionada'];
 export const ATTEMPT_LABELS = { 1: 'Primera fecha', 2: '1er recuperatorio', 3: '2do recuperatorio' };
@@ -157,9 +161,11 @@ export function initAgenda(ctx) {
   const submitBtn = document.getElementById('agenda-submit');
   const listEl = document.getElementById('agenda-list');
   const emptyFormEl = document.getElementById('agenda-no-subjects');
+  const suggestionsEl = document.getElementById('agenda-suggestions');
 
   let entries = [];
   let options = [];
+  let guaraniDates = [];
 
   attemptSel.innerHTML = Object.entries(ATTEMPT_LABELS)
     .map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
@@ -183,6 +189,17 @@ export function initAgenda(ctx) {
     const isFinal = examSel.value === 'final';
     attemptWrap.classList.toggle('d-none', isFinal);
     attemptSel.disabled = isFinal;
+    renderSuggestions();
+  }
+
+  function renderSuggestions() {
+    if (!suggestionsEl) return;
+    const subject = selectedSubject();
+    const isFinal = examSel.value === 'final';
+    const taken = entries.filter(e => e.kind === 'final' && subject && e.subjectCode === subject.code).map(e => e.date);
+    const html = subject && isFinal ? suggestionsHtml(suggestionsFor(guaraniDates, subject.code), taken) : '';
+    suggestionsEl.innerHTML = html;
+    suggestionsEl.classList.toggle('d-none', !html);
   }
 
   function renderForm() {
@@ -274,6 +291,7 @@ export function initAgenda(ctx) {
       const saved = await ctx.getStore().saveExamDate(payload);
       entries = entries.filter(e => e.id !== saved.id).concat(saved);
       renderList();
+      renderSuggestions();
       dateInput.value = '';
       if (!isFinal) {
         const next = nextInstance(payload.partialNumber, payload.attemptNumber, subject.partials);
@@ -298,6 +316,7 @@ export function initAgenda(ctx) {
       await ctx.getStore().deleteExamDate(entry.id);
       entries = entries.filter(e => e !== entry);
       renderList();
+      renderSuggestions();
     } catch (err) {
       btn.disabled = false;
       toastError('No se pudo borrar la fecha', err);
@@ -327,8 +346,18 @@ export function initAgenda(ctx) {
     }
   });
 
+  if (suggestionsEl) {
+    suggestionsEl.addEventListener('click', (ev) => {
+      const chip = ev.target.closest('button.guarani-date');
+      if (!chip || chip.disabled) return;
+      dateInput.value = chip.dataset.date;
+      submitBtn.focus();
+    });
+  }
+
   modalEl.addEventListener('show.bs.modal', async () => {
     renderForm();
+    getGuaraniExamDates().then(list => { guaraniDates = list; renderSuggestions(); });
     listEl.innerHTML = '<div class="d-flex justify-content-center p-4"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Cargando…</span></div></div>';
     try {
       entries = await ctx.getStore().getExamDates();
@@ -337,5 +366,6 @@ export function initAgenda(ctx) {
       toastError('No se pudo cargar tu agenda', err);
     }
     renderList();
+    renderSuggestions();
   });
 }

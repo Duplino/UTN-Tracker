@@ -40,7 +40,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    environment:
+    environment: &app_env
       MYSQL_IP: db
       MYSQL_PORT: 3306
       DB: ${DB:?falta DB en .env}
@@ -55,6 +55,24 @@ services:
       - caddy_net
     # No se publica ningún puerto al host: Caddy llega por la red compartida
     # usando el nombre del contenedor (APP_CONTAINER_NAME:80).
+
+  # Trae las fechas de final de Guaraní los lunes a las 9 (y al arrancar, si hace más
+  # de una semana que no se traen). Misma imagen que la app, otro proceso: ver
+  # bin/exam-dates-scheduler.php. Logs: docker compose logs scheduler
+  scheduler:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+        APP_COMMIT: ${APP_COMMIT:-}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
+    environment: *app_env
+    command: ["php", "bin/exam-dates-scheduler.php"]
 
 networks:
   caddy_net:
